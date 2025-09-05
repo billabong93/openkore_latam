@@ -1,0 +1,151 @@
+automacro EnviarItem {
+inventory "Carta Mosca Caçadora" >= 1
+timeout 3600
+call {
+do rodex open
+do rodex write
+do rodex settarget Um Centavo
+do rodex settitle CartinhaMosca
+do rodex setbody CartinhaMosca
+do rodex add @inventory(Carta Mosca Caçadora) 1
+do rodex send
+do reload macros.txt
+}
+run-once 0
+}
+automacro EnviarItem2 {
+inventory "Carta PecoPeco" >= 1
+timeout 3600
+call {
+do rodex open
+do rodex write
+do rodex settarget Um Centavo
+do rodex settitle CartinhaPeco
+do rodex setbody CartinhaPeco
+do rodex add @inventory(Carta PecoPeco) 1
+do rodex send
+do reload macros.txt
+}
+run-once 0
+}
+automacro EnviarItem3 {
+zeny >= 2500
+inventory "Morango" >= 78
+timeout 3600
+call {
+do rodex open
+do rodex write
+do rodex settarget Um Centavo
+do rodex settitle Morango
+do rodex setbody Morango
+do rodex add @inventory(Morango) 78
+do rodex send
+do reload macros.txt
+}
+run-once 0
+}
+automacro EnviarItem4 {
+inventory "Carta Esqueleto Arqueiro" >= 1
+timeout 3600
+call {
+do rodex open
+do rodex write
+do rodex settarget Um Centavo
+do rodex settitle CartinhaPeco
+do rodex setbody CartinhaPeco
+do rodex add @inventory(Carta Esqueleto Arqueiro) 1
+do rodex send
+do reload macros.txt
+}
+run-once 0
+}
+automacro EnviarItem5 {
+inventory "Mel" >= 100
+timeout 3600
+call {
+do rodex open
+do rodex write
+do rodex settarget Um Centavo
+do rodex settitle CartinhaPeco
+do rodex setbody CartinhaPeco
+do rodex add @inventory(Mel) 100
+do rodex send
+do reload macros.txt
+}
+run-once 0
+}
+automacro RodexItems {
+    zeny >= 1020000          # valor de zeny, 2500 é para cada anexo de item, se vc vai enviar 5 anexo de itens então é 12500 aqui.
+    timeout 60
+    call zeny
+}
+macro zeny {
+    $mailTitle = Zeny           # título do rodex
+    $mailBody  = Olá, Chegaram seus zenys.   # corpo do rodex
+    $receiver  = Celtos            # nome de quem recebe
+
+    do rodex open
+    do rodex write   $receiver
+    do rodex settarget $receiver
+    do rodex settitle  $mailTitle
+    do rodex setbody   $mailBody
+    do rodex setzeny 1000000             # envio de zeny, mas pode deixar zero
+
+    do rodex send
+    do rodex close
+
+}
+
+###########  macros.txt  ###########
+# -- CONFIGURÁVEL -------------------
+# Intervalo (segundos) entre checagens.
+# 600  = 10 min;  900 = 15 min; etc.
+# -----------------------------------
+
+automacro Rodex_Timer {
+    timeout 600
+    call Rodex_Pegar
+}
+
+# ---------- MACRO PRINCIPAL ----------
+macro Rodex_Pegar {
+    log ===== INICIANDO COLETA RODEX =====
+    do rodex close
+    do rodex open
+    pause 2
+    do rodex list          # carrega a 1ª página
+    pause 1
+
+    # Enquanto existir ao menos um e-mail listado…
+    
+    do rodex read 0    # abre o 1º da lista (índice 0)
+    pause 1
+    do rodex getitems  # retira todos os itens anexados
+    pause 0.5
+    do rodex getzeny
+    pause 0.5
+    do rodex delete 0    # apaga a mensagem (organização)
+    pause 0.5
+    do rodex refresh
+    pause 0.5
+    do rodex list      # atualiza a lista; se ficar vazia, o while termina
+    pause 0.5
+    do rodex read 0    # abre o 1º da lista (índice 0)
+    pause 1
+    do rodex getitems  # retira todos os itens anexados
+    pause 0.5
+    do rodex getzeny
+    pause 0.5
+    do rodex delete 0   # apaga a mensagem (organização)
+    pause 0.5
+    do rodex refresh
+    pause 0.5
+    do rodex list      # atualiza a lista; se ficar vazia, o while termina
+    pause 0.5
+}
+
+do rodex close
+
+timeout 600
+log ===== FIM DA COLETA RODEX ======
+#######################################

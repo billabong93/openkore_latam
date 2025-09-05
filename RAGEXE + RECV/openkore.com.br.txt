@@ -1,0 +1,27 @@
+# ================================================
+# Arquivo de configuração para openkore.com.br
+# ================================================
+# IMPORTANTE: Configure os endereços corretos antes de usar!
+# Os valores abaixo são apenas exemplos/padrão
+#
+# Endereços de memória do cliente RO (valores em hexadecimal)
+# Estes valores devem ser obtidos através de análise do cliente
+
+; ===== Realtime checksum log =====
+rtPanelEnabled=true
+rtLogToFile=false
+rtLogFile=openkore_realtime_log.txt
+
+clientSubAddress=B945A0
+instanceRAddress=B94860
+recvPtrAddress=14738F0
+
+
+# Configurações do servidor xKore
+koreServerIP=
+koreServerPort=
+
+# Configuração para múltiplos clientes
+# Se true, pergunta a porta no terminal a cada execução
+# Se false, usa sempre a porta padrão do koreServerPort
+allowMultiClient=True
