@@ -33,21 +33,17 @@ Você pode clonar o repositório direto com o **Git Desktop**:
 ---
 
 ### 2️⃣ Configurar IP / Servidor  
-- Dentro da pasta `Configurador de IP`, abra o **configurador.exe**  
-- Informe **IP** e **Porta** do servidor que deseja usar.  
-- O programa ajustará automaticamente os arquivos do OpenKore.  
+- Dentro da pasta `Configurador de IP`, abra o *ConfigurarIP.bat**  (Como modo Admin)
+- O programa ajustará automaticamente os IPs necessários.  
 
 ---
 
 ### 3️⃣ Usar o Launcher  
 O projeto já vem com um **launcher simplificado**:  
 
-1. Execute o arquivo `start.py` (ele já cuida do bypass de IP).  
-2. O **Poseidon** será iniciado automaticamente em paralelo.  
-3. Assim que o cliente se conectar ao Poseidon, o OpenKore assume.  
+1. Execute o arquivo `OpenKore LATAM Launcher.exe`
 
-> 🔒 O `start.py` precisa ser aberto como **Administrador**.  
-> Já o `start-poseidon.exe` não precisa de permissão de admin.  
+> Ele irá sempre verificar e baixar a última atualização desse repositório.
 
 ---
 
