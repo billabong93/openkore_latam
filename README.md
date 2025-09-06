@@ -10,12 +10,12 @@ Aqui você encontra tudo pronto: OpenKore configurado, bypass de IP, executávei
 
 ## 📂 Estrutura da Pasta  
 
-openkore_latam/
+`openkore_latam/
 ├── ByPassIP/ # Ferramenta para burlar restrições de IP
 ├── Configurador de IP/ # Script simples para alterar IP/porta rapidamente
 ├── RAGEXE + RECV/ # Executáveis customizados (ragexe / recvpacket)
 ├── openkore-master/ # Cliente OpenKore já configurado
-└── README.md # Este arquivo :)
+└── README.md # Este arquivo :)`
 
 
 ---
