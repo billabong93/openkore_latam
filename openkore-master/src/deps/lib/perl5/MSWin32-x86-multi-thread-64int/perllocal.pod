@@ -1,0 +1,88 @@
+=head2 Thu Aug 21 23:04:41 2025: C<Module> L<Canary::Stability|Canary::Stability>
+
+=over 4
+
+=item *
+
+C<installed into: C:\Users\Usuario\Desktop\XCOREN~1\src\deps\lib\perl5>
+
+=item *
+
+C<LINKTYPE: dynamic>
+
+=item *
+
+C<VERSION: 2013>
+
+=item *
+
+C<EXE_FILES: >
+
+=back
+
+=head2 Thu Aug 21 23:04:49 2025: C<Module> L<common::sense|common::sense>
+
+=over 4
+
+=item *
+
+C<installed into: C:\Users\Usuario\Desktop\XCOREN~1\src\deps\lib\perl5>
+
+=item *
+
+C<LINKTYPE: dynamic>
+
+=item *
+
+C<VERSION: 3.75>
+
+=item *
+
+C<EXE_FILES: >
+
+=back
+
+=head2 Thu Aug 21 23:04:55 2025: C<Module> L<Types::Serialiser|Types::Serialiser>
+
+=over 4
+
+=item *
+
+C<installed into: C:\Users\Usuario\Desktop\XCOREN~1\src\deps\lib\perl5>
+
+=item *
+
+C<LINKTYPE: dynamic>
+
+=item *
+
+C<VERSION: 1.01>
+
+=item *
+
+C<EXE_FILES: >
+
+=back
+
+=head2 Thu Aug 21 23:05:25 2025: C<Module> L<JSON::XS|JSON::XS>
+
+=over 4
+
+=item *
+
+C<installed into: C:\Users\Usuario\Desktop\XCOREN~1\src\deps\lib\perl5>
+
+=item *
+
+C<LINKTYPE: dynamic>
+
+=item *
+
+C<VERSION: 4.03>
+
+=item *
+
+C<EXE_FILES: bin/json_xs>
+
+=back
+

@@ -1,0 +1,44 @@
+=head2 Fri Aug  8 21:13:57 2025: C<Module> L<Net::SSLeay|Net::SSLeay>
+
+=over 4
+
+=item *
+
+C<installed into: C:\Users\Administrator\Documents\bots\kore1\plugins\telegramCommands\localperl\lib\perl5>
+
+=item *
+
+C<LINKTYPE: dynamic>
+
+=item *
+
+C<VERSION: 1.94>
+
+=item *
+
+C<EXE_FILES: >
+
+=back
+
+=head2 Fri Aug  8 21:14:02 2025: C<Module> L<Mozilla::CA|Mozilla::CA>
+
+=over 4
+
+=item *
+
+C<installed into: C:\Users\Administrator\Documents\bots\kore1\plugins\telegramCommands\localperl\lib\perl5>
+
+=item *
+
+C<LINKTYPE: dynamic>
+
+=item *
+
+C<VERSION: 20250602>
+
+=item *
+
+C<EXE_FILES: >
+
+=back
+
