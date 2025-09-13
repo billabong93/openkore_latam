@@ -1,21 +1,13 @@
-# Ragnarok Server
-# Here you'll define the IP Address and the Port where Poseidon
-# will keep waiting for your ragnarok online client to connect.
+### DEFINA AQUI O IP SEGURO, EX: 172.65.175.75
 ragnarokserver_ip=172.65.175.75
-ragnarokserver_port=6901
-fake_ip=
-
-# Query Server
-# Here you'll define the IP Address and the Port where Poseidon
-# will keep waiting for open kore to connect and send the GG/HS queries.
 queryserver_ip=172.65.175.75
-queryserver_port=24390
 
-# Server Type
-# Here you have to specify your current server type in order
-# to the poseidon operate properly !
-# The available server types for now are : Default, bRO_.* (check servertypes.txt)
-# You should modify this if you're having problems with char list.
+
+### DEFINA AQUI AS PORTAS QUE O POSEIDON VAI RODAR, Exemplos abaixo.
+ragnarokserver_ports=6901,6902,6903
+queryserver_ports=24390,24391,24392
+
+### NAO MEXA!
 server_type=ROla_2025-06-17
-
+fake_ip=
 debug=0
