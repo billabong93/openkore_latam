@@ -12,9 +12,9 @@ rtPanelEnabled=true
 rtLogToFile=false
 rtLogFile=openkore_realtime_log.txt
 
-clientSubAddress=B945A0
-instanceRAddress=B94860
-recvPtrAddress=14738F0
+clientSubAddress=B955A0
+instanceRAddress=B95860
+recvPtrAddress=14768F8
 
 
 # Configurações do servidor xKore

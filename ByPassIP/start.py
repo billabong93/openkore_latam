@@ -7,8 +7,8 @@ import sys  # <<--- IMPORTANTE
 EXE_PATH = r"C:\Gravity\Ragnarok\ragexe.exe"
 IP = "172.65.175.75"
 
-TAADDRESS_ADDR = 0x014491E0
-DOMAIN_PTR_ADDR = 0x010D3C98
+TAADDRESS_ADDR = 0x0144C1E8
+DOMAIN_PTR_ADDR = 0x010D6C98
 
 while True:
     porta_input = input(f"Digite a porta para o servidor Ragnarok (padrão: 6901): ").strip()
