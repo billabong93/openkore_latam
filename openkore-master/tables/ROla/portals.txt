@@ -3605,3 +3605,63 @@ moc_para01 41 187 moc_para01 179 93
 izlude 110 182 izlude_in 65 87
 gef_fild06 20 304 glast_01 377 304
 glast_01 377 304 gef_fild06 27 304
+
+
+#### MAPAS FALTANTES por CELTOS
+# Payon Dungeon (variações)
+pay_dun00_a 20 180 pay_dun01 100 100
+pay_dun00_b 20 180 pay_dun01 100 100
+pay_dun00_c 20 180 pay_dun01 100 100
+
+# Orc Dungeon (variações)
+orcsdun01_a 33 170 orcsdun02 21 185
+orcsdun01_b 33 170 orcsdun02 21 185
+orcsdun01_c 33 170 orcsdun02 21 185
+
+# Izlude (variações)
+izlude_a 197 205 izlu2dun 107 50 150 c r0
+izlude_b 197 205 izlu2dun 107 50 150 c r0
+izlude_c 197 205 izlu2dun 107 50 150 c r0
+izlude_d 197 205 izlu2dun 107 50 150 c r0
+
+# Geffen Field 10 (variações)
+gef_fild10_a 52 326 mjolnir_02 99 351 1700 c r2 c r3
+gef_fild10_b 52 326 mjolnir_02 99 351 1700 c r2 c r3
+gef_fild10_c 52 326 mjolnir_02 99 351 1700 c r2 c r3
+
+# Academia Izlude (iz_ac01 / iz_ac02)
+iz_ac01_a 100 24 izlude 127 253
+iz_ac01_b 100 24 izlude 127 253
+iz_ac01_c 100 24 izlude 127 253
+iz_ac01_d 100 24 izlude 127 253
+
+iz_ac02_a 94 27 iz_ac01 78 28
+iz_ac02_b 94 27 iz_ac01 78 28
+iz_ac02_c 94 27 iz_ac01 78 28
+iz_ac02_d 94 27 iz_ac01 78 28
+
+# Arena / Testes
+1@ma_a 100 100 prt_are_in 60 14
+1@ma_b 100 100 prt_are_in 60 14
+1@ma_c 100 100 prt_are_in 60 14
+1@ma_d 100 100 prt_are_in 60 14
+
+1@os_a 100 100 prt_are_in 60 14
+1@os_b 100 100 prt_are_in 60 14
+1@os_c 100 100 prt_are_in 60 14
+
+# Gl_church
+gl_church_a 150 150 gl_church 50 50
+gl_church_b 150 150 gl_church 50 50
+
+# Prontera evento
+prt_mk_a 150 150 prontera 116 72
+
+# Outros mapas de evento/quest
+ba_bath 150 150 prontera 116 72
+evt_bomb 150 150 prontera 116 72
+un_bk_q 150 150 prontera 116 72
+un_bunker 150 150 prontera 116 72
+thana_boss 150 150 prontera 116 72
+que_bingo 150 150 prontera 116 72
+que_ba 150 150 prontera 116 72
