@@ -1,6 +1,7 @@
 # ====================
-# ROLA_strings v1.0
+# LATAMTranslate v1.5
 # Plugin author: Rubim, UnknownXD
+# Plugin modified by: roxleopardo
 # ====================
 
 package LATAMTranslate;
@@ -11,146 +12,199 @@ use Globals;
 use Settings;
 use Utils;
 use utf8;
-use Log        qw(message debug error);
+use Log qw(message debug error);
 use JSON::Tiny qw(from_json to_json);
 
 our %strings_cache;
 
-Plugins::register( 'LATAMTranslate', 'Fixes issues with localized strings.', \&onUnload );
+our $RE_TOKEN_BLOB = qr{
+    \x1C
+    (
+        [^\x1C]*
+        (?: \x1C [^\x1C]* \x1C [^\x1C]* )*
+    )
+    \x1C
+}x;
 
+my $base_hooks;
+
+my $plugin_path = $Plugins::current_plugin_folder;
+
+load();
 my $hooks = Plugins::addHooks(
-    ['actor_setName', \&setName, undef],
-    ['packet_localBroadcast', \&localBroadcast, undef],
-    ['packet_pre/npc_talk', \&npcTalkPre, undef],
-    ['packet_pre/npc_talk_responses', \&npcTalkRespPre, undef],
+	['start3', \&load, undef],
 );
+
+Plugins::register( 'LATAMTranslate', 'Fixes issues with localized strings.', \&unload );
+
+sub load {
+	my $master = $masterServers{ $config{master} };
+	if ( grep { $master->{serverType} eq $_ } qw(ROla) ) {
+		$base_hooks = Plugins::addHooks(
+			['actor_setName', \&setName, undef],
+			['packet_pre/public_chat', \&publicChatPre, undef],
+			['packet_pre/local_broadcast', \&localBroadcastPre, undef],
+			['packet_pre/system_chat', \&systemChatPre, undef],
+			['packet_pre/npc_talk', \&npcTalkPre, undef],
+			['pre/npc_talk_responses', \&npcTalkRespPre, undef]
+		);
+		loadJSON();
+	}
+
+}
+
+# Plugin cleanup
+sub unload {
+	Plugins::delHooks($hooks) if ($hooks);
+	Plugins::delHooks($base_hooks) if ($base_hooks);
+	%strings_cache = ();
+}
 
 # Load actor_name.json
 sub loadJSON {
-	message "Loading strings.json...\n", "rolaStrings";
+	message "Loading strings.json...\n", "LATAMTranslate";
 	%strings_cache = ();
 
-	my $file = "$Plugins::current_plugin_folder/strings.json";
+	my $file = "$plugin_path/strings.json";
 	unless ( -r $file ) {
-		error( "[rolaStrings] Can't read $file\n" );
+		error( "[LATAMTranslate] Can't read $file\n" );
 		return;
 	}
 
 	open my $fh, '<', $file or do {
-		error( "[rolaStrings] Failed to open $file: $!\n" );
+		error( "[LATAMTranslate] Failed to open $file: $!\n" );
 		return;
 	};
 
-	local $/;    # Enable slurp mode
+	local $/;	# Enable slurp mode
 	my $json_text = <$fh>;
 	close $fh;
 
-	my $data = eval { from_json( $json_text ) };    # ← FIXED
+	my $data = eval { from_json( $json_text ) };	# ← FIXED
 	if ( $@ || ref( $data ) ne 'HASH' ) {
-		error( "[rolaStrings] Failed to parse JSON: $@\n" );
+		error( "[LATAMTranslate] Failed to parse JSON: $@\n" );
 		return;
 	}
 
 	%strings_cache = %{$data};
 	my $count = scalar( keys %strings_cache );
-	message "[rolaStrings] Loaded $count actor names from strings.json\n", "rolaStrings";
+	message "[LATAMTranslate] Loaded $count actor names from strings.json\n", "LATAMTranslate";
 }
-
-loadJSON();
-
-# Plugin cleanup
-sub onUnload {
-	Plugins::delHooks( $hooks );
-	%strings_cache = ();
-}
-
 
 sub debug {
-    my (undef, $args) = @_;
-    message "[ROLA DEBUG] Debug: " . Data::Dumper::Dumper($args) . "\n", "debug";
+	my (undef, $args) = @_;
+	message "[LATAMTranslate] Debug: " . Data::Dumper::Dumper($args) . "\n", "debug";
 }
 
 sub translate_token {
 	my ($token) = @_;
 
 	if (exists $strings_cache{$token}) {
-		return $strings_cache{$token};
+		my $string = $strings_cache{$token};
+        	utf8::decode($string);
+		return $string;
 	} else {
 		# print warning of missing token and the hex
 		my $hex = unpack("H*", $token);
-		message("[ROLA] Missing token: $token (hex: $hex)\n");
+		message("[LATAMTranslate] Missing token: $token (hex: $hex)\n");
 		return "[MISSING:$token]";
 	}
 }
 
+# Handles composite tokens of the type: ∟ID\x1Darg0\x1Darg1...∟
+# Also supports U+2194 (↔) as a fallback separator in case it's rendered that way.
+sub translate_composite_token {
+    my ($blob) = @_;
+
+    # Split into ID and parameters using 0x1D (GS) or U+2194 (↔) as separators
+    my @parts = split(/\x1D|\x{2194}/, $blob);
+    my $id    = shift @parts;
+
+    # Try to find a template by ID; if not found, fallback to simple token translation (logs as MISSING)
+    unless (exists $strings_cache{$id}) {
+        return translate_token($blob);
+    }
+
+    my $template = $strings_cache{$id};
+
+    # Replace placeholders {0}, {1}, {2} with the corresponding arguments
+    for my $i (0..$#parts) {
+        my $arg = $parts[$i] // '';
+        if ($arg =~ /^\x1C([[:print:]]+?)\x1C$/) {
+            $arg = translate_token($1);
+        }
+        $template =~ s/\{\Q$i\E\}/$arg/g;
+    }
+
+    return $template;
+}
+
+sub _translate_blob {
+    my ($blob) = @_;
+    return (index($blob, "\x1D") >= 0 || $blob =~ /\x{2194}/)
+        ? translate_composite_token($blob)
+        : translate_token($blob);
+}
+
+sub _translate_tokens_inplace {
+    my ($sref) = @_;
+    return unless defined $$sref;
+    return unless index($$sref, "\x1C") >= 0;   # fast-path
+
+    $$sref =~ s/$RE_TOKEN_BLOB/_translate_blob($1)/gex;
+}
+
+sub _translate_args_field {
+    my ($args, $field) = @_;
+    my $val = $args->{$field};
+    return unless defined $val;
+    _translate_tokens_inplace(\$val);
+    $args->{$field} = $val;
+}
+
 sub setName {
-	my ($hookName, $args) = @_;
+    my (undef, $args) = @_;
+    my $name = $args->{new_name};
+    return unless defined $name;
 
-	my $new_name = $args->{new_name};
+    my $orig = $name;
+    _translate_tokens_inplace(\$name);
 
-	# Check for ∟...∟ (0x1C) encoded strings
-	if (defined $new_name && $new_name =~ /\x1C(.*?)\x1C/) {
-		my $token = $1;
-		my $translated = translate_token($token);
+    return if $name eq $orig;
+    return if $name =~ /\[MISSING:/;
 
-		if ($translated !~ /^\[MISSING:/) {
-			$args->{new_name} = $translated;
-			$args->{return} = 1;  # Let the main setName apply our translation
-		}
-	}
+    $args->{new_name} = $name;
+    $args->{return}   = 1;
 }
 
 sub npcTalkPre {
-    my ( $self, $args ) = @_;
-    my $message = $args->{msg} || '';
-
-	my @tokens = $message =~ /\x1C([A-Za-z0-9]+)\x1C/g;
-
-    if (@tokens) {
-        my $last_token = $tokens[-1];
-        my $translated = translate_token($last_token);
-        $args->{msg} = $translated;
-    }
+    my (undef, $args) = @_;
+    _translate_args_field($args, 'msg');
 }
 
 sub npcTalkRespPre {
     my (undef, $args) = @_;
+    my $responses = $args->{responses};
 
-    my $raw_msg = $args->{RAW_MSG} || '';
-    my $original_msg = $raw_msg;  # For debug
-
-    my $hex_msg = unpack('H*', $raw_msg);
-
-	#message Misc::visualDump($raw_msg);
-
-    my $translated = $raw_msg;
-	$translated =~ s/\x1C([A-Za-z0-9]+)\x1C/translate_token($1)/ge;
-  
-    my $new_size = length($translated);
-    substr($translated, 2, 2, pack('v', $new_size));
-
-    $args->{RAW_MSG} = $translated;
-    $args->{RAW_MSG_SIZE} = $new_size;
+    for my $i (0 .. $#$responses) {
+        utf8::encode($responses->[$i]);
+        _translate_tokens_inplace(\$responses->[$i]);
+    }
 }
 
-
-
-sub localBroadcast {
-	my ( $self, $args ) = @_;
-	my $message = $args->{Msg} || '';
-
-	if ( substr( $message, 0, 1 ) eq "\x1C" ) {
-		my $clean_message = $message;
-		$message =~ s/\x1C//g;
-
-		if ( exists $strings_cache{$message} ) {
-			$message = $strings_cache{$message};
-		} else {
-			error( "[ROLA] String '$message' not found in strings.json\n" );
-			return; 
-		}
-	}
-
-	message "[ROLA] $message\n", "schat";
+sub publicChatPre {
+    my (undef, $args) = @_;
+    _translate_args_field($args, 'message');
 }
+
+sub localBroadcastPre {
+    my (undef, $args) = @_;
+    _translate_args_field($args, 'message');
+}
+
+sub systemChatPre {
+    my (undef, $args) = @_;
+    _translate_args_field($args, 'message');
+}
+
 1;
