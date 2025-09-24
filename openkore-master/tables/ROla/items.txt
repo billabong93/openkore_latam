@@ -8314,6 +8314,7 @@
 28631#Enciclopédia Ancestral#
 28705#Adaga Rubi#
 28721#Monokage#
+28725#Walgwanggun Ilusional#
 28744#Punhal Ancestral#
 28762#Bazerald Ilusional#
 28763#Kodachi Ancestral#
@@ -9918,3 +9919,30 @@
 1100004#Elixir Azul#
 1100005#Elixir Dourado#
 1100036#Peixe Compartilhado#
+16063#Maça Longa Ilusional#
+26007#Lança Espectral Ilusional#
+26109#Cajado de Bordéus Ilusional#
+28725#Adaga da Lua Ilusional#
+1846#Luva Combo de Batalha Ilusional#
+13337#Huuma Nevasca Ilusional#
+28022#Infiltrador Ilusional#
+28023#Osso Afiado Ilusional (Sharpened Legbone of Ghoul)#
+2039#Cajado de Feitiçaria Ilusional#
+18149#Balista Ilusional#
+28612#Livro do Apocalipse Ilusional#
+1141#Espada Imaterial Ilusional#
+1306#Machado de Guerra Ilusional#
+1417#Machado de Haste (Pole Axe) Ilusional#
+13338#Shuriken de Asa Ilusional#
+16065#Driver de Ferro Ilusional#
+28626#Tableta / Tablet Ilusional#
+18174#Arco Caçador Ilusional#
+510034#Adaga Antiga Ilusional#
+550031#Cajado Dea Ilusional#
+620010#Doom Slayer Ilusional#
+500030#Excalibur Ilusional#
+530015#Gelerdria Ilusional#
+550030#Cajado Espinhos da Escuridão Ilusional#
+28725#Walgwanggun Ilusional#
+
+
