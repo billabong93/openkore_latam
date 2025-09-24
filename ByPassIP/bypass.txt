@@ -1,0 +1,12 @@
+# bypass.txt - key=value
+# Caminhos por porta:
+6901_EXE_PATH = C:\Gravity\Ragnarok\ragexe.exe
+6902_EXE_PATH = C:\Gravity\Ragnarok\ragexe.exe
+6903_EXE_PATH = C:\Gravity\Ragnarok\ragexe.exe
+
+# IP/Portas (IP será combinado com a porta escolhida no seletor)
+IP = 172.65.175.75
+
+# Ponteiros/endereço (hex ou decimal). Se variar no seu cliente, ajuste aqui:
+TAADDRESS_ADDR = 0x0144C1E8
+DOMAIN_PTR_ADDR = 0x010D6C98
