@@ -112,29 +112,6 @@ anthell02 171 170 cmd_fild08 344 82
 cmd_fild08 335 355 anthell01 35 263
 cmd_fild08 348 82 anthell02 171 170
 
-# Morroc area (Episode 12)
-moc_fild01 84 19 moc_fild20 209 333
-moc_fild07 380 202 moc_fild20 36 177
-moc_fild11 189 360 moc_fild20 197 24
-moc_fild11 377 197 moc_fild20 36 177
-moc_fild13 32 171 moc_fild20 349 179
-moc_fild16 124 381 moc_fild20 197 24
-moc_fild16 333 380 moc_fild20 197 24
-moc_fild20 38 174 morocc 160 61 0 c r1 c c c c r1 c c r1
-moc_fild20 38 183 morocc 160 61 0 c r1 c c c c r1 c c r1
-moc_fild20 189 21 morocc 160 61 0 c r1 c c c c r1 c c r1
-moc_fild20 200 21 morocc 160 61 0 c r1 c c c c r1 c c r1
-moc_fild20 354 183 morocc 160 61 0 c r1 c c c c r1 c c r1
-moc_fild20 354 174 morocc 160 61 0 c r1 c c c c r1 c c r1
-moc_fild20 203 336 moc_fild01 86 32 0 c r1 c c c c r2
-moc_fild20 215 336 moc_fild01 86 32 0 c r1 c c c c r2
-moc_fild20 203 336 morocc 160 61 0 c r1 c c c c r1 c c r1
-moc_fild20 215 336 morocc 160 61 0 c r1 c c c c r1 c c r1
-morocc 299 207 moc_fild20 36 177
-prt_fild09 95 19 moc_fild20 209 333
-prt_fild09 246 17 moc_fild20 209 333
-prt_fild10 263 23 moc_fild20 209 333
-
 # Dimensional Gorge (Episode 12)
 # moc_fild20 -> moc_fild21 npcs are only available with the quest and a party with at least two members online
 moc_fild20 38 174 moc_fild21 38 193 0 c r1 c c c
@@ -144,7 +121,6 @@ moc_fild20 200 21 moc_fild21 38 193 0 c r1 c c c
 moc_fild20 354 183 moc_fild21 38 193 0 c r1 c c c
 moc_fild20 354 174 moc_fild21 38 193 0 c r1 c c c
 moc_fild20 203 336 moc_fild21 38 193 0 c r1 c c c
-moc_fild20 215 336 moc_fild21 38 193 0 c r1 c c c
 moc_fild21 26 196 moc_fild20 349 179
 moc_fild22 32 196 moc_fild20 349 179
 
@@ -3476,10 +3452,10 @@ iz_ac01_b 100 24 izlude 127 253
 iz_ac01_c 100 24 izlude 127 253
 iz_ac01_d 100 24 izlude 127 253
 
-iz_ac02_a 94 27 iz_ac01 78 28
-iz_ac02_b 94 27 iz_ac01 78 28
-iz_ac02_c 94 27 iz_ac01 78 28
-iz_ac02_d 94 27 iz_ac01 78 28
+#iz_ac02_a 94 27 iz_ac01 78 28
+#iz_ac02_b 94 27 iz_ac01 78 28
+#iz_ac02_c 94 27 iz_ac01 78 28
+#iz_ac02_d 94 27 iz_ac01 78 28
 
 # Arena / Testes
 1@ma_a 100 100 prt_are_in 60 14
@@ -3509,7 +3485,7 @@ que_ba 150 150 prontera 116 72
 iz_ac02_a 217 27 iz_ac01_a 122 25
 iz_ac01_a 122 25 iz_ac02_a 214 27
 
-### De nada (variações e updates) 24.09.25 ### @billabong93
+### De nada (variações e updates) 24.09.25 ### billabong93
 
 # Prontera
 prontera 29 207 alberta 117 56 180 1 c r3 c r5 n
@@ -3633,6 +3609,138 @@ izlude_in 65 84 izlude 112 179
 izlude_in 74 158 izlude 52 168
 izlude_in 87 169 izlude_in 111 169
 izlude_in 108 169 izlude_in 84 169
+
+# Academia Criatura
+iz_ac01 78 25 iz_ac02 201 27
+iz_ac01 122 25 iz_ac02 214 27
+iz_ac01_a 78 25 iz_ac02 201 27
+iz_ac01_a 122 25 iz_ac02 214 27
+iz_ac01_b 78 25 iz_ac02 201 27
+iz_ac01_b 122 25 iz_ac02 214 27
+iz_ac01_c 78 25 iz_ac02 201 27
+iz_ac01_c 122 25 iz_ac02 214 27
+iz_ac01_d 78 25 iz_ac02 201 27
+iz_ac01_d 122 25 iz_ac02 214 27
+iz_ac02 83 48 iz_ac02 197 44
+iz_ac02 83 78 iz_ac02 197 60
+iz_ac02 83 107 iz_ac02 197 76
+iz_ac02 83 137 iz_ac02 197 92
+iz_ac02 83 168 iz_ac02 197 108
+iz_ac02 103 183 iz_ac02 208 118
+iz_ac02 124 48 iz_ac02 218 44
+iz_ac02 124 78 iz_ac02 218 60
+iz_ac02 124 108 iz_ac02 218 76
+iz_ac02 124 137 iz_ac02 218 92
+iz_ac02 124 167 iz_ac02 218 108
+iz_ac02 194 44 iz_ac02 80 48
+iz_ac02 194 60 iz_ac02 80 78
+iz_ac02 194 76 iz_ac02 80 107
+iz_ac02 194 92 iz_ac02 80 137
+iz_ac02 194 108 iz_ac02 80 168
+iz_ac02 198 27 iz_ac01 78 28
+iz_ac02 208 121 iz_ac02 103 186
+iz_ac02 217 27 iz_ac01 122 28
+iz_ac02 221 44 iz_ac02 127 48
+iz_ac02 221 60 iz_ac02 128 78
+iz_ac02 221 76 iz_ac02 127 108
+iz_ac02 221 92 iz_ac02 127 137
+iz_ac02 221 108 iz_ac02 127 167
+iz_ac02_a 83 48 iz_ac02_a 197 44
+iz_ac02_a 83 78 iz_ac02_a 197 60
+iz_ac02_a 83 107 iz_ac02_a 197 76
+iz_ac02_a 83 137 iz_ac02_a 197 92
+iz_ac02_a 83 168 iz_ac02_a 197 108
+iz_ac02_a 103 183 iz_ac02_a 208 118
+iz_ac02_a 124 48 iz_ac02_a 218 44
+iz_ac02_a 124 78 iz_ac02_a 218 60
+iz_ac02_a 124 108 iz_ac02_a 218 76
+iz_ac02_a 124 137 iz_ac02_a 218 92
+iz_ac02_a 124 167 iz_ac02_a 218 108
+iz_ac02_a 194 44 iz_ac02_a 80 48
+iz_ac02_a 194 60 iz_ac02_a 80 78
+iz_ac02_a 194 76 iz_ac02_a 80 107
+iz_ac02_a 194 92 iz_ac02_a 80 137
+iz_ac02_a 194 108 iz_ac02_a 80 168
+iz_ac02_a 198 27 iz_ac01 78 28
+iz_ac02_a 208 121 iz_ac02_a 103 186
+iz_ac02_a 217 27 iz_ac01 122 28
+iz_ac02_a 221 44 iz_ac02_a 127 48
+iz_ac02_a 221 60 iz_ac02_a 128 78
+iz_ac02_a 221 76 iz_ac02_a 127 108
+iz_ac02_a 221 92 iz_ac02_a 127 137
+iz_ac02_a 221 108 iz_ac02_a 127 167
+iz_ac02_b 83 48 iz_ac02_b 197 44
+iz_ac02_b 83 78 iz_ac02_b 197 60
+iz_ac02_b 83 107 iz_ac02_b 197 76
+iz_ac02_b 83 137 iz_ac02_b 197 92
+iz_ac02_b 83 168 iz_ac02_b 197 108
+iz_ac02_b 103 183 iz_ac02_b 208 118
+iz_ac02_b 124 48 iz_ac02_b 218 44
+iz_ac02_b 124 78 iz_ac02_b 218 60
+iz_ac02_b 124 108 iz_ac02_b 218 76
+iz_ac02_b 124 137 iz_ac02_b 218 92
+iz_ac02_b 124 167 iz_ac02_b 218 108
+iz_ac02_b 194 44 iz_ac02_b 80 48
+iz_ac02_b 194 60 iz_ac02_b 80 78
+iz_ac02_b 194 76 iz_ac02_b 80 107
+iz_ac02_b 194 92 iz_ac02_b 80 137
+iz_ac02_b 194 108 iz_ac02_b 80 168
+iz_ac02_b 198 27 iz_ac01 78 28
+iz_ac02_b 208 121 iz_ac02_b 103 186
+iz_ac02_b 217 27 iz_ac01 122 28
+iz_ac02_b 221 44 iz_ac02_b 127 48
+iz_ac02_b 221 60 iz_ac02_b 128 78
+iz_ac02_b 221 76 iz_ac02_b 127 108
+iz_ac02_b 221 92 iz_ac02_b 127 137
+iz_ac02_b 221 108 iz_ac02_b 127 167
+iz_ac02_c 83 48 iz_ac02_c 197 44
+iz_ac02_c 83 78 iz_ac02_c 197 60
+iz_ac02_c 83 107 iz_ac02_c 197 76
+iz_ac02_c 83 137 iz_ac02_c 197 92
+iz_ac02_c 83 168 iz_ac02_c 197 108
+iz_ac02_c 103 183 iz_ac02_c 208 118
+iz_ac02_c 124 48 iz_ac02_c 218 44
+iz_ac02_c 124 78 iz_ac02_c 218 60
+iz_ac02_c 124 108 iz_ac02_c 218 76
+iz_ac02_c 124 137 iz_ac02_c 218 92
+iz_ac02_c 124 167 iz_ac02_c 218 108
+iz_ac02_c 194 44 iz_ac02_c 80 48
+iz_ac02_c 194 60 iz_ac02_c 80 78
+iz_ac02_c 194 76 iz_ac02_c 80 107
+iz_ac02_c 194 92 iz_ac02_c 80 137
+iz_ac02_c 194 108 iz_ac02_c 80 168
+iz_ac02_c 198 27 iz_ac01 78 28
+iz_ac02_c 208 121 iz_ac02_c 103 186
+iz_ac02_c 217 27 iz_ac01 122 28
+iz_ac02_c 221 44 iz_ac02_c 127 48
+iz_ac02_c 221 60 iz_ac02_c 128 78
+iz_ac02_c 221 76 iz_ac02_c 127 108
+iz_ac02_c 221 92 iz_ac02_c 127 137
+iz_ac02_c 221 108 iz_ac02_c 127 167
+iz_ac02_d 83 48 iz_ac02_d 197 44
+iz_ac02_d 83 78 iz_ac02_d 197 60
+iz_ac02_d 83 107 iz_ac02_d 197 76
+iz_ac02_d 83 137 iz_ac02_d 197 92
+iz_ac02_d 83 168 iz_ac02_d 197 108
+iz_ac02_d 103 183 iz_ac02_d 208 118
+iz_ac02_d 124 48 iz_ac02_d 218 44
+iz_ac02_d 124 78 iz_ac02_d 218 60
+iz_ac02_d 124 108 iz_ac02_d 218 76
+iz_ac02_d 124 137 iz_ac02_d 218 92
+iz_ac02_d 124 167 iz_ac02_d 218 108
+iz_ac02_d 194 44 iz_ac02_d 80 48
+iz_ac02_d 194 60 iz_ac02_d 80 78
+iz_ac02_d 194 76 iz_ac02_d 80 107
+iz_ac02_d 194 92 iz_ac02_d 80 137
+iz_ac02_d 194 108 iz_ac02_d 80 168
+iz_ac02_d 198 27 iz_ac01 78 28
+iz_ac02_d 208 121 iz_ac02_d 103 186
+iz_ac02_d 217 27 iz_ac01 122 28
+iz_ac02_d 221 44 iz_ac02_d 127 48
+iz_ac02_d 221 60 iz_ac02_d 128 78
+iz_ac02_d 221 76 iz_ac02_d 127 108
+iz_ac02_d 221 92 iz_ac02_d 127 137
+iz_ac02_d 221 108 iz_ac02_d 127 167
 
 # Payon
 payon 175 226 alberta 117 56 120 1 c r3 c r1 n
@@ -3782,6 +3890,38 @@ prt_fild08d 55 21 moc_fild01 56 380
 prt_fild08d 170 378 prontera 156 34
 prt_fild08d 233 16 moc_fild01 238 378
 prt_fild08d 371 212 izlude 24 98
+
+# Fenda Dimensional
+moc_fild20 189 21 moc_fild16 124 372 0 c r2 n
+moc_fild20 200 21 moc_fild16 124 372 0 c r2 n
+moc_fild20 203 336 prt_fild10 263 34 0 c r2 n
+moc_fild20 203 336 moc_fild13 41 171 0 c r2 n
+moc_fild20 215 336 prt_fild10 263 34 0 c r2 n
+moc_fild20 215 336 moc_fild13 41 171 0 c r2 n
+moc_fild20 354 174 moc_fild13 41 171 0 c r2 n
+moc_fild20 354 183 moc_fild13 41 171 0 c r2 n
+moc_fild20 38 174 morocc 160 61 0 c r2 n
+moc_fild20 38 183 morocc 160 61 0 c r2 n
+moc_fild11 377 197 moc_fild20 36 177
+moc_fild11 189 360 moc_fild20 208 207 0 c r2 n
+prt_fild10 263 23 moc_fild20 208 207 0 c r2 n
+prt_fild10 263 23 morocc 160 61 0 c r3 n
+prt_fild10 263 23 moc_fild07 377 209 0 c r4 n
+moc_fild07 380 202 moc_fild20 208 207 0 c r2 n
+moc_fild07 380 202 prt_fild10 263 34 0 c r3 n
+moc_fild13 32 171 morocc 160 61 0 c r3 n
+moc_fild13 32 171 moc_fild16 124 372 0 c r4 n
+moc_fild16 124 381 moc_fild20 208 207 0 c r2 n
+moc_fild16 124 381 moc_fild13 41 171 0 c r3 n
+moc_fild16 333 380 moc_fild20 208 207 0 c r2 n
+moc_fild16 333 380 moc_fild13 41 171 0 c r3 n
+moc_fild01 84 19 moc_fild20 208 207 0 c r2 n
+moc_fild01 84 19 morocc 160 61 0 c r3 n
+prt_fild09 95 19 moc_fild20 208 207 0 c r2 n
+prt_fild09 95 19 morocc 160 61 0 c r3 n
+prt_fild09 246 17 moc_fild20 208 207 0 c r2 n
+prt_fild09 246 17 morocc 160 61 0 c r3 n
+morocc 299 207 moc_fild20 208 207
 
 # Caverna de Payon 00
 pay_dun00_a 21 186 pay_arche 39 131
