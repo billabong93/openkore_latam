@@ -2,6 +2,7 @@
 
 [![Forum](https://img.shields.io/badge/Forum-OpenKore.com.br-blue)](https://openkore.com.br)  
 [![Git](https://img.shields.io/badge/Download-Git%20Desktop-orange)](https://git-scm.com/downloads)  
+[![Discord](https://img.shields.io/badge/%20Discord-purple)]([https://git-scm.com/downloads](https://discord.gg/Um4XGTxbch))  
 
 Bem-vindo ao **OpenKore LATAM** – um projeto otimizado e traduzido para a comunidade brasileira/latina de Ragnarok Online.  
 Aqui você encontra tudo pronto: OpenKore configurado, bypass de IP, executáveis e ferramentas auxiliares.  
