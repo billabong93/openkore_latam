@@ -3420,9 +3420,6 @@ prontera 134 221 prt_in 131 71
 moc_para01 47 161 moc_para01 48 16
 moc_para01 179 90 moc_para01 41 187
 moc_para01 41 187 moc_para01 179 93
-gef_fild06 20 304 glast_01 377 304
-glast_01 377 304 gef_fild06 27 304
-
 
 #### MAPAS FALTANTES por CELTOS
 # Payon Dungeon (variações)
@@ -3863,6 +3860,8 @@ airport 148 46 airplane 244 58 1200 1 c r0 c r0 n
 
 # Brasilis
 brasilis 316 57 alberta 244 115 c r0 n
+brasilis 308 336 bra_fild01 74 34
+bra_fild01 72 34 brasilis 309 334
 
 # Arredores de Prontera 08
 prt_fild08 371 212 izlude 24 98
@@ -3987,7 +3986,9 @@ orcsdun01_b 183 8 in_orcs01 21 185
 orcsdun01_c 32 172 in_orcs01 30 180
 orcsdun01_c 183 8 in_orcs01 21 185
 
-# Abadia de Glastheim
+# Glastheim
+gef_fild06 18 304 glast_01 376 304
+glast_01 380 304 gef_fild06 22 304
 gl_church_a 16 299 gl_chyard 147 284
 gl_church_a 156 4 glast_01 200 134
 gl_church_a 301 46 gl_chyard 147 15
