@@ -3815,10 +3815,10 @@ y_airport 128 46 airplane 244 58 1200 1 c r0 c r0 n
 y_airport 138 46 airplane 244 58 1200 1 c r0 c r0 n
 y_airport 148 46 airplane_01 244 58 1200 1 c r0 c r0 n
 y_airport 158 46 airplane_01 244 58 1200 1 c r0 c r0 n
-yuno 145 184 ein_fild06 199 152 400 c r0 c r0 n
-yuno 145 184 hu_fild04 186 78 800 c r0 c r0 n
-yuno 145 184 yuno_fild03 201 152 400 c r2 c r0 n
-yuno 145 184 yuno_fild07 225 145 400 c r1 c r0 n
+yuno 143 184 ein_fild06 199 152 400 c r0 c r0 n
+yuno 143 184 hu_fild04 186 78 800 c r0 c r0 n
+yuno 143 184 yuno_fild03 201 152 400 c r2 c r0 n
+yuno 143 184 yuno_fild07 225 145 400 c r1 c r0 n
 yuno 152 187 aldebaran 168 112 120 1 c r2 c r0 n
 
 # Einbroch
