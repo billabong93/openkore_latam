@@ -2,6 +2,7 @@
 
 [![Forum](https://img.shields.io/badge/Forum-OpenKore.com.br-blue)](https://openkore.com.br)  
 [![Git](https://img.shields.io/badge/Download-Git%20Desktop-orange)](https://git-scm.com/downloads)  
+[![Discord](https://img.shields.io/badge/%20Discord-purple)]([https://git-scm.com/downloads](https://discord.gg/Um4XGTxbch))  
 
 Bem-vindo ao **OpenKore LATAM** – um projeto otimizado e traduzido para a comunidade brasileira/latina de Ragnarok Online.  
 Aqui você encontra tudo pronto: OpenKore configurado, bypass de IP, executáveis e ferramentas auxiliares.  
@@ -10,13 +11,12 @@ Aqui você encontra tudo pronto: OpenKore configurado, bypass de IP, executávei
 
 ## 📂 Estrutura da Pasta  
 
-`openkore_latam/
-├── ByPassIP/ # Ferramenta para burlar restrições de IP
-├── Configurador de IP/ # Script simples para alterar IP/porta rapidamente
-├── RAGEXE + RECV/ # Executáveis customizados (ragexe / recvpacket)
-├── openkore-master/ # Cliente OpenKore já configurado
-└── README.md # Este arquivo :)`
-
+openkore_latam/<br>
+├── ByPassIP/ # Ferramenta para burlar restrições de IP<br>
+├── Configurador de IP/ # Script simples para alterar IP/porta rapidamente<br>
+├── RAGEXE + RECV/ # Executáveis customizados (ragexe / recvpacket)<br>
+├── openkore-master/ # Cliente OpenKore já configurado<br>
+└── README.md # Este arquivo :)<br>
 
 ---
 
