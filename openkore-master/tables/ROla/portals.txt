@@ -233,7 +233,7 @@ man_fild02 135 49 dic_fild01 159 264 20000 c c r4
 dic_fild01 161 266 man_fild02 135 49 20000 c c r2
 
 #Splendide
-mid_camp 13 138 spl_fild02 379 143 c r0 n
+mid_camp 13 143 spl_fild02 379 143 c r0 n #
 spl_fild02 382 143 mid_camp 16 143
 mid_camp 9 213 spl_fild02 380 217 c r0 n
 spl_fild02 383 216 mid_camp 12 215
@@ -1666,8 +1666,8 @@ prontera 204 192 prt_in 68 130
 prontera 208 154 prt_in 172 33
 prontera 237 317 prt_church 100 56
 prontera 289 203 prt_fild06 23 193
-prontera 121 72 prt_cas 18 29 c r0
-prt_cas 27 27 dali 109 86 c r3 c c r0
+#prontera 121 72 prontera 156 327
+#prt_cas 27 27 dali 109 86 c r3 c c r0
 prt_castle 28 121 prt_castle 40 138
 prt_castle 31 113 prt_castle 54 113
 prt_castle 40 138 prt_castle 28 121
@@ -3791,12 +3791,12 @@ alberta 45 145 alberta_in 69 141
 alberta 113 60 morocc 156 47 120 c r2 c r1 n
 alberta 113 60 payon 161 58 120 c r2 c r0 n
 alberta 113 60 prontera 116 72 180 c r2 c r2 n
-alberta 245 29 ayothaya 149 71 10000 c r1 c c r0 n
+alberta 245 29 ayothaya 149 71 10000 c r1 c r0 n
 alberta 245 40 lou_fild01 190 101 10000 c r1 c c r0
 alberta 245 62 gon_fild01 258 82 10000 c r1 c c r0 n
 alberta 245 74 amatsu 197 83 10000 c r1 c c c r0 n
 alberta 245 82 brasilis 314 60 10000 c c r0 n
-alberta 247 119 tur_dun01 157 39 10000 c r1 c r0 c c  n
+alberta 247 119 tur_dun01 157 39 10000 c r1 c r0 c c n
 alberta_in 66 113 alberta_in 66 132
 alberta_in 66 130 alberta_in 66 111
 alberta_in 66 153 alberta_in 66 174
@@ -3815,17 +3815,16 @@ y_airport 128 46 airplane 244 58 1200 1 c r0 c r0 n
 y_airport 138 46 airplane 244 58 1200 1 c r0 c r0 n
 y_airport 148 46 airplane_01 244 58 1200 1 c r0 c r0 n
 y_airport 158 46 airplane_01 244 58 1200 1 c r0 c r0 n
-yuno 145 184 ein_fild06 199 152 400 c r0 c r0 n
-yuno 145 184 hu_fild04 186 78 800 c r0 c r0 n
-yuno 145 184 yuno_fild03 201 152 400 c r2 c r0 n
-yuno 145 184 yuno_fild07 225 145 400 c r1 c r0 n
+yuno 143 184 ein_fild06 199 152 400 c r0 c r0 n
+yuno 143 184 hu_fild04 186 78 800 c r0 c r0 n
+yuno 143 184 yuno_fild03 201 152 400 c r2 c r0 n
+yuno 143 184 yuno_fild07 225 145 400 c r1 c r0 n
 yuno 152 187 aldebaran 168 112 120 1 c r2 c r0 n
 
 # Einbroch
 einbroch 246 205 ein_fild06 199 152 600 c r0 c r0 n
 einbroch 246 205 lhz_fild01 244 130 1400 c r1 c r0 n
 einbroch 250 211 moc_para01 31 14 c c r0 n
-
 
 # Lighthalzen
 lhz_airport 138 43 airplane 244 58 1200 1 c r0 c r0 n
@@ -3921,6 +3920,9 @@ prt_fild09 95 19 morocc 160 61 0 c r3 n
 prt_fild09 246 17 moc_fild20 208 207 0 c r2 n
 prt_fild09 246 17 morocc 160 61 0 c r3 n
 morocc 299 207 moc_fild20 208 207
+moc_fild20 349 179 moc_fild22b 38 195 c c c r0 n
+moc_fild20 209 332 moc_fild22b 38 195 c c c r0 n
+moc_fild22b 37 196 moc_fild20 342 179 c c c r0 n
 
 # Caverna de Payon 00
 pay_dun00_a 21 186 pay_arche 39 131
@@ -4053,3 +4055,71 @@ moc_para0c 180 156 moc_para0c 29 185
 malangdo 218 81 lasagna 206 297 2000 c c r0 n
 malangdo 219 86 alberta 192 150 1000 c c r1 n
 malangdo 219 86 izlude 86 159 1000 c c r0 n
+
+# Zonda Staff ### ******Provisório******
+alberta 35 239 bif_fild02 291 232 20000 c r0 c r0 n
+alberta 35 239 eclage 100 28 20000 c r1 c r0 n
+alberta 35 239 splendide 271 386 20000 c r2 c r0 n
+alberta 35 239 mid_camp 210 288 19000 c r3 c r0 n
+alberta 35 239 manuk 112 352 20000 c r4 c r0 n
+alberta 35 239 dic_fild01 149 279 20000 c r5 c r0 n
+prontera 145 87 bif_fild02 291 232 20000 c r0 c r0 n
+prontera 145 87 eclage 100 28 20000 c r1 c r0 n
+prontera 145 87 splendide 271 386 20000 c r2 c r0 n
+prontera 145 87 mid_camp 210 288 19000 c r3 c r0 n
+prontera 145 87 manuk 112 352 20000 c r4 c r0 n
+prontera 145 87 dic_fild01 149 279 20000 c r5 c r0 n
+morocc 157 257 bif_fild02 291 232 20000 c r0 c r0 n
+morocc 157 257 eclage 100 28 20000 c r1 c r0 n
+morocc 157 257 splendide 271 386 20000 c r2 c r0 n
+morocc 157 257 mid_camp 210 288 19000 c r3 c r0 n
+morocc 157 257 manuk 112 352 20000 c r4 c r0 n
+morocc 157 257 dic_fild01 149 279 20000 c r5 c r0 n
+payon 178 104 bif_fild02 291 232 20000 c r0 c r0 n
+payon 178 104 eclage 100 28 20000 c r1 c r0 n
+payon 178 104 splendide 271 386 20000 c r2 c r0 n
+payon 178 104 mid_camp 210 288 19000 c r3 c r0 n
+payon 178 104 manuk 112 352 20000 c r4 c r0 n
+payon 178 104 dic_fild01 149 279 20000 c r5 c r0 n
+geffen 117 66 bif_fild02 291 232 20000 c r0 c r0 n
+geffen 117 66 eclage 100 28 20000 c r1 c r0 n
+geffen 117 66 splendide 271 386 20000 c r2 c r0 n
+geffen 117 66 mid_camp 210 288 19000 c r3 c r0 n
+geffen 117 66 manuk 112 352 20000 c r4 c r0 n
+geffen 117 66 dic_fild01 149 279 20000 c r5 c r0 n
+aldebaran 138 122 bif_fild02 291 232 20000 c r0 c r0 n
+aldebaran 138 122 eclage 100 28 20000 c r1 c r0 n
+aldebaran 138 122 splendide 271 386 20000 c r2 c r0 n
+aldebaran 138 122 mid_camp 210 288 19000 c r3 c r0 n
+aldebaran 138 122 manuk 112 352 20000 c r4 c r0 n
+aldebaran 138 122 dic_fild01 149 279 20000 c r5 c r0 n
+yuno 145 184 bif_fild02 291 232 20000 c r0 c r0 n
+yuno 145 184 eclage 100 28 20000 c r1 c r0 n
+yuno 145 184 splendide 271 386 20000 c r2 c r0 n
+yuno 145 184 mid_camp 210 288 19000 c r3 c r0 n
+yuno 145 184 manuk 112 352 20000 c r4 c r0 n
+yuno 145 184 dic_fild01 149 279 20000 c r5 c r0 n
+einbroch 248 205 bif_fild02 291 232 20000 c r0 c r0 n
+einbroch 248 205 eclage 100 28 20000 c r1 c r0 n
+einbroch 248 205 splendide 271 386 20000 c r2 c r0 n
+einbroch 248 205 mid_camp 210 288 19000 c r3 c r0 n
+einbroch 248 205 manuk 112 352 20000 c r4 c r0 n
+einbroch 248 205 dic_fild01 149 279 20000 c r5 c r0 n
+lighthalzen 169 103 bif_fild02 291 232 20000 c r0 c r0 n
+lighthalzen 169 103 eclage 100 28 20000 c r1 c r0 n
+lighthalzen 169 103 splendide 271 386 20000 c r2 c r0 n
+lighthalzen 169 103 mid_camp 210 288 19000 c r3 c r0 n
+lighthalzen 169 103 manuk 112 352 20000 c r4 c r0 n
+lighthalzen 169 103 dic_fild01 149 279 20000 c r5 c r0 n
+rachel 118 139 bif_fild02 291 232 20000 c r0 c r0 n
+rachel 118 139 eclage 100 28 20000 c r1 c r0 n
+rachel 118 139 splendide 271 386 20000 c r2 c r0 n
+rachel 118 139 mid_camp 210 288 19000 c r3 c r0 n
+rachel 118 139 manuk 112 352 20000 c r4 c r0 n
+rachel 118 139 dic_fild01 149 279 20000 c r5 c r0 n
+veins 198 133 bif_fild02 291 232 20000 c r0 c r0 n
+veins 198 133 eclage 100 28 20000 c r1 c r0 n
+veins 198 133 splendide 271 386 20000 c r2 c r0 n
+veins 198 133 mid_camp 210 288 19000 c r3 c r0 n
+veins 198 133 manuk 112 352 20000 c r4 c r0 n
+veins 198 133 dic_fild01 149 279 20000 c r5 c r0 n
