@@ -3010,28 +3010,6 @@ eclage 116 40 moc_para01 31 14 c r0 n
 harboro1 90 221 moc_para01 31 14 c r0 n
 verus04 116 243 moc_para01 31 14 c r0 n
 
-# Eden HQ
-moc_para01 47 39 moc_para01 106 14 c r0
-moc_para01 107 12 moc_para01 47 37
-moc_para01 100 27 moc_para01 47 85
-moc_para01 49 86 moc_para01 103 27
-moc_para01 113 32 moc_para01 105 92
-moc_para01 102 92 moc_para01 111 33
-moc_para01 57 27 moc_para01 162 26
-moc_para01 158 26 moc_para01 55 27
-#moc_para01 48 16 moc_para01 48 164
-moc_para01 48 16 moc_paraup 48 164
-#moc_para01 47 161 moc_para01 47 18
-moc_paraup 47 161 moc_para01 47 18
-#moc_para01 41 187 moc_para01 179 93
-moc_paraup 41 187 moc_paraup 179 93
-#moc_para01 179 90 moc_para01 41 185
-moc_paraup 179 90 moc_paraup 41 185
-moc_paraup 29 187 moc_para01 180 159
-moc_para01 180 156 moc_paraup 29 185
-moc_paraup 17 187 moc_para01 132 159
-moc_para01 132 156 moc_paraup 17 185
-
 # Port Malaya
 alberta 237 71 malaya 271 55 10000 c r1 n
 ma_fild01 37 272 malaya 370 277
@@ -3998,7 +3976,24 @@ gl_church_b 16 299 gl_chyard 147 284
 gl_church_b 156 4 glast_01 200 134
 gl_church_b 301 46 gl_chyard 147 15
 
-# Éden
+# Éden HQ
+moc_para01 17 187 moc_para01 132 159
+moc_para01 29 187 moc_para01 180 159
+moc_para01 30 10 prontera 116 72
+moc_para01 41 187 moc_para01 179 93
+moc_para01 47 161 moc_para01 47 18
+moc_para01 48 16 moc_para01 48 164
+moc_para01 48 39 moc_para01 106 14
+moc_para01 49 86 moc_para01 103 27
+moc_para01 57 27 moc_para01 162 26
+moc_para01 100 27 moc_para01 47 85
+moc_para01 102 92 moc_para01 111 33
+moc_para01 107 12 moc_para01 48 35
+moc_para01 113 32 moc_para01 105 92
+moc_para01 132 156 moc_para01 17 185
+moc_para01 158 26 moc_para01 55 27
+moc_para01 179 90 moc_para01 41 185
+moc_para01 180 156 moc_para01 29 185
 moc_para0a 17 187 moc_para0a 132 159
 moc_para0a 29 187 moc_para0a 180 159
 moc_para0a 30 10 prontera 116 72
