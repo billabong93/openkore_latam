@@ -41,7 +41,7 @@ XKore_hookIp 172.65.175.75
 XKore_hookport 5400
 
 # XKore 2 / Proxy configuration
-XKore_listenIp 172.65.175.75
+XKore_listenIp 0.0.0.0
 XKore_listenPort 6901
 XKore_publicIp 172.65.175.75
 XKore_ID
