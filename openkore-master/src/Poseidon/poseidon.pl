@@ -1,301 +1,373 @@
 #!/usr/bin/env perl
-# =====================================================================
-# Poseidon server — multiport (console only, sem deps extras)
-# - Multi pares (RagnarokServer <-> QueryServer)
-# - Mata processos nas portas alvo (sem matar a si mesmo)
-# - Pré-flight de bind e "skip" de pares indisponíveis
-# - Logs com timestamp + cores (quando TTY)
-# - Banners em quadro (Unicode OU ASCII, auto-fallback)
-# - Tratamento de sinais + saída limpa
-# =====================================================================
+###########################################################
+# Hydra Server - MULTIPORTA
+# (Formerly known as Poseidon Server)
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License, or (at your option) any later version.
+#
+# Copyright (c) 2021-2025 OpenKore Development Team
+#
+# Credits:
+# Celtos - OpenKore LATAM Community & openkore.com.br
+# isieo - schematic of XKore 2 and other interesting ideas
+# anonymous person - beta-testing
+# kaliwanagan - original author
+# illusionist - bRO support
+# Fr3DBr - bRO Update (El Dicastes++)
+###########################################################
 
 use strict;
 use warnings;
-use utf8;  # ok mesmo com fallback ASCII; ignora se console não suportar
+use utf8;
+
 use FindBin qw($RealBin);
 use lib "$RealBin/..";
 use lib "$RealBin/../..";
 use lib "$RealBin/../deps";
-
+use Time::HiRes qw(time sleep);
 use Getopt::Long;
-use IO::Socket::INET;
-use Time::HiRes qw(sleep);
-use Scalar::Util qw(looks_like_number);
 
 use Poseidon::Config;
 use Poseidon::RagnarokServer;
 use Poseidon::QueryServer;
 
-# ------------------------------- Consts --------------------------------
-use constant VERSION        => '3.4e';
-use constant BRAND_NAME     => 'Celtos / OpenKore LATAM';
-use constant BRAND_SUPPORT  => 'https://openkore.com.br/';
-use constant SLEEP_TIME     => 0.01;   # 10ms
-use constant NETSTAT_WAIT_S => 0.20;
+use constant SUPPORT_URL => 'https://openkore.com.br/';
+use constant FORUM_URL => 'https://openkore.com.br/';
+use constant SLEEP_TIME => 0.01;
+use constant VERSION => '1.0-hydra';
 
-# ------------------------------- Globals -------------------------------
-our @RO_SERVERS;       # Poseidon::RagnarokServer
-our @QRY_SERVERS;      # Poseidon::QueryServer
-our %PAIR_IDX_BY_QRY;  # "host:port" -> idx
-our $HAS_TTY = -t STDOUT ? 1 : 0;
-our $IS_WIN  = ($^O =~ /MSWin32/i) ? 1 : 0;
+our @roServers;
+our @queryServers;
 
-# Habilita UTF-8 no STDOUT (se o console aguentar; se não, só ignora)
+# Detecta se o terminal suporta cores
+my $HAS_COLOR = (-t STDOUT) ? 1 : 0;
+my $IS_WIN = ($^O =~ /MSWin32/i) ? 1 : 0;
+
+# Habilita UTF-8 no output (com fallback)
 eval { binmode(STDOUT, ":encoding(UTF-8)"); 1; };
 
-# -------------------------------- Log ----------------------------------
-sub _ts { my @t = gmtime(); sprintf('%04d-%02d-%02dT%02d:%02d:%02dZ', $t[5]+1900,$t[4]+1,@t[3,2,1,0]) }
-sub _c  { return $_[1] unless $HAS_TTY; my($code,$s)=@_; "\e[${code}m${s}\e[0m" }
-
-sub log_info { print  _c('36', "["._ts()."] [INFO] "), @_, "\n" }   # cyan
-sub log_ok   { print  _c('32', "["._ts()."] [ OK ] "), @_, "\n" }   # green
-sub log_warn { print  _c('33', "["._ts()."] [WARN] "), @_, "\n" }   # yellow
-sub log_err  { print  _c('31', "["._ts()."] [ERR ] "), @_, "\n" }   # red
-sub log_dbg  { return unless $Poseidon::Config::config{debug}; print _c('90',"["._ts()."] [DBG ] "), @_, "\n" } # gray
-
-# --------- Quadro: Unicode seguro? Se não, usa ASCII (+- |) -----------
-sub _unicode_box_ok {
-    # Windows Terminal / ConEmu / ansicon ou LANG UTF-8 → OK
+# Detecta suporte a Unicode
+sub _has_unicode {
     return 1 if $ENV{WT_SESSION} || $ENV{ConEmuANSI} || $ENV{ANSICON};
     my $lang = $ENV{LC_ALL} // $ENV{LANG} // '';
     return 1 if $lang =~ /UTF-?8/i;
-    # Em Windows padrão, assume NÃO
     return 0 if $IS_WIN;
-    # Em outros TTYs (Linux/macOS) geralmente OK
-    return $HAS_TTY ? 1 : 0;
+    return $HAS_COLOR ? 1 : 0;
 }
-my $BOX_UTF8 = _unicode_box_ok();
 
-# ------------------------- Pretty Box Helpers --------------------------
-sub _box_chars {
-    if ($BOX_UTF8) {
-        return ("╔","╗","╚","╝","═","║","╠","╣");
+my $HAS_UNICODE = _has_unicode();
+
+# Códigos de cor ANSI
+sub color {
+    return $_[1] unless $HAS_COLOR;
+    my ($code, $text) = @_;
+    return "\e[${code}m${text}\e[0m";
+}
+
+# Paleta de cores
+sub c_reset   { "\e[0m" }
+sub c_bold    { color('1', $_[0]) }
+sub c_red     { color('31', $_[0]) }
+sub c_green   { color('32', $_[0]) }
+sub c_yellow  { color('33', $_[0]) }
+sub c_blue    { color('34', $_[0]) }
+sub c_magenta { color('35', $_[0]) }
+sub c_cyan    { color('36', $_[0]) }
+sub c_white   { color('37', $_[0]) }
+sub c_gray    { color('90', $_[0]) }
+sub c_bred    { color('91', $_[0]) }
+sub c_bgreen  { color('92', $_[0]) }
+sub c_byellow { color('93', $_[0]) }
+sub c_bblue   { color('94', $_[0]) }
+sub c_bmagenta{ color('95', $_[0]) }
+sub c_bcyan   { color('96', $_[0]) }
+sub c_bwhite  { color('97', $_[0]) }
+
+# Caracteres de desenho
+sub get_box_chars {
+    if ($HAS_UNICODE) {
+        return {
+            tl => '╔', tr => '╗', bl => '╚', br => '╝',
+            h  => '═', v  => '║', 
+            ml => '╠', mr => '╣', tm => '╦', bm => '╩',
+            dot => '•', arrow => '→', check => '✓', 
+            cross => '✗', star => '★', wave => '~',
+            hydra => '🐉'
+        };
     } else {
-        return ("+","+","+","+","-","|","+","+"); # ASCII fallback
+        return {
+            tl => '+', tr => '+', bl => '+', br => '+',
+            h  => '-', v  => '|',
+            ml => '+', mr => '+', tm => '+', bm => '+',
+            dot => '*', arrow => '>', check => 'v',
+            cross => 'x', star => '*', wave => '~',
+            hydra => 'H'
+        };
     }
 }
-sub _box_line   { my ($ch,$len)=@_; ($ch//'=') x ($len//72) }
 
-# Largura segura: usa 72 colunas (não quebra em consoles estreitos)
-sub _box_center {
-    my ($text,$width) = @_;
-    $width ||= 72;
-    $text  = "" unless defined $text;
-    my $len = length($text);
-    my $pad = $width - $len; $pad = 0 if $pad < 0;
-    my $left  = int($pad/2);
-    my $right = $pad - $left;
-    return (" " x $left).$text.(" " x $right);
-}
-sub pretty_banner {
-    my ($title, @lines) = @_;
-    my $width  = 72;
-    my ($TL,$TR,$BL,$BR,$H,$V,$HL,$HR) = _box_chars();
-    my $border = _box_line($H,$width);
+my $box = get_box_chars();
 
-    print _c('36', $TL.$border.$TR."\n");
-    print _c('36', $V)._c('37', _box_center($title,$width))._c('36', $V."\n");
-    print _c('36', $HL.$border.$HR."\n");
-    for my $ln (@lines) {
-        print _c('36', $V)._c('37', _box_center($ln,$width))._c('36', $V."\n");
-    }
-    print _c('36', $BL.$border.$BR."\n");
+# Funções de desenho
+sub draw_line {
+    my ($char, $len) = @_;
+    $len ||= 70;
+    return $char x $len;
 }
 
-# ------------------------------ Utils ----------------------------------
-sub _valid_port {
-    my ($p) = @_;
-    return 0 unless defined $p && looks_like_number($p);
-    return $p > 0 && $p < 65536;
+sub draw_box_top {
+    my $len = shift || 70;
+    return $box->{tl} . draw_line($box->{h}, $len-2) . $box->{tr};
 }
 
-sub _can_bind {
-    my ($ip, $port) = @_;
-    return 0 unless _valid_port($port);
-    my $sock = IO::Socket::INET->new(
-        LocalAddr => $ip,
-        LocalPort => $port,
-        Listen    => 1,
-        Proto     => 'tcp',
-        ReuseAddr => 1,
-    );
-    if ($sock) { close $sock; return 1 }
-    return 0;
+sub draw_box_bottom {
+    my $len = shift || 70;
+    return $box->{bl} . draw_line($box->{h}, $len-2) . $box->{br};
 }
 
-# Mata processos escutando nas portas pedidas (sem matar a si)
-sub free_requested_ports {
-    my %want;
-    my %cfg = %Poseidon::Config::config;
-    for my $p (@{$cfg{ragnarokserver_ports}}, @{$cfg{queryserver_ports}}) {
-        next unless _valid_port($p);
-        $want{$p} = 1;
-    }
-    return unless %want;
+sub draw_box_middle {
+    my $len = shift || 70;
+    return $box->{ml} . draw_line($box->{h}, $len-2) . $box->{mr};
+}
 
-    my %pid_to_ports;
-    my $self_pid = $$;
+sub draw_box_line {
+    my ($text, $len) = @_;
+    $len ||= 70;
+    my $text_len = length($text);
+    my $padding = $len - $text_len - 2;
+    my $left = int($padding / 2);
+    my $right = $padding - $left;
+    return $box->{v} . (' ' x $left) . $text . (' ' x $right) . $box->{v};
+}
 
-    if ($IS_WIN) {
-        for my $port (sort {$a<=>$b} keys %want) {
-            my $needle = int($port);
-            my @lines = `netstat -ano -p tcp | findstr :$needle 2>NUL`;
-            for my $ln (@lines) {
-                next unless $ln =~ /\bLISTENING\b/i;
-                if ($ln =~ /LISTENING\s+(\d+)\s*$/i) {
-                    my $pid = 0 + $1;
-                    next if $pid == 0 || $pid == $self_pid;
-                    $pid_to_ports{$pid}{$needle} = 1;
-                }
-            }
-        }
-        for my $pid (sort {$a<=>$b} keys %pid_to_ports) {
-            my $ports = join(',', sort {$a<=>$b} keys %{$pid_to_ports{$pid}});
-            log_warn("[port-free] Matando PID $pid (ports: $ports)...");
-            my $rc = system('taskkill','/F','/PID', $pid); # sem shell
-            if ($rc != 0) { log_err("Falha ao matar PID $pid (permissão?). Pulando.") }
-            select(undef,undef,undef, NETSTAT_WAIT_S);
-        }
+# Banner ASCII Art
+sub print_logo {
+    print c_bcyan(draw_box_top(70)) . "\n";
+    print c_bcyan($box->{v}) . c_bwhite("                      HYDRA SERVER                           ") . c_bcyan($box->{v}) . "\n";
+    print c_bcyan($box->{v}) . c_byellow("                  ") . $box->{wave} . " MULTIPORT EDITION " . $box->{wave} . "                       " . c_bcyan($box->{v}) . "\n";
+    print c_bcyan(draw_box_middle(70)) . "\n";
+    
+    if ($HAS_UNICODE) {
+        print c_bcyan($box->{v}) . c_bblue("        🐉    ") . c_bwhite("GameGuard Query Server") . c_bblue("    🐉              ") . c_bcyan($box->{v}) . "\n";
     } else {
-        for my $port (sort {$a<=>$b} keys %want) {
-            my @pids = `lsof -nP -iTCP:$port -sTCP:LISTEN -t 2>/dev/null`;
-            chomp @pids;
-            if (!@pids) {
-                my @ss = `ss -ltnp 'sport = :$port' 2>/dev/null`;
-                for my $ln (@ss) { while ($ln =~ /pid=(\d+)/g) { push @pids, 0+$1 } }
-            }
-            for my $pid (@pids) {
-                next if $pid == $self_pid;
-                $pid_to_ports{$pid}{$port} = 1;
-            }
-        }
-        for my $pid (sort {$a<=>$b} keys %pid_to_ports) {
-            my $ports = join(',', sort {$a<=>$b} keys %{$pid_to_ports{$pid}});
-            log_warn("[port-free] Matando PID $pid (ports: $ports)...");
-            kill 9, $pid or log_err("Não foi possível matar PID $pid. Pulando.");
-            select(undef,undef,undef, NETSTAT_WAIT_S);
-        }
+        print c_bcyan($box->{v}) . c_bblue("            ") . c_bwhite("GameGuard Query Server") . c_bblue("                ") . c_bcyan($box->{v}) . "\n";
     }
+    
+    print c_bcyan($box->{v}) . c_gray("                    Version " . VERSION . "                    ") . c_bcyan($box->{v}) . "\n";
+    print c_bcyan(draw_box_middle(70)) . "\n";
+    print c_bcyan($box->{v}) . c_bmagenta("              Developed by Celtos & Community                ") . c_bcyan($box->{v}) . "\n";
+    print c_bcyan($box->{v}) . c_bblue("                 OpenKore LATAM Project                      ") . c_bcyan($box->{v}) . "\n";
+    print c_bcyan(draw_box_bottom(70)) . "\n";
 }
 
-sub compute_available_pairs {
-    my %cfg = %Poseidon::Config::config;
-    my @pairs;
-
-    my $n = scalar @{$cfg{ragnarokserver_ports}};
-    my $m = scalar @{$cfg{queryserver_ports}};
-    if ($n != $m) {
-        die "Config inválida: ragnarokserver_ports ($n) difere de queryserver_ports ($m).\n";
-    }
-
-    for (my $i = 0; $i < $n; $i++) {
-        my ($ro_p, $qry_p) = ($cfg{ragnarokserver_ports}[$i], $cfg{queryserver_ports}[$i]);
-
-        unless (_valid_port($ro_p) && _valid_port($qry_p)) {
-            log_warn("[skip] Par ".($i+1)." possui porta inválida (RO:$ro_p, QRY:$qry_p)");
-            next;
-        }
-
-        my $ro_ok  = _can_bind($cfg{ragnarokserver_ip}, $ro_p);
-        my $qry_ok = _can_bind($cfg{queryserver_ip},    $qry_p);
-
-        if ($ro_ok && $qry_ok) {
-            push @pairs, [$ro_p, $qry_p];
-        } else {
-            my @why;
-            push @why, "RO:$cfg{ragnarokserver_ip}:$ro_p" unless $ro_ok;
-            push @why, "QRY:$cfg{queryserver_ip}:$qry_p"  unless $qry_ok;
-            log_warn("[skip] Par ".($i+1)." indisponível -> ".join(' ', @why));
-        }
-    }
-    return @pairs;
+sub print_status {
+    my ($icon, $color_func, $label, $value) = @_;
+    print $color_func->($box->{dot} . " " . $label . ": ") . c_bwhite($value) . "\n";
 }
 
-sub _pairs_summary_lines {
-    my @out;
-    for (my $i = 0; $i < @RO_SERVERS; $i++) {
-        my $ro = $RO_SERVERS[$i];
-        my $qs = $QRY_SERVERS[$i];
-        push @out, sprintf("Par %d  RO:%s:%d  <->  QRY:%s:%d",
-            $i+1, $ro->getHost(), $ro->getPort(), $qs->getHost(), $qs->getPort());
-    }
-    return @out;
+sub print_server_pair {
+    my ($idx, $ro_host, $ro_port, $qry_host, $qry_port) = @_;
+    
+    print c_bcyan($box->{ml} . draw_line($box->{h}, 68) . $box->{mr}) . "\n";
+    print c_bcyan($box->{v}) . c_byellow(" " . $box->{star} . " PAR #$idx ") . (" " x 56) . c_bcyan($box->{v}) . "\n";
+    print c_bcyan($box->{v}) . "  " . c_bgreen($box->{arrow} . " RO Server   : ") . 
+          c_bwhite("$ro_host:$ro_port") . (" " x (70 - 20 - length("$ro_host:$ro_port"))) . c_bcyan($box->{v}) . "\n";
+    print c_bcyan($box->{v}) . "  " . c_bblue($box->{arrow} . " Query Server: ") . 
+          c_bwhite("$qry_host:$qry_port") . (" " x (70 - 20 - length("$qry_host:$qry_port"))) . c_bcyan($box->{v}) . "\n";
 }
 
-# ------------------------------ Boot -----------------------------------
+sub print_warning {
+    my ($msg) = @_;
+    print c_byellow($box->{v} . " " . $box->{cross} . " AVISO: ") . c_yellow($msg) . 
+          (" " x (70 - length($msg) - 10)) . c_byellow($box->{v}) . "\n";
+}
+
+sub print_error {
+    my ($msg) = @_;
+    print c_bred($box->{v} . " " . $box->{cross} . " ERRO: ") . c_red($msg) . 
+          (" " x (70 - length($msg) - 9)) . c_bred($box->{v}) . "\n";
+}
+
+sub print_success {
+    my ($msg) = @_;
+    print c_bgreen($box->{v} . " " . $box->{check} . " ") . c_green($msg) . 
+          (" " x (70 - length($msg) - 4)) . c_bgreen($box->{v}) . "\n";
+}
+
 sub initialize {
     print "\n";
-    pretty_banner(
-        "Poseidon ".VERSION." - ".BRAND_NAME,
-        "Carregando configuração...",
-        "Suporte: ".BRAND_SUPPORT,
-    );
+    print_logo();
+    print "\n";
+    
+    print c_cyan(draw_box_top(70)) . "\n";
+    print c_cyan($box->{v}) . c_bwhite("  CARREGANDO CONFIGURACAO...") . (" " x 40) . c_cyan($box->{v}) . "\n";
+    print c_cyan(draw_box_bottom(70)) . "\n\n";
 
+    # Carrega configuracao
     Getopt::Long::Configure('default');
     Poseidon::Config::parseArguments();
-    Poseidon::Config::parse_config_file($Poseidon::Config::config{file});
+    Poseidon::Config::parse_config_file($config{file});
     Poseidon::Config::finalize();
 
-    # Sinais para saída limpa
-    $SIG{INT}  = sub { log_warn("SIGINT recebido. Finalizando..."); _cleanup_and_exit(0) };
-    $SIG{TERM} = sub { log_warn("SIGTERM recebido. Finalizando..."); _cleanup_and_exit(0) };
+    # Verifica configuracao
+    my $ro_ports = $config{ragnarokserver_ports};
+    my $qry_ports = $config{queryserver_ports};
 
-    free_requested_ports();
-
-    my @pairs = compute_available_pairs();
-    if (!@pairs) { die "Nenhum par de portas livre para bind. Ajuste as portas ou rode como Administrador.\n"; }
-
-    log_info("Inicializando servidores (pares: ".scalar(@pairs).")...");
-    @RO_SERVERS = ();
-    @QRY_SERVERS = ();
-    %PAIR_IDX_BY_QRY = ();
-
-    my %cfg = %Poseidon::Config::config;
-
-    for (my $i = 0; $i < @pairs; $i++) {
-        my ($ro_p, $qry_p) = @{$pairs[$i]};
-        my $ro = Poseidon::RagnarokServer->new($ro_p,  $cfg{ragnarokserver_ip});
-        my $qs = Poseidon::QueryServer->new   ($qry_p, $cfg{queryserver_ip}, $ro);
-
-        push @RO_SERVERS,  $ro;
-        push @QRY_SERVERS, $qs;
-
-        $PAIR_IDX_BY_QRY{$qs->getHost().":".$qs->getPort()} = $i;
-
-        log_ok(sprintf("Par %d  RO:%s:%d  <->  QRY:%s:%d",
-            $i+1, $ro->getHost(), $ro->getPort(), $qs->getHost(), $qs->getPort()));
+    unless ($ro_ports && ref($ro_ports) eq 'ARRAY' && @$ro_ports > 0) {
+        print c_bred(draw_box_top(70)) . "\n";
+        print_error("ragnarokserver_ports nao definido!");
+        print c_bred($box->{v}) . c_red("  Configure no poseidon.txt:") . (" " x 40) . c_bred($box->{v}) . "\n";
+        print c_bred($box->{v}) . c_yellow("    ragnarokserver_ports=6901,6902,6903") . (" " x 28) . c_bred($box->{v}) . "\n";
+        print c_bred(draw_box_bottom(70)) . "\n\n";
+        exit(1);
     }
 
-    if ($cfg{fake_ip}) { log_info("Fake Server IP: $cfg{fake_ip}") }
+    unless ($qry_ports && ref($qry_ports) eq 'ARRAY' && @$qry_ports > 0) {
+        print c_bred(draw_box_top(70)) . "\n";
+        print_error("queryserver_ports nao definido!");
+        print c_bred($box->{v}) . c_red("  Configure no poseidon.txt:") . (" " x 40) . c_bred($box->{v}) . "\n";
+        print c_bred($box->{v}) . c_yellow("    queryserver_ports=24390,24391,24392") . (" " x 29) . c_bred($box->{v}) . "\n";
+        print c_bred(draw_box_bottom(70)) . "\n\n";
+        exit(1);
+    }
 
-    my @sum = _pairs_summary_lines();
-    pretty_banner(
-        "Poseidon ".VERSION." pronto",
-        "Debug: ".(($cfg{debug}) ? "On" : "Off"),
-        "Pares ativos: ".scalar(@pairs),
-        @sum,
-        "CTRL+C para sair"
-    );
+    if (@$ro_ports != @$qry_ports) {
+        print c_bred(draw_box_top(70)) . "\n";
+        print_error("Numero de portas diferente!");
+        print c_bred($box->{v}) . c_red("  RO Ports  : " . scalar(@$ro_ports)) . (" " x 51) . c_bred($box->{v}) . "\n";
+        print c_bred($box->{v}) . c_red("  QRY Ports : " . scalar(@$qry_ports)) . (" " x 51) . c_bred($box->{v}) . "\n";
+        print c_bred(draw_box_bottom(70)) . "\n\n";
+        exit(1);
+    }
+
+    print c_bgreen(draw_box_top(70)) . "\n";
+    print c_bgreen($box->{v}) . c_bwhite("  INICIANDO SERVIDORES...") . (" " x 43) . c_bgreen($box->{v}) . "\n";
+    print c_bgreen(draw_box_bottom(70)) . "\n\n";
+
+    # Cria os pares de servidores
+    my $success_count = 0;
+    for (my $i = 0; $i < @$ro_ports; $i++) {
+        my $ro_port = $ro_ports->[$i];
+        my $qry_port = $qry_ports->[$i];
+
+        eval {
+            my $roServer = new Poseidon::RagnarokServer(
+                $ro_port, 
+                $config{ragnarokserver_ip}
+            );
+            
+            my $queryServer = new Poseidon::QueryServer(
+                $qry_port, 
+                $config{queryserver_ip}, 
+                $roServer
+            );
+
+            push @roServers, $roServer;
+            push @queryServers, $queryServer;
+
+            print_server_pair($i+1, 
+                $roServer->getHost(), $roServer->getPort(),
+                $queryServer->getHost(), $queryServer->getPort());
+            
+            $success_count++;
+        };
+        
+        if ($@) {
+            print c_byellow(draw_box_top(70)) . "\n";
+            print_warning("Par " . ($i+1) . " nao pode ser iniciado");
+            print c_byellow($box->{v}) . c_yellow("  RO Port  : $ro_port") . (" " x (70 - 15 - length($ro_port))) . c_byellow($box->{v}) . "\n";
+            print c_byellow($box->{v}) . c_yellow("  QRY Port : $qry_port") . (" " x (70 - 15 - length($qry_port))) . c_byellow($box->{v}) . "\n";
+            print c_byellow($box->{v}) . c_gray("  Porta em uso ou sem permissao") . (" " x 37) . c_byellow($box->{v}) . "\n";
+            print c_byellow(draw_box_bottom(70)) . "\n";
+        }
+    }
+
+    unless ($success_count > 0) {
+        print "\n";
+        print c_bred(draw_box_top(70)) . "\n";
+        print_error("NENHUM SERVIDOR INICIADO!");
+        print c_bred($box->{v}) . c_red("  Verifique:") . (" " x 56) . c_bred($box->{v}) . "\n";
+        print c_bred($box->{v}) . c_yellow("   1. Portas em uso por outro programa") . (" " x 30) . c_bred($box->{v}) . "\n";
+        print c_bred($box->{v}) . c_yellow("   2. Permissoes (use sudo ou Admin)") . (" " x 32) . c_bred($box->{v}) . "\n";
+        print c_bred($box->{v}) . c_yellow("   3. Firewall bloqueando as portas") . (" " x 33) . c_bred($box->{v}) . "\n";
+        print c_bred(draw_box_bottom(70)) . "\n\n";
+        exit(1);
+    }
+
+    # Banner final - STATUS
+    print "\n";
+    print c_bgreen(draw_box_top(70)) . "\n";
+    if ($HAS_UNICODE) {
+        print c_bgreen($box->{v}) . c_bwhite("                    ✨ SERVIDOR PRONTO ✨                    ") . c_bgreen($box->{v}) . "\n";
+    } else {
+        print c_bgreen($box->{v}) . c_bwhite("                    SERVIDOR PRONTO                          ") . c_bgreen($box->{v}) . "\n";
+    }
+    print c_bgreen(draw_box_middle(70)) . "\n";
+    
+    my $status_line = sprintf("Pares Ativos: %d de %d", $success_count, scalar(@$ro_ports));
+    print c_bgreen($box->{v}) . "  " . c_bwhite($status_line) . (" " x (70 - length($status_line) - 4)) . c_bgreen($box->{v}) . "\n";
+    
+    print c_bgreen($box->{v}) . "  " . c_cyan("Server Type : ") . c_white($config{server_type}) . 
+          (" " x (70 - 16 - length($config{server_type}) - 4)) . c_bgreen($box->{v}) . "\n";
+    
+    my $debug_status = $config{debug} ? c_byellow("ON") : c_gray("OFF");
+    print c_bgreen($box->{v}) . "  " . c_cyan("Debug       : ") . $debug_status . 
+          (" " x (70 - 16 - 2 - 4)) . c_bgreen($box->{v}) . "\n";
+    
+    if ($config{fake_ip}) {
+        print c_bgreen($box->{v}) . "  " . c_cyan("Fake IP     : ") . c_white($config{fake_ip}) . 
+              (" " x (70 - 16 - length($config{fake_ip}) - 4)) . c_bgreen($box->{v}) . "\n";
+    }
+    
+    print c_bgreen(draw_box_middle(70)) . "\n";
+    print c_bgreen($box->{v}) . c_gray("  Pressione CTRL+C para encerrar") . (" " x 36) . c_bgreen($box->{v}) . "\n";
+    print c_bgreen(draw_box_bottom(70)) . "\n\n";
+    
+    print c_bmagenta("  " . $box->{hydra} . " Comunidade OpenKore LATAM\n");
+    print c_bcyan("  " . $box->{arrow} . " Forum & Suporte: " . FORUM_URL . "\n");
+    print c_gray("  " . $box->{arrow} . " Desenvolvido por Celtos\n\n");
 }
 
-# --------------------------- Console loop ------------------------------
-sub run_console_loop {
+sub __start {
     initialize();
+    
+    # Loop principal
     while (1) {
-        for my $ro (@RO_SERVERS)  { $ro->iterate() }
-        for my $qs (@QRY_SERVERS) { $qs->iterate() }
+        for my $roServer (@roServers) {
+            eval { $roServer->iterate(); };
+            warn c_red("Erro RO: $@\n") if $@;
+        }
+        
+        for my $queryServer (@queryServers) {
+            eval { $queryServer->iterate(); };
+            warn c_red("Erro Query: $@\n") if $@;
+        }
+        
         sleep SLEEP_TIME;
     }
 }
 
-# ------------------------------ Cleanup --------------------------------
-sub _cleanup_and_exit {
-    my ($code) = @_;
-    log_info("Encerrado (code=$code).");
-    exit($code);
-}
+# Tratamento de sinais
+$SIG{INT} = sub {
+    print "\n\n";
+    print c_byellow(draw_box_top(70)) . "\n";
+    if ($HAS_UNICODE) {
+        print c_byellow($box->{v}) . c_bwhite("                   👋 ENCERRANDO HYDRA 👋                    ") . c_byellow($box->{v}) . "\n";
+    } else {
+        print c_byellow($box->{v}) . c_bwhite("                   ENCERRANDO HYDRA                          ") . c_byellow($box->{v}) . "\n";
+    }
+    print c_byellow(draw_box_middle(70)) . "\n";
+    print c_byellow($box->{v}) . c_yellow("  Fechando servidores...") . (" " x 44) . c_byellow($box->{v}) . "\n";
+    print c_byellow($box->{v}) . c_bmagenta("  Obrigado por usar Hydra Server!") . (" " x 34) . c_byellow($box->{v}) . "\n";
+    print c_byellow($box->{v}) . c_gray("  OpenKore LATAM - openkore.com.br") . (" " x 33) . c_byellow($box->{v}) . "\n";
+    print c_byellow(draw_box_bottom(70)) . "\n\n";
+    exit(0);
+};
 
-END { 1 }
+$SIG{TERM} = $SIG{INT};
 
-# -------------------------------- Main ---------------------------------
-run_console_loop();
+# Inicia o servidor
+__start() unless defined $ENV{INTERPRETER};

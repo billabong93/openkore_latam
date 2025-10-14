@@ -1,37 +1,3 @@
-###########################################################
-# Poseidon server - Ragnarok Online server emulator
-#
-# Aviso ao fiscal de "copia" do Discord:
-#  - Codigo aberto TEM AUTOR, nao "dono de boteco".
-#  - GPL permite fork, patch, redistribuicao e COBRAR por servico.
-#  - Se doeu, e porque nao leu licenca nem sabe abrir um diff.
-#
-# openkore.com.br (forum oficial) nao precisa da sua permissao.
-# Voces vivem gritando "copiou!" mas nunca mostram PR que preste.
-# Originalidade nao e grito em print: e commit com teste passando.
-#
-# Quer respeito? Entra com patch. Quer palco? Vai pro Discord.
-# Aqui a regra e simples: quem entrega codigo, fala. O resto e ruído.
-#
-# Refrão pros “donos do exclusivo”:
-#  - “Meu codigo”: mas depende de base GPL de anos.
-#  - “Nao pode cobrar”: servico e suporte NAO sao proibidos.
-#  - “Plagio!”: aponta linha, arquivo, commit — ou aceita que e choro.
-#
-# Este programa e software livre; voce pode redistribuir e/ou
-# modifica-lo sob os termos da GNU GPL v2 ou (a sua opcao) posterior.
-# Copyright (c) OpenKore Development Team; manutencao: openkore.com.br
-###########################################################
-# Esta classe emula um servidor de Ragnarok Online.
-# O cliente RO conecta aqui. Este servidor envia periodicamente
-# uma consulta GameGuard ao cliente RO e salva a resposta.
-###########################################################
-# TODO:
-# 1) Usar unpack strings por serverType.
-# 2) Plugin/hook por serverType ou um algoritmo base com hooks.
-###########################################################
-
-
 package Poseidon::RagnarokServer;
 
 use strict;
@@ -111,7 +77,7 @@ sub query
 		}
 	}
 
-	print "[OpenKore.com.br]-> Error: no Ragnarok Online client connected.\n";
+	print "[RagnarokServer]-> Error: no Ragnarok Online client connected.\n";
 }
 
 ##
@@ -143,10 +109,7 @@ sub getState {
 #
 # Read the response for the last GameGuard query.
 sub readResponse {
-	my ($self) = @_;
-
 	my $resp = $_[0]->{response};
-	chop($resp) if ($self->{type}->{$config{server_type}}->{checksum} == 1);
 	$_[0]->{response} = undef;
 	$_[0]->{state} = 'ready';
 	return $resp;
@@ -157,35 +120,34 @@ sub readResponse {
 
 sub onClientNew
 {
-    my ($self, $client, $index) = @_;
+	my ($self, $client, $index) = @_;
 
-    if ( $state == 0 )
-    {
-        # Initialize Decryption
-        $enc_val1 = 0;
-        $enc_val2 = 0;
-        $enc_val3 = 0;
-    } else { $state = 0; }
+	if ( $state == 0 )
+	{
+		# Initialize Decryption
+		$enc_val1 = 0;
+		$enc_val2 = 0;
+		$enc_val3 = 0;
+	} else { $state = 0; }
 
-    $self->{challengeNum} = 0;
+	$self->{challengeNum} = 0;
 
-    print "[OpenKore.com.br]-> Cliente ($index) conectado. Vamos ver se o 'codigo exclusivo' aguenta um diff de verdade.\n";
+	print "[RagnarokServer]-> Ragnarok Online client ($index) connected.\n";
 }
 
 sub onClientExit
 {
-    my ($self, $client, $index) = @_;
+	my ($self, $client, $index) = @_;
 
-    $self->{challengeNum} = 0;
+	$self->{challengeNum} = 0;
 
-    print "[OpenKore.com.br]-> Cliente ($index) desconectado. Menos barulho, mais commit na proxima.\n";
+	print "[RagnarokServer]-> Ragnarok Online client ($index) disconnected.\n";
 }
-
 
 ## constants
 my $accountID = pack("V", "2000001");
-my $posX = 221;
-my $posY = 128;
+my $posX = 170;
+my $posY = 89;
 
 ## Globals
 my $charID = pack("V", "100001");
@@ -252,10 +214,24 @@ sub ParsePacket {
 	### These variables control the account information ###
 	my $host = $self->getHost();
 	my $port = pack("v", $self->getPort());
-	$host = $config{fake_ip} ? $config{fake_ip} : ($host eq 'localhost' ? '127.0.0.1' : $host);
+	$host = '127.0.0.1' if ($host eq 'localhost');
 	my @ipElements = split /\./, $host;
+	if($switch eq '0436' || $switch eq '007D' || $switch eq '0B1C'){
+		if($switch eq '007D'){			
+			$msg = substr($msg, 3);
+			$switch = '0360';
+			print "\nReceived packet $msg:\n" if ($config{debug});
+		} elsif ($switch eq '0B1C'){
+			$msg = substr($msg, 3);
+			$switch = '0436';
+			print "\nReceived packet $msg:\n" if ($config{debug});			
+		}
+		$msg = substr($msg, 0, -1);
+	}
 	print "\nReceived packet $switch:\n" if ($config{debug});
 	visualDump($msg, "$switch") if ($config{debug});
+	
+
 
 	# Note:
 	# The switch packets are pRO specific and assumes the use of secureLogin 1. It may or may not work with other
@@ -298,11 +274,10 @@ sub ParsePacket {
 					pack("Z20","S1000") . # flag
 					pack("Z*", "OpenkoreClientToken"); # login_token
 			SendData($client, $data);
-
 	} elsif (($switch eq '0064') || ($switch eq '01DD') || ($switch eq '01FA') || ($switch eq '0277') || ($switch eq '027C') || ($switch eq '02B0') || ($switch eq '0825') || ($switch eq '0987') || ($switch eq '0A76') || ($switch eq '0AAC') || ($switch eq '0B04')) { # master_login
 		# send account_server_info
 		my $sex = 1;
-		my $serverName = pack("a20", "openkore.com.br"); # server name should be less than or equal to 20 characters
+		my $serverName = pack("a20", "Hydra Server"); # server name should be less than or equal to 20 characters
 		my $serverUsers = pack("V", @{$self->clients()} - 1);
 
 		my $data;
@@ -355,6 +330,17 @@ sub ParsePacket {
 				pack("v", 0x6985) . # property
 				pack("x128").# ip_port
 				pack("x4"); # unknown
+		} elsif ($switch eq '0825' || $self->{type}->{$config{server_type}}->{account_server_info} eq '0C32') { # received ROLA Token
+			$data = pack("v", 0x0C32) . # header
+				pack("v", 0xE5) . # length
+				pack("H*", "B2D05E00") . # sessionID
+				pack("H*", "1E8481") . # accountID
+				pack("x59") .
+				$serverName .
+				pack("H*", "e22a00000000") .
+				pack("a18", $host.":".$self->getPort()). # ip:port
+				pack("x110") . # padding
+				pack("H*", "01789d0000"); # end servers list
 		} elsif ($switch eq '0825' || $self->{type}->{$config{server_type}}->{account_server_info} eq '0AC4') { # received kRO Zero Token
 			$data = pack("v", 0x0AC4) . # header
 				pack("v", 0xE0) . # length
@@ -491,24 +477,12 @@ sub ParsePacket {
 			SendData($client, $data);
 		}
 
-	} elsif ($switch eq $self->{type}->{$config{server_type}}->{map_login} &&
+	} elsif ($switch eq  $self->{type}->{$config{server_type}}->{map_login} &&
 		(length($msg) == 19) &&
 		(substr($msg, 2, 4) eq $accountID) &&
 		(substr($msg, 6, 4) eq $charID) &&
 		(substr($msg, 10, 4) eq $sessionID)
 		) { # client sends the maplogin packet
-
-		SendMapLogin($self, $client, $msg, $index);
-		# save servers.txt info
-		$clientdata{$index}{serverType} = 0;
-
-	} elsif ($switch eq $self->{type}->{$config{server_type}}->{map_login} &&
-		(length($msg) == 27) &&
-		(substr($msg, 5, 4) eq $accountID) &&
-		(substr($msg, 9, 4) eq $charID) &&
-		(substr($msg, 13, 4) eq $sessionID)
-		) { # client sends the maplogin packet
-
 		SendMapLogin($self, $client, $msg, $index);
 		# save servers.txt info
 		$clientdata{$index}{serverType} = 0;
@@ -646,13 +620,8 @@ sub ParsePacket {
 		$clientdata{$index}{serverType} = "1 or 2";
 
 	} elsif (($switch eq '0436' || $switch eq '022D' || $switch eq $self->{type}->{$config{server_type}}->{map_login}) &&
-		(length($msg) == 19 || length($msg) == 23) &&
-		(substr($msg, 2, 4) eq $accountID) &&
-		(substr($msg, 6, 4) eq $charID) &&
-		(substr($msg, 10, 4) eq $sessionID)
-		) { # client sends the maplogin packet
+		(length($msg) == 19 || length($msg) == 23)) { # client sends the maplogin packet
 		$clientdata{$index}{serverType} = 0;
-
 		SendMapLogin($self, $client, $msg, $index);
 
 		$client->{connectedToMap} = 1;
@@ -719,6 +688,7 @@ sub ParsePacket {
 	} elsif ($switch eq '09D0' || $switch eq '0228') { # client sends game guard sync
 		# Queue the response
 		# Don't allow other packet's (like Sync) to get to RO server.
+		$msg = substr($msg, 0, length($msg) - 1);
 		my $length = unpack("v",substr($msg,2,2));
 		if ($length > 0) {
 			$self->{response} = pack("v", $packet_id) . substr($msg,2,$length);
@@ -760,8 +730,8 @@ sub ParsePacket {
 				SendNPCTalk($self, $client, $msg, $index, $npcID1, "Welcome to Kafra Corp. We will stay with you wherever you go.");
 				SendNPCTalkContinue($self, $client, $msg, $index, $npcID1);
 			} else {
-				SendNPCTalk($self, $client, $msg, $index, $npcID0, "[Celtos]");
-				SendNPCTalk($self, $client, $msg, $index, $npcID0, "Estou analisando seus pacotes de login... tao pateticos e reciclados quanto o 'codigo exclusivo' que voces juram ser donos. Voces nao criam nada, so choram quando alguem melhora o lixo que entregam.");
+				SendNPCTalk($self, $client, $msg, $index, $npcID0, "[Hakore]");
+				SendNPCTalk($self, $client, $msg, $index, $npcID0, "Hello! I was examining your RO client's login packets while you were connecting to Poseidon.");
 				SendNPCTalkContinue($self, $client, $msg, $index, $npcID0);
 			}
 
@@ -772,7 +742,7 @@ sub ParsePacket {
 			if ($npcID eq $npcID0) {
 				if ($response == 1) {
 					# Check server info
-					SendNPCTalk($self, $client, $msg, $index, $npcID, "[Celtos]");
+					SendNPCTalk($self, $client, $msg, $index, $npcID, "[Hakore]");
 					SendNPCTalk($self, $client, $msg, $index, $npcID, "Your RO client uses the following server details:");
 					SendNPCTalk($self, $client, $msg, $index, $npcID, "^2222DDversion: $clientdata{$index}{version}");
 					SendNPCTalk($self, $client, $msg, $index, $npcID, "master_version: $clientdata{$index}{master_version}");
@@ -804,8 +774,8 @@ sub ParsePacket {
 
 				} elsif ($response == 2) {
 					# Use storage
-					SendNPCTalk($self, $client, $msg, $index, $npcID, "[Celtos]");
-					SendNPCTalk($self, $client, $msg, $index, $npcID, "Valeu pela visita. Agora some e tenta multiplicar commits em vez de fofoca.");
+					SendNPCTalk($self, $client, $msg, $index, $npcID, "[Hakore]");
+					SendNPCTalk($self, $client, $msg, $index, $npcID, "Thank you for the visit. Go and multiply!");
 					SendNpcTalkClose($self, $client, $msg, $index, $npcID);
 				}
 
@@ -835,93 +805,71 @@ sub ParsePacket {
 			if ($npcID eq $npcID0) {
 				if ($clientdata{$index}{npc_talk_code} == 2) {
 					# Show NPC response list
-					SendNpcTalkResponses($self, $client, $msg, $index, $npcID, "Continua:Eita!:");
+					SendNpcTalkResponses($self, $client, $msg, $index, $npcID, "Yes, please:No, thanks:");
 					$clientdata{$index}{npc_talk_code} = 3;
 
 				} else {
-SendNPCTalk($self, $client, $msg, $index, $npcID, "[Celtos]");
-if (!$clientdata{$index}{npc_talk_code}) {
-    if (!defined $clientdata{$index}{serverType}) {
-        SendNPCTalk($self, $client, $msg, $index, $npcID,
-            "Olhei seu servidor... e nada combina. Igual suas ideias: soltas, sem fundamento, e depois ainda juram que e 'original'.");
-    } elsif ($clientdata{$index}{serverType} == 7 || $clientdata{$index}{serverType} == 12) {
-        SendNPCTalk($self, $client, $msg, $index, $npcID,
-            "Esse serverType ai? Igual ao 'codigo exclusivo' que voces vendem: incompleto, bugado e sem suporte.");
-    } else {
-        SendNPCTalk($self, $client, $msg, $index, $npcID,
-            "Analise concluida: OpenKore suporta seu servidor melhor do que voces suportam critica.");
-        SendNPCTalk($self, $client, $msg, $index, $npcID,
-            "Quer detalhes? Eu entrego. Diferente de voces, que so entregam drama.");
-    }
-    SendNPCTalkContinue($self, $client, $msg, $index, $npcID);
-    $clientdata{$index}{npc_talk_code} = 1;
+					SendNPCTalk($self, $client, $msg, $index, $npcID, "[Hakore]");
+					if (!$clientdata{$index}{npc_talk_code}) {
+						if (!defined $clientdata{$index}{serverType}) {
+							SendNPCTalk($self, $client, $msg, $index, $npcID, "However, I regret that OpenKore may not currently support your server.");
+						} elsif ($clientdata{$index}{serverType} == 7 || $clientdata{$index}{serverType} == 12) {
+							SendNPCTalk($self, $client, $msg, $index, $npcID, "However, I regret that OpenKore does not yet fully support your server this time.");
+						} else {
+							SendNPCTalk($self, $client, $msg, $index, $npcID, "Based on my examination, I think OpenKore supports your server.");
+							SendNPCTalk($self, $client, $msg, $index, $npcID, "I can tell you the possible server details you can use to make OpenKore to connect to your server.");
+						}
+						SendNPCTalkContinue($self, $client, $msg, $index, $npcID);
+						$clientdata{$index}{npc_talk_code} = 1;
 
-} elsif ($clientdata{$index}{npc_talk_code} == 1) {
-    if ((!defined $clientdata{$index}{serverType}) || ($clientdata{$index}{serverType} == 7)) {
-        SendNPCTalk($self, $client, $msg, $index, $npcID,
-            "Quer mesmo ouvir os detalhes? Ou vai correr pro Discord chorar 'copia' de novo?");
-    } else {
-        SendNPCTalk($self, $client, $msg, $index, $npcID,
-            "Quer saber os detalhes ou prefere inventar fofoca em forum?");
-    }
-    SendNPCTalkContinue($self, $client, $msg, $index, $npcID);
-    $clientdata{$index}{npc_talk_code} = 2;
+					} elsif ($clientdata{$index}{npc_talk_code} == 1) {
+						if ((!defined $clientdata{$index}{serverType}) || ($clientdata{$index}{serverType} == 7)) {
+							SendNPCTalk($self, $client, $msg, $index, $npcID, "Would you still like to hear the details?");
+						} else {
+							SendNPCTalk($self, $client, $msg, $index, $npcID, "Would you like to hear the details?");
+						}
+						SendNPCTalkContinue($self, $client, $msg, $index, $npcID);
+						$clientdata{$index}{npc_talk_code} = 2;
 
-} elsif ($clientdata{$index}{npc_talk_code} == 2.5) {
-    if (!defined $clientdata{$index}{serverType}) {
-        SendNPCTalk($self, $client, $msg, $index, $npcID,
-            "Nao achei serverType pro seu server. Igual voces: falam que sao unicos, mas ninguem acha relevancia.");
-        SendNPCTalk($self, $client, $msg, $index, $npcID,
-            "Tenta todos os tipos, vai na sorte. Igual suas contribuicoes: tentativa e erro, sem resultado.");
-    } elsif ($clientdata{$index}{serverType} == 7 || $clientdata{$index}{serverType} == 12) {
-        SendNPCTalk($self, $client, $msg, $index, $npcID,
-            "Esse server? So da pra logar e brincar. Igual voces: conseguem aparecer, mas nao conseguem lutar, criar, nem sustentar.");
-        SendNPCTalk($self, $client, $msg, $index, $npcID,
-            "Ataque, skill, sentar ou levantar... tudo bugado. Igual o ego inflado de voces.");
-    }
-    SendNPCTalkContinue($self, $client, $msg, $index, $npcID);
-    $clientdata{$index}{npc_talk_code} = 4;
+					} elsif ($clientdata{$index}{npc_talk_code} == 2.5) {
+						if (!defined $clientdata{$index}{serverType}) {
+							SendNPCTalk($self, $client, $msg, $index, $npcID, "As you can see, I can't find a matching serverType for your server.");
+							SendNPCTalk($self, $client, $msg, $index, $npcID, "Please make a trial-and-error using all available serverTypes, one of them might be able to work.");
+						} elsif ($clientdata{$index}{serverType} == 7 || $clientdata{$index}{serverType} == 12) {
+							SendNPCTalk($self, $client, $msg, $index, $npcID, "Like I said, your server is not yet fully supported by OpenKore.");
+							SendNPCTalk($self, $client, $msg, $index, $npcID, "You can login to the server and do most basic tasks, but you cannot attack, sit or stand, or use skills.");
+						}
+						SendNPCTalkContinue($self, $client, $msg, $index, $npcID);
+						$clientdata{$index}{npc_talk_code} = 4;
 
-} elsif ($clientdata{$index}{npc_talk_code} == 3) {
-    SendNPCTalk($self, $client, $msg, $index, $npcID,
-        "Os valores de ^2222DDip^000000 e ^2222DDport^000000 estao no seu (s)clientinfo.xml.");
-    SendNPCTalk($self, $client, $msg, $index, $npcID,
-        "Se nem isso voce sabe achar, para de bancar 'dev original' e admite que so copia tutorial mal feito.");
-    SendNPCTalkContinue($self, $client, $msg, $index, $npcID);
-    $clientdata{$index}{npc_talk_code} = 4;
+					} elsif ($clientdata{$index}{npc_talk_code} == 3) {
+						SendNPCTalk($self, $client, $msg, $index, $npcID, "The values of ^2222DDip^000000 and ^2222DDport^000000 can be found on your client's (s)clientinfo.xml.");
+						SendNPCTalkContinue($self, $client, $msg, $index, $npcID);
+						$clientdata{$index}{npc_talk_code} = 4;
 
-} elsif ($clientdata{$index}{npc_talk_code} == 4) {
-    if (!defined $clientdata{$index}{serverType}) {
-        SendNPCTalk($self, $client, $msg, $index, $npcID,
-            "Nenhum serverType bateu. Em vez de gritar 'copia', abre uma issue decente com log/pcap e prova que sabe contribuir.");
-        SendNPCTalk($self, $client, $msg, $index, $npcID,
-            "Guia e codebase: ^2222DDhttps://openkore.com.br/^000000");
-        SendNPCTalk($self, $client, $msg, $index, $npcID,
-            "Sem dado tecnico, sem ajuda. Simples.");
-    } else {
-        if (   ($clientdata{$index}{serverType} == 7)
-            || ($clientdata{$index}{serverType} == 8)
-            || ($clientdata{$index}{serverType} == 9)
-            || ($clientdata{$index}{serverType} == 10)
-            || ($clientdata{$index}{serverType} == 11)
-            || ($clientdata{$index}{serverType} == 12)
-            || ($clientdata{$index}{masterLogin_packet})
-            || ($clientdata{$index}{gameLogin_packet}) ) {
-
-            SendNPCTalk($self, $client, $msg, $index, $npcID,
-                "Conecta usando OpenKore.com.BR. Versao 'magica' que vocês julgam ser cópia...");
-        } else {
-            SendNPCTalk($self, $client, $msg, $index, $npcID,
-                "OpenKore v1.6.6+ roda. Se quebrar, o seu 'original' ta torto.");
-        }
-
-        SendNPCTalk($self, $client, $msg, $index, $npcID,
-            "Mais info: ^2222DDhttps://openkore.com.br/^000000");
-        SendNPCTalk($self, $client, $msg, $index, $npcID,
-            "Mostra commit, nao novela. Boa sorte (vai precisar).");
-    }
-    SendNpcTalkClose($self, $client, $msg, $index, $npcID);
-
+					} elsif ($clientdata{$index}{npc_talk_code} == 4) {
+						if (!defined $clientdata{$index}{serverType}) {
+							SendNPCTalk($self, $client, $msg, $index, $npcID, "If none of the serverTypes work, please inform the developers about this so we can support your server in future releases of OpenKore.");
+							SendNPCTalk($self, $client, $msg, $index, $npcID, "Please visit ^2222DDhttps://forums.openkore.com/^000000");
+							SendNPCTalk($self, $client, $msg, $index, $npcID, "Thank you.");
+						} else {
+							if (($clientdata{$index}{serverType} == 7)
+								|| ($clientdata{$index}{serverType} == 8)
+								|| ($clientdata{$index}{serverType} == 9)
+								|| ($clientdata{$index}{serverType} == 10)
+								|| ($clientdata{$index}{serverType} == 11)
+								|| ($clientdata{$index}{serverType} == 12)
+								|| ($clientdata{$index}{masterLogin_packet})
+								|| ($clientdata{$index}{gameLogin_packet})
+							) {
+								SendNPCTalk($self, $client, $msg, $index, $npcID, "Please note that you can only connect to your server using OpenKore GIT.");
+							} else {
+								SendNPCTalk($self, $client, $msg, $index, $npcID, "OpenKore v.1.6.6 or later will work on your server.");
+							}
+							SendNPCTalk($self, $client, $msg, $index, $npcID, "For more info, please visit ^2222DDhttps://openkore.com/^000000");
+							SendNPCTalk($self, $client, $msg, $index, $npcID, "Good luck!");
+						}
+						SendNpcTalkClose($self, $client, $msg, $index, $npcID);
 					}
 				}
 
@@ -937,7 +885,7 @@ if (!$clientdata{$index}{npc_talk_code}) {
 			}
 
 		} elsif ($switch eq '0B1C') { # pong packet (keep-alive)
-			SendData($client, pack("v", 0x0B1D));
+			SendData($client, pack("v", 0x0B18));		
 		} elsif ($switch eq '01C0') { # Remaining time??
 			# SendData($client, pack("v V3", 0x01C0, 0xFF, 0xFF, 0xFF));
 		} elsif ($clientdata{$index}{mode}) {
@@ -1051,10 +999,10 @@ sub SendCharacterList
 	my $block;
 
 	my $sex = 1;
-	my $map = "prt_fild08.gat";
+	my $map = "brasilis.gat";
 
 	# Filling Character 1 Block
-	$cID = $charID;	$hp = 10000; $maxHp = 10000; $sp = 10000; $maxSp = 10000; $hairstyle = 5; $level = 99; $headTop = 0; $hairColor = 6; $hairPallete = 0;
+	$cID = $charID;	$hp = 10000; $maxHp = 10000; $sp = 10000; $maxSp = 10000; $hairstyle = 1; $level = 99; $headTop = 0; $hairColor = 6; $hairPallete = 0;
 	$name = "Celtos"; $str = 1; $agi = 1; $vit = 1; $int = 1; $dex = 1; $luk = 1;	$exp = 1; $zeny = 1; $jobExp = 1; $jobLevel = 50; $slot = 0; $rename = 0;
 
 	# Preparing Character 1 Block
@@ -1068,10 +1016,6 @@ sub SendCharacterList
 
 	# Attaching Block
 	$data .= $block;
-
-	# Filling Character 2 Block
-	$cID = $charID;	$hp = 10000; $maxHp = 10000; $sp = 10000; $maxSp = 10000; $hairstyle = 1; $level = 99; $headTop = 0; $hairColor = 6;
-	$name = "Celtos Dev"; $str = 1; $agi = 1; $vit = 1; $int = 1; $dex = 1; $luk = 1;	$exp = 1; $zeny = 1; $jobExp = 1; $jobLevel = 50; $slot = 1; $rename = 0;
 
 	# Preparing Character 2 Block
 	if ($self->{type}->{$config{server_type}}->{received_characters} eq '0B72') {
@@ -1094,13 +1038,16 @@ sub SendCharacterList
 
 sub SendMapLogin {
 	my ($self, $client, $msg, $index) = @_;
-
+	
+	SendData($client, pack("v C2", 0x0B18, 0x00, 0x00));
 	SendData($client, pack("v a4", 0x0283, $accountID));
 
 	if ( $config{server_type} =~ /^kRO/ ) { # kRO
 		SendData($client, pack("v", 0x0ADE) . pack("V", 0x00));
+	} elsif($config{server_type} =~ /^ROLA/){
+		#SendData($client, pack("H*", 'de0a46000000'));;
 	}
-
+	
 	# mapLogin packet
 	if ($self->{type}->{$config{server_type}}->{map_loaded} eq '0A18') {
 		# '0A18' => ['map_loaded', 'V a3 C2 v C', [qw(syncMapSync coords xSize ySize font sex)]], # 14
@@ -1108,10 +1055,12 @@ sub SendMapLogin {
 	} elsif ($self->{type}->{$config{server_type}}->{map_loaded} eq '02EB') {
 		# '02EB' => ['map_loaded', 'V a3 a a v', [qw(syncMapSync coords xSize ySize font)]], # 13
 		SendData($client, pack("v", 0x02EB) . pack("V", getTickCount) . getCoordString($posX, $posY, 1) . pack("C*", 0x00, 0x00) .  pack("C*", 0x00, 0x00));
+		SendData($client, pack("v", 0x0B32) . pack("v", 0x0013) . pack("V", 0x00000001) .  pack("V", 0x00000000) .  pack("v", 0x0100) .  pack("v", 0x0100) .  pack("v", 0x0000));
+		SendData($client, pack("H*", '0F01E2000100000000000900000001004E565F4241534943004765744D6170496E666F0A000000000018000400000001000A000A00414C5F5255574143480000000000000000000000000000000019000200000001000A000900414C5F504E45554D41000000000000000000000000000000001A0004000000020009000100414C5F54454C45504F525400000000000000000000000000001B000200000004001A000900414C5F574152500000000000000000000000000000000000001C00100000000A0028000900414C5F4845414C000000000000000000000000000000000000'));	
 	} else {
 		# '0073' => ['map_loaded','x4 a3',[qw(coords)]]
 		SendData($client, pack("v", 0x0073) . pack("V", getTickCount) . getCoordString($posX, $posY, 1) . pack("C*", 0x00, 0x00));
-	}
+	} 
 
 	my $data;
 	if ($clientdata{$index}{mode}) {
@@ -1138,7 +1087,6 @@ sub SendMapLogin {
 				SendData($client, $data);
 		}
 	}
-
 	# '013A' => ['attack_range', 'v', [qw(type)]],
 	SendData($client, pack("v2", , 0x013A, 1));
 
@@ -1210,12 +1158,11 @@ sub SendUnitName
 	}
 }
 
-sub SendSystemChatMessage
-{
-	my ($self, $client, $msg, $index, $message) = @_;
+sub SendSystemChatMessage {
+    my ($self, $client, $msg, $index, $message) = @_;
 
-	# '009A' => ['system_chat', 'v Z*', [qw(len message)]],
-	SendData($client, pack("v2 a32", 0x009A, 36, $message));
+    my $len = length($message);
+    SendData($client, pack("v v a*", 0x009A, $len, $message));
 }
 
 sub SendShowNPC
@@ -1326,15 +1273,15 @@ sub PerformMapLoadedTasks
 	SendLookTo($self, $client, $msg, $index, $accountID, 4);
 
 	# Let's not wait for the client to ask for the unit info
-	SendUnitInfo($self, $client, $msg, $index, $accountID, 'Celtos' . (($clientdata{$index}{mode} ? ' Dev' : '')));
+	SendUnitInfo($self, $client, $msg, $index, $accountID, 'Poseidon' . (($clientdata{$index}{mode} ? ' Dev' : '')));
 
 	# Global Announce
-	SendSystemChatMessage($self, $client, $msg, $index, "Acesse: www.openkore.com.br!");
+	SendSystemChatMessage($self, $client, $msg, $index, "Welcome to the Poseidon Server !");
 
 	# Show an NPC
-	SendShowNPC($self, $client, $msg, $index, 1, $npcID0, 86, $posX - 3, $posY - 4, "Celtos");
+	SendShowNPC($self, $client, $msg, $index, 1, $npcID0, 86, $posX + 3, $posY + 4, "Server Details Guide");
 	SendLookTo($self, $client, $msg, $index, $npcID0, 3);
-	SendUnitInfo($self, $client, $msg, $index, $npcID0, "www.openkore.com.br");
+	SendUnitInfo($self, $client, $msg, $index, $npcID0, "Server Details Guide");
 
 	# Dev Mode (Char Slot 1)
 	if ($clientdata{$index}{mode})
@@ -1355,7 +1302,3 @@ sub PerformMapLoadedTasks
 }
 
 1;
-
-# 0064 packet thanks to abt123
-# 0204 packet thanks to elhazard
-# queue the response (thanks abt123)

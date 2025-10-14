@@ -95,22 +95,24 @@ map_login 0436
 map_loaded 02EB
 actor_exists 09FF
 skills_list 0B32
-item_list_start 0B08
+item_list_start  0B08
 expandedItemID 1
 actor_info 0A30
 actor_name 0ADF
 
-[ROla_2025-06-17]
-checksum 1
-account_server_info
+[ROLA_2025-05-29]
+account_server_info 0C32
+received_login_token 0AE3
 received_characters 099D
 charBlockSize 155
 received_character_ID_and_Map 0AC5
-map_login 0B1C
+map_login 0436
 map_loaded 02EB
 skills_list 010F
-actor_exists 09FF
+actor_exists 01D8
 item_list_start 0B08
 expandedItemID 1
 actor_info 0A30
-actor_name 0095
+actor_name 0ADF
+master_login 0C26
+token_login 0825
