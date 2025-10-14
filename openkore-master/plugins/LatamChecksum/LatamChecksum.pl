@@ -7,6 +7,7 @@ use Misc;
 use AI;
 use utf8;
 use Network::Send ();
+use Network::Send ();
 use Log           qw(message warning error debug);
 use IO::Socket::INET;
 use Time::HiRes qw(usleep);
@@ -93,28 +94,25 @@ sub serverSendPre {
 
 	return if ( ref($::net) eq 'Network::XKore' );
 
-	# Ativa checksum quando em primeiro pacote e IDs conhecidos
-	if ( $counter == 0 ) {
-		if ( $messageID eq '0B1C' ) {
-			warning "Checksum enabled on first.\n";
-			$enabled = 1;
-		}
-
-		if ( $messageID eq $messageSender->{packet_lut}{map_login} ) {
-			warning "Checksum enabled on map login.\n";
-			$enabled = 1;
-			$messageSender->sendPing();
-		}
-	}
-
-	# Apenas no map e com checksum habilitado, anexa o byte do servidor
+	# Estado de mapa: realizar protocolo de seed no primeiro pacote
 	if ( $::net->getState() >= 4 ) {
+		if ( $counter == 0 ) {
+			# Habilita checksum no primeiro pacote sempre (alinha com fluxo original)
+			$enabled = 1;
+			# Caso seja map_login, mantém o ping como no original
+			if ( $messageID eq $messageSender->{packet_lut}{map_login} ) {
+				warning "Checksum enabled on map login.\n";
+				$messageSender->sendPing();
+			}
+		}
+
+		# Quando habilitado, solicita 1 byte ao servidor
 		if ( $enabled ) {
 			$$msg .= pack( "C", calc_checksum( $$msg ) );
 		}
 	}
 
-	# Incrementa sempre (wrap 12 bits), conforme fluxo oficial
+	# Incrementa sempre (wrap 12 bits)
 	$counter = ( $counter + 1 ) & 0xFFF;
 }
 
