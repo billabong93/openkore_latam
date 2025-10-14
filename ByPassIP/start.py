@@ -32,10 +32,10 @@ DEFAULTS = {
 }
 
 # Timings — aumente se o cliente demorar mais pra iniciar
-INIT_WAIT_MAX = 15.0       # segundos para esperar as strings aparecerem
-INIT_POLL = 0.05           # intervalo de polling enquanto esperando
-AFTER_PATCH_GRACE = 1.0    # tempo de folga após escrever (evita crash)
-BETWEEN_LAUNCH_SLEEP = 3.0 # intervalo entre lançamentos quando abrir todas
+INIT_WAIT_MAX = 90.0       # segundos para esperar as strings aparecerem
+INIT_POLL = 10.0           # intervalo de polling enquanto esperando
+AFTER_PATCH_GRACE = 5.0    # tempo de folga após escrever (evita crash)
+BETWEEN_LAUNCH_SLEEP = 10.0 # intervalo entre lançamentos quando abrir todas
 # ---------------------------------------------------------
 
 DEFAULT_TA = "lt-account-01.gnjoylatam.com:6951"
