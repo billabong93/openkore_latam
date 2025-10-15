@@ -16,6 +16,7 @@ use strict;
 use Network::Receive qw(:actor_type :connection :stat_info :party_invite :party_leave :exp_origin);
 use base qw(Network::Receive);
 use Time::HiRes qw(time usleep);
+use Commands;
 
 use AI;
 use Log qw(message warning error debug);
@@ -60,6 +61,7 @@ sub new {
 	my $self = $class->SUPER::new();
 
 	$self->{packet_list} = {
+		'0BC7' => ['reconnect_on_0BC7'],
 		'0069' => ['account_server_info', 'v a4 a4 a4 a4 a26 C a*', [qw(len sessionID accountID sessionID2 lastLoginIP lastLoginTime accountSex serverInfo)]],
 		'006A' => ['login_error', 'C Z20', [qw(type date)]],
 		# '006B' => ['received_characters_info', 'v x20 a*', [qw(len charInfo)]], # not used in official server
@@ -1604,6 +1606,23 @@ sub senbei_amount {
 	my ($self, $args) = @_;
 
 	$char->{senbei} = $args->{senbei};
+}
+
+sub reconnect_on_0BC7 {
+    my ($self, $args) = @_;
+    our $last_relog_0BC7 ||= 0;
+    my $now = time;
+
+    # anti-loop: 30s
+    return if $now - $last_relog_0BC7 < 30;
+    $last_relog_0BC7 = $now;
+
+    my $raw = unpack('H*', $args->{RAW_MSG} // '');
+    message sprintf("[0BC7] recebido (len=%d raw=%s) -> relog em 0s\n",
+        length($args->{RAW_MSG} // ''), $raw);
+
+
+    Commands::run("relog 0");
 }
 
 *changeToInGameState = *Network::Receive::changeToInGameState;
