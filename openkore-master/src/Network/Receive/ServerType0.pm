@@ -60,7 +60,7 @@ sub new {
 	my $self = $class->SUPER::new();
 
 	$self->{packet_list} = {
-		'08C7' => ['detector_de_macro', 'v', [qw(flag)]],
+		'0BC7' => ['detector_de_macro', 'v', [qw(flag)]],
 		'0069' => ['account_server_info', 'v a4 a4 a4 a4 a26 C a*', [qw(len sessionID accountID sessionID2 lastLoginIP lastLoginTime accountSex serverInfo)]],
 		'006A' => ['login_error', 'C Z20', [qw(type date)]],
 		# '006B' => ['received_characters_info', 'v x20 a*', [qw(len charInfo)]], # not used in official server
