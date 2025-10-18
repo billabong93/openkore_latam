@@ -7577,7 +7577,6 @@ sub npc_talk_responses {
     autoNpcTalk($ID, $nameID);
 
     $talk{ID} = $ID;
-	$talk{name} = $name;
     $talk{nameID} = $nameID;
 
     my $talk = unpack("Z*", substr($msg, 8));
