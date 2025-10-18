@@ -8,7 +8,6 @@ gon_fild01 255 79 alberta 243 67 0 c r0 n
 izlude 197 205 izlu2dun 107 50 150 c r0
 izlu2dun 108 27 izlude 176 182 0 c r0
 prt_fild05 270 212 prt_sewb1 135 248 0 c r0
-aldebaran 223 222 xmas_fild01 78 68 0 c r1 c c n
 moc_fild12 35 303 cmd_fild08 331 319 0 c r0 n
 ayothaya 152 68 alberta 247 42 0 c r0 n
 ama_in02 115 177 ama_dun01 229 10 0 c r1 c r0 n
@@ -63,7 +62,6 @@ new_2-2 118 108 geffen 122 65 0 c c c r0 c c c r4 c
 new_3-2 118 108 geffen 122 65 0 c c c r0 c c c r4 c
 new_4-2 118 108 geffen 122 65 0 c c c r0 c c c r4 c
 new_5-2 118 108 geffen 122 65 0 c c c r0 c c c r4 c
-
 new_1-2 126 106 new_1-2 160 171
 new_2-2 126 106 new_2-2 160 171
 new_3-2 126 106 new_3-2 160 171
@@ -84,7 +82,6 @@ new_2-2 46 172 new_2-2 78 106
 new_3-2 46 172 new_3-2 78 106
 new_4-2 46 172 new_4-2 78 106
 new_5-2 46 172 new_5-2 78 106
-
 new_1-3 96 174 new_1-4 99 10 0 c r0 c
 new_2-3 96 174 new_2-4 99 10 0 c r0 c
 new_3-3 96 174 new_3-4 99 10 0 c r0 c
@@ -113,6 +110,7 @@ cmd_fild08 335 355 anthell01 35 263
 cmd_fild08 348 82 anthell02 171 170
 
 # Dimensional Gorge (Episode 12)
+
 # moc_fild20 -> moc_fild21 npcs are only available with the quest and a party with at least two members online
 moc_fild20 38 174 moc_fild21 38 193 0 c r1 c c c
 moc_fild20 38 183 moc_fild21 38 193 0 c r1 c c c
@@ -142,30 +140,37 @@ rachel 149 138 bat_room 154 150 0 c c r0 c
 #bat_room 148 150 payon 161 58 0 c r0 c
 #bat_room 148 150 prontera 116 72 0 c r0 c
 #bat_room 148 150 rachel 115 124 0 c r0 c
-
 # following bat_room npcs are only available with base lvl 80
+
 # Tierra 1 Blue
 bat_room 124 178 bat_room 57 223 0 c r0 c
 bat_room 57 220 bat_room 154 150
+
 # Tierra 1 Red
 bat_room 125 121 bat_room 57 207 0 c r0 c
 bat_room 57 211 bat_room 154 150
+
 # Flavius 1 Blue
 bat_room 133 178 bat_room 85 223 0 c r0 c
 bat_room 85 220 bat_room 154 150
+
 # Flavius 1 Red
 bat_room 133 121 bat_room 85 207 0 c r0 c
 bat_room 85 211 bat_room 154 150
+
 # Tierra 2 Blue
 bat_room 140 178 bat_room 114 223 0 c r0 c
 bat_room 113 220 bat_room 154 150
+
 # Tierra 2 Red
 bat_room 140 121 bat_room 114 207 0 c r0 c
 bat_room 113 211 bat_room 154 150
+
 # Flavius 2 Blue
 bat_room 148 178 bat_room 141 224 0 c r0 c
 bat_room 141 220 bat_room 154 150
 bat_b02 10 293 bat_room 154 150 0 c
+
 # Flavius 2 Red
 bat_room 148 121 bat_room
 bat_room  bat_room 154 150
@@ -219,12 +224,12 @@ dali02 45 96 moc_fild22 36 196 c r0 c n
 
 #Cat Hand Agent Warper
 #moc_para01 17 33 moc_fild20 342 198 c r0 n
-#moc_fild20 368 197 moc_fild22b c r1 n
-moc_fild22b 182 179 mid_camp 210 291 c c c c r0 c c n
+#moc_fild20 368 197 moc_fild22b 175 159 c r1 n
+#moc_fild22b 182 179 mid_camp 210 291 c c c c r0 c c n
 mid_camp 207 234 spl_fild02 51 240 10000 c c r2
 mid_camp 207 234 man_fild02 133 47 10000 c c r4
 spl_fild02 53 242 mid_camp 180 247 10000 c c r4
-spl_fild02 53 242 bif_fild02 291 232 55000 c c r2
+spl_fild02 53 242 bif_fild02 291 323 55000 c c r2
 bif_fild02 293 325 spl_fild02 51 240 55000 c c r4
 bif_fild02 293 325 ecl_fild01 116 309 15000 c c r2
 ecl_fild01 117 311 bif_fild02 291 323 15000 c c r2
@@ -233,7 +238,10 @@ man_fild02 135 49 dic_fild01 159 264 20000 c c r4
 dic_fild01 161 266 man_fild02 135 49 20000 c c r2
 
 #Splendide
-mid_camp 13 143 spl_fild02 379 143 c r0 n #
+mid_camp 13 143 spl_fild02 379 143 c r0 n 
+#
+mid_camp 9 215 spl_fild02 380 217 c r0 n 
+#
 spl_fild02 382 143 mid_camp 16 143
 mid_camp 9 213 spl_fild02 380 217 c r0 n
 spl_fild02 383 216 mid_camp 12 215
@@ -354,8 +362,6 @@ dic_dun01 28 100 dic_dun01 367 172
 dic_dun01 371 100 dic_dun01 33 43
 dic_dun01 29 43 dic_dun01 367 100
 dic_dun01 371 44 dic_fild01 28 79
-dic_dun01 286 104 dic_dun02 101 142 c r0 n
-dic_dun02 102 148 dic_dun01 290 99
 dicastes01 255 175 dic_in01 344 272
 dic_in01 342 271 dicastes01 255 173
 dicastes01 136 103 dic_in01 26 98
@@ -404,38 +410,45 @@ dic_in01 121 203 dic_in01 122 282 r2
 dic_in01 121 203 dic_in01 121 201 r3
 
 # Battlegrounds (Episode 13)
+
 # KVM Blue
 bat_room 164 178 bat_room 169 223 0 c r0 c
 bat_room 169 220 bat_room 154 150
+
 #(chatroom) bat_room 169 226 bat_c01 53 131
 bat_c01 51 130 bat_room 154 150 0 c
+
 # KVM Red
 bat_room 164 121 bat_room 169 207 0 c r0 c
 bat_room 169 211 bat_room 154 150
+
 #(chatroom) bat_room 169 205 bat_c01 147 56
 bat_c01 148 54 bat_room 154 150 0 c
 
-#################### Criatura Academy ####################
+# Criatura Academy #
 izlude 125 257 iz_ac01 99 29
 izlude 130 257 iz_ac01 99 29
 iz_ac01 100 24 izlude 127 253
+
 # Eden Teleport Officer
 iz_ac01 106 36 moc_para01 31 14 0 c r0 c
+
 # Garden
 iz_ac01 45 80 new_1-3 95 171 0 c r0 c
 new_1-3 96 176 iz_ac01 49 73
+
 # Second floor
 iz_ac01 78 25 iz_ac02 104 27
 iz_ac01 122 25 iz_ac02 104 27
 iz_ac02 94 27 iz_ac01 78 28
 iz_ac02 113 27 iz_ac01 122 28
+
 # Free Warps (Kafra)
 iz_ac01 95 46 iz_ac01 97 86 0 c c c r2 c c c r1 r0
 iz_ac01 95 46 iz_ac02 104 179 0 c c c r2 c c c r1 r1
 iz_ac01 95 46 izlude 128 98 0 c c c r2 c c c r1 r2 c r1
 iz_ac02 101 176 iz_ac01 97 86 0 c c c r2 c c c r1 r0
 iz_ac02 101 176 izlude 128 98 0 c c c r2 c c c r1 r2 c r1
-
 alb_ship 26 166 alberta 170 170
 alb_ship 37 174 alb_ship 68 99
 alb_ship 41 163 alberta 178 165
@@ -1666,7 +1679,7 @@ prontera 204 192 prt_in 68 130
 prontera 208 154 prt_in 172 33
 prontera 237 317 prt_church 100 56
 prontera 289 203 prt_fild06 23 193
-#prontera 121 72 prontera 156 327
+#prontera 121 72 prontera 156 32
 #prt_cas 27 27 dali 109 86 c r3 c c r0
 prt_castle 28 121 prt_castle 40 138
 prt_castle 31 113 prt_castle 54 113
@@ -2067,7 +2080,6 @@ um_fild02 188 374 um_fild04 182 13
 um_fild02 373 148 um_fild03 32 145
 um_fild02 373 329 um_fild03 19 334
 um_fild02 22 272 um_fild01 369 277
-um_fild02 373 148 um_fild03 32 145
 um_fild03 19 334 um_fild02 373 329
 um_fild03 32 145 um_fild02 373 148
 um_fild03 114 50 cmd_fild01 77 366
@@ -2264,7 +2276,6 @@ ra_in01 241 299 ra_in01 193 312
 ra_in01 185 303 ra_in01 194 249
 ra_in01 357 61 ra_in01 310 62
 ra_in01 297 59 ra_in01 339 116
-ra_temin 28 319 ra_san01 139 139
 ra_temin 130 93 ra_temin 239 258
 ra_temin 206 93 ra_temin 312 258
 ra_temin 275 332 ra_temin 27 305
@@ -2344,7 +2355,8 @@ lhz_fild01 296 382 ra_fild06 298 25
 ra_fild12 36 225 rachel 270 125
 ra_fild08 165 29 ra_fild12 149 369
 ra_fild12 149 374 ra_fild08 165 36
-ra_fild12 303 27 ra_fild13 295 341
+
+#ra_fild12 303 27 ra_fild13 295 341
 ra_fild13 295 346 ra_fild12 303 33
 ra_fild11 360 226 rachel 30 125
 ra_fild11 21 290 ra_fild10 379 283
@@ -2448,10 +2460,8 @@ ve_fild04 44 249 ve_fild03 350 220
 ve_fild04 115 50 ve_fild06 80 183
 ve_fild05 200 330 ve_fild03 222 48
 ve_fild05 359 192 ve_fild06 80 183
-ve_fild06 153 220 veins 218 355
 ve_fild06 81 177 ve_fild04 115 55
 ve_fild06 81 177 ve_fild05 354 191
-ve_fild07 147 371 veins 146 28
 yuno_fild06 369 136 hu_fild04 28 126
 hu_fild04 26 126 yuno_fild06 367 136
 yuno_fild06 149 369 hu_fild01 139 37
@@ -2471,13 +2481,9 @@ abbey01 87 122 abbey01 13 201
 abbey01 13 204 abbey01 88 118
 abbey01 321 102 abbey02 149 11
 abbey02 149 8 abbey01 321 99
-abbey02 149 290 abbey03 119 8
-abbey03 119 5 abbey02 149 287
 abyss_01 267 274 hu_fild05 192 207
 abyss_01 26 23 abyss_02 275 270
 abyss_02 278 270 abyss_01 26 26
-abyss_02 145 281 abyss_03 116 27
-abyss_03 116 24 abyss_02 145 278
 einbroch 92 280 airplane 224 64
 einbroch 64 234 airport 138 51
 airport 142 61 einbroch 62 246
@@ -2786,7 +2792,6 @@ alberta 246 51 moscovia 162 56 10000 c r1 c r0 n
 moscovia 166 53 alberta 243 67 0 c r0 n
 alberta 189 151 izlude 190 209 500 c r1
 hu_fild06 200 372 hugel 95 37
-hugel 95 33 hu_fild06 200 367
 hu_fild06 28 119 hu_fild05 347 130
 hu_fild05 353 126 hu_fild06 34 119
 airplane 254 54 airplane 91 67
@@ -2840,9 +2845,9 @@ s_atelier 18 79 lighthalzen 41 56
 einbroch 218 198 einbroch 181 196 10 c c c c r0
 einbroch 173 229 einbroch 179 204 10 c c c c r0
 einbroch 176 172 einbroch 181 196 10 c c c c r0
+
 # 175 196 have several destinations, all in einbroch
 einbroch 175 196 einbroch 216 188 0 c c r0
-
 einbroch 137 199 que_ng 138 167
 que_ng 130 166 einbroch 130 197
 que_ng 178 162 que_ng 176 86
@@ -2859,7 +2864,6 @@ y_airport 145 63 yuno 59 244 0 c r0 n
 # Lighthalzen airport
 lhz_airport 143 43 lhz_airport 148 51 1200 c r0 c r0 n
 lhz_airport 143 49 lhz_airport 142 40 0 c r0 c r0 n
-
 prt_fild03 371 256 prt_monk 25 248
 prt_monk 245 137 monk_in 98 183
 monk_in 98 186 prt_monk 245 139
@@ -2901,7 +2905,6 @@ aldebaran 53 65 alde_alche 42 175
 alde_alche 42 171 aldebaran 56 68
 alde_alche 41 186 alde_alche 113 178
 alde_alche 114 183 alde_alche 42 182
-
 lhz_airport 142 13 lighthalzen 262 75
 
 # Lighthalzen Rekenber HQ - entrance
@@ -2912,7 +2915,6 @@ lhz_in01 116 121 lighthalzen 106 243
 lhz_in01 35 226 lhz_in01 37 225 0 n
 lhz_in01 40 224 lhz_in01 19 129
 lhz_in01 15 129 lhz_in01 34 224
-
 lhz_in01 191 127 lhz_in01 53 129
 lhz_in01 43 114 lhz_in01 277 130
 lhz_in01 278 132 lhz_in01 43 120
@@ -2931,7 +2933,6 @@ lighthalzen 251 299 lhz_in03 97 21
 lhz_in03 93 21 lighthalzen 247 299
 
 # Rogue Guild
-
 cmd_fild07 193 117 in_rogue 379 46
 in_rogue 375 46 cmd_fild07 196 117
 in_rogue 375 33 in_rogue 380 125
@@ -2939,7 +2940,9 @@ in_rogue 375 125 in_rogue 379 33
 
 #(portal with dialog) cmd_fild09 335 143 in_rogue 169 34 0 c r0 r2 r4 r0 c
 in_rogue 172 34 cmd_fild09 341 143
+
 # maze entrance
+
 #in_rogue 160 34 in_rogue x y 0 c c c c c c r0
 
 # maze exit
@@ -2948,22 +2951,29 @@ in_rogue 370 320 in_rogue 378 113
 # Louyang Tower
 louyang 133 245 lou_in01 25 19
 lou_in01 28 19 louyang 136 245
+
 # bug: Kore can't use this portal properly lou_in01 25 23 lou_in01 17 19 500 c c r1 c
 
 # Mushroom Farm
-moc_ruins 141 125 job_thief1 133 333 0 c # random endpoint
+moc_ruins 141 125 job_thief1 133 333 0 c 
+# random endpoint
 job_thief1 180 15 moc_ruins 145 117
 
 # Hugel - Lighthalzen Airship (needs additional configuration)
+
 #airplane 243 73 einbroch 92 278
+
 #airplane 243 73 hugel 181 146
+
 #airplane 243 73 lighthalzen 302 75
+
 #airplane 243 73 yuno 92 260
 new_zone01 148 112 new_zone02 100 9
 new_zone02 126 106 new_zone02 160 171
 new_zone02 73 106 new_zone02 41 172
 pay_fild07 163 17 pay_fild03 177 275
 alde_alche 19 171 aldebaran 68 56
+
 #airport 142 13 lighthalzen 262 75
 lighthalzen 196 46 lhz_in02 282 83
 lhz_in02 274 82 lhz_in02 270 14
@@ -2986,7 +2996,6 @@ geffen 132 66 moc_para01 31 14 c c r0
 geffen 196 147 moc_para01 31 14 c c r0
 payon 177 111 moc_para01 31 14 c c r0
 aldebaran 133 119 moc_para01 31 14 c c r0
-
 moscovia 220 192 moc_para01 31 14 c c r0
 einbroch 55 202 moc_para01 31 14 c c r0
 yuno 144 189 moc_para01 31 14 c c r0
@@ -3032,6 +3041,7 @@ ma_fild02 248 33 ma_fild01 266 359
 ma_fild01 266 359 ma_fild02 248 36
 ma_scene01 140 80 ma_fild01 288 52
 ma_fild01 288 52 ma_scene01 142 78
+
 #Need to finish nurse quest to get access to the hospital
 malaya 48 76 ma_dun01 33 110 0 r0 n
 ma_dun01 35 108 malaya 58 76 0 c r0 n
@@ -3084,14 +3094,10 @@ mal_in02 137 53 mal_in02 139 33
 mal_in02 159 61 mal_in02 142 60
 mal_in02 142 60 mal_in02 162 61
 
-# following is a single warp, depends of entrance npc used
-# currently unsupported, do not enable that
-moc_para01 30 10 prontera 116 72
-
-#------------------------------
 xmas 139 307 evt_xmas 129 129 0 c r1
 
 #EP-14.2
+
 # mora <-> bif_fild02
 mora 182 74 bif_fild02 286 327
 mora 56 25 bif_fild02 176 162
@@ -3141,29 +3147,23 @@ ecl_in01 47 8 eclage 297 307
 #Flame Basin
 moro_vol 91 105 ecl_in01 38 96 c c r0 n
 ecl_in01 38 98 moro_vol 91 102 c r0 n
-
 aethra 71 132 aethra_in 127 126
 aethra 90 168 aethra_in 199 176
 aethra_in 127 122 aethra 71 132
 aethra_in 199 172 aethra 90 168
-
 ashroom 24 78 pallet 41 68
 ashroom 37 27 ashroom 90 63
 ashroom 81 56 pallet 24 44
 ashroom 90 66 ashroom 37 27
-
 pallet 24 44 ashroom 81 58
 pallet 41 68 ashroom 22 94
 pallet 51 28 ashroom 24 78
 pallet 53 49 plt_in 35 55
-
 plt_in 19 62 plt_in 114 61
 plt_in 35 52 pallet 53 49
 plt_in 111 61 plt_in 19 62
 plt_in 131 69 saladuelo 44 17
-
 saladuelo 44 17 plt_in 127 68
-
 caspen 96 205 ayo_in02 100 151
 caspen 104 265 casp_in01 174 190
 caspen 117 232 cmd_in02 178 132
@@ -3399,15 +3399,22 @@ moc_para01 47 161 moc_para01 48 16
 moc_para01 179 90 moc_para01 41 187
 moc_para01 41 187 moc_para01 179 93
 
-#### MAPAS FALTANTES por CELTOS
+# MAPAS FALTANTES por CELTOS
+
 # Payon Dungeon (variações)
+
 #pay_dun00_a 20 180 pay_dun01 100 100
+
 #pay_dun00_b 20 180 pay_dun01 100 100
+
 #pay_dun00_c 20 180 pay_dun01 100 100
 
 # Orc Dungeon (variações)
+
 #orcsdun01_a 33 170 orcsdun02 21 185
+
 #orcsdun01_b 33 170 orcsdun02 21 185
+
 #orcsdun01_c 33 170 orcsdun02 21 185
 
 # Izlude (variações)
@@ -3417,8 +3424,11 @@ izlude_c 197 205 izlu2dun 107 50 150 c r0
 izlude_d 197 205 izlu2dun 107 50 150 c r0
 
 # Geffen Field 10 (variações)
+
 #gef_fild10_a 52 326 mjolnir_02 99 351 1700 c r2 c r3
+
 #gef_fild10_b 52 326 mjolnir_02 99 351 1700 c r2 c r3
+
 #gef_fild10_c 52 326 mjolnir_02 99 351 1700 c r2 c r3
 
 # Academia Izlude (iz_ac01 / iz_ac02)
@@ -3428,8 +3438,11 @@ iz_ac01_c 100 24 izlude 127 253
 iz_ac01_d 100 24 izlude 127 253
 
 #iz_ac02_a 94 27 iz_ac01 78 28
+
 #iz_ac02_b 94 27 iz_ac01 78 28
+
 #iz_ac02_c 94 27 iz_ac01 78 28
+
 #iz_ac02_d 94 27 iz_ac01 78 28
 
 # Arena / Testes
@@ -3437,13 +3450,14 @@ iz_ac01_d 100 24 izlude 127 253
 1@ma_b 100 100 prt_are_in 60 14
 1@ma_c 100 100 prt_are_in 60 14
 1@ma_d 100 100 prt_are_in 60 14
-
 1@os_a 100 100 prt_are_in 60 14
 1@os_b 100 100 prt_are_in 60 14
 1@os_c 100 100 prt_are_in 60 14
 
 # Gl_church
+
 #gl_church_a 150 150 gl_church 50 50
+
 #gl_church_b 150 150 gl_church 50 50
 
 # Prontera evento
@@ -3460,7 +3474,12 @@ que_ba 150 150 prontera 116 72
 iz_ac02_a 217 27 iz_ac01_a 122 25
 iz_ac01_a 122 25 iz_ac02_a 214 27
 
-### De nada (variações e updates) 24.09.25 ### billabong93
+#
+#
+# De nada (variações e updates) 24.09.25 
+#
+#
+# billabong93
 
 # Prontera
 prontera 29 207 alberta 117 56 180 1 c r3 c r5 n
@@ -3520,7 +3539,6 @@ izlude 128 148 payon 161 58 120 1 c r2 c r1
 izlude 131 148 moc_para01 31 14 c c r0 n
 izlude 182 218 malangdo 206 297 1000 c r1 c c r0 n
 izlude 197 205 alberta 188 169 500 c r1 n
-izlude 197 205 izlu2dun 107 50 150 c r0
 izlude 202 75 airplane_01 244 58 1200 c r0 c r0 n
 izlude 213 161 arena_room 100 30
 izlude_a 20 98 prt_fild08 367 212
@@ -3554,7 +3572,6 @@ izlude_b 213 161 arena_room 100 30
 izlude_c 20 98 prt_fild08 367 212
 izlude_c 52 172 izlude_in 74 161
 izlude_c 110 182 izlude_in 65 87
-izlude_c 125 257 iz_ac01 99 29
 izlude_c 125 257 iz_ac01 99 29
 izlude_c 128 148 aldebaran 168 112 180 1 c r2 c r3
 izlude_c 128 148 geffen 120 39 120 1 c r2 c r0
@@ -3728,6 +3745,11 @@ payon 181 104 alberta 117 56 120 1 c r3 c r1 n
 payon 181 104 morocc 156 47 120 1 c r3 c r2 n
 payon 181 104 prontera 116 72 120 1 c r3 c r0 n
 
+# Bazar de Payon
+payon 181 104 pay_mk 212 100 c r0 n
+pay_mk 108 75 payon 168 106 c r2 n
+pay_mk 108 75 moc_para01 31 14 c r3 n
+
 # Morroc
 morocc 155 257 cmd_fild02 89 83 250 c r3 c r0 n
 morocc 155 257 moc_fild11 267 100 100 c r2 c r0 n
@@ -3787,6 +3809,7 @@ aldebaran 143 119 geffen 120 39 120 1 c r2 c r0 n
 aldebaran 143 119 izlude 120 39 120 1 c r2 c r2 n
 aldebaran 143 119 mjolnir_02 99 351 170 1 c r2 c r2 n
 aldebaran 143 119 yuno 158 125 120 1 c r2 c r1 n
+aldebaran 168 168 xmas_fild01 78 68 0 c r1 c c n
 
 # Juno 
 y_airport 128 46 airplane 244 58 1200 1 c r0 c r0 n
@@ -3811,7 +3834,6 @@ lighthalzen 164 86 moc_para01 31 14 c c r0 n
 lighthalzen 167 103 lhz_fild01 244 130 200 c r0 c r0 n
 
 # Rachel
-ra_fild12 295 208 airplane_01 245 60
 rachel 109 138 veins 205 101 220 1 c r2 c r0
 rachel 116 139 ra_fild04 214 220 600 c r0 c r0 n
 rachel 116 139 ve_fild04 198 174 600 c r1 c r0 n
@@ -3825,12 +3847,19 @@ veins 208 128 rachel 115 125 220 1 c r2 c r0 n
 hugel 186 147 airplane 244 58 1 1200 c c r0 n
 
 # Aeroplano
+
 #airplane 243 73 airport 143 39
+
 #airplane 243 73 hugel 183 149
+
 #airplane 243 73 lhz_airport 143 39
+
 #airplane 243 73 y_airport 143 39
+
 #airplane_01 243 74 izlude 200 73
+
 #airplane_01 243 74 ra_fild12 292 204
+
 #airplane_01 243 74 y_airport 143 39
 airport 138 46 airplane 244 58 1200 1 c r0 c r0 n
 airport 148 46 airplane 244 58 1200 1 c r0 c r0 n
@@ -3841,7 +3870,6 @@ brasilis 308 336 bra_fild01 74 34
 bra_fild01 72 34 brasilis 309 334
 
 # Arredores de Prontera 08
-prt_fild08 371 212 izlude 24 98
 prt_fild08a 16 187 prt_fild07 380 186
 prt_fild08a 16 239 prt_fild07 379 239
 prt_fild08a 55 21 moc_fild01 56 380
@@ -3910,6 +3938,20 @@ pay_dun00_b 184 33 pay_dun01 19 33
 pay_dun00_c 21 186 pay_arche 39 131
 pay_dun00_c 184 33 pay_dun01 19 33
 
+# Monte Mjolnir
+mjolnir_07a 16 377 mjolnir_06 382 377
+mjolnir_07a 17 77 mjolnir_06 383 74
+mjolnir_07a 156 16 prt_fild00 159 383
+mjolnir_07a 214 383 mjolnir_03 212 17
+mjolnir_07a 383 233 mjolnir_08 30 234
+mjolnir_07a 383 362 mjolnir_08 29 346
+mjolnir_07b 16 377 mjolnir_06 382 377
+mjolnir_07b 17 77 mjolnir_06 383 74
+mjolnir_07b 156 16 prt_fild00 159 383
+mjolnir_07b 214 383 mjolnir_03 212 17
+mjolnir_07b 383 233 mjolnir_08 30 234
+mjolnir_07b 383 362 mjolnir_08 29 346
+
 # Geffen
 geffen 115 66 gef_fild06 34 270 6666 c r3 c r0 n
 geffen 115 66 gef_fild10 150 301 100 c r2 c r0 n
@@ -3949,14 +3991,30 @@ gef_f10_c 215 51 in_orcs01 162 53
 gef_f10_c 223 205 in_orcs01 108 89
 gef_f10_c 251 371 gef_fild09 225 28
 gef_f10_c 370 56 gef_fild03 21 52
-gef_f10_d 63 337 in_orcs01 30 157
-gef_f10_d 104 21 gef_fild11 114 360
-gef_f10_d 136 331 in_orcs01 122 171
-gef_f10_d 138 284 in_orcs01 29 114
-gef_f10_d 215 51 in_orcs01 162 53
-gef_f10_d 223 205 in_orcs01 108 89
-gef_f10_d 251 371 gef_fild09 225 28
-gef_f10_d 370 56 gef_fild03 21 52
+gef_fild10_a 63 337 in_orcs01 30 157
+gef_fild10_a 104 21 gef_fild11 114 360
+gef_fild10_a 136 331 in_orcs01 122 171
+gef_fild10_a 138 284 in_orcs01 29 114
+gef_fild10_a 215 51 in_orcs01 162 53
+gef_fild10_a 223 205 in_orcs01 108 89
+gef_fild10_a 251 371 gef_fild09 225 28
+gef_fild10_a 370 56 gef_fild03 21 52
+gef_fild10_b 63 337 in_orcs01 30 157
+gef_fild10_b 104 21 gef_fild11 114 360
+gef_fild10_b 136 331 in_orcs01 122 171
+gef_fild10_b 138 284 in_orcs01 29 114
+gef_fild10_b 215 51 in_orcs01 162 53
+gef_fild10_b 223 205 in_orcs01 108 89
+gef_fild10_b 251 371 gef_fild09 225 28
+gef_fild10_b 370 56 gef_fild03 21 52
+gef_fild10_c 63 337 in_orcs01 30 157
+gef_fild10_c 104 21 gef_fild11 114 360
+gef_fild10_c 136 331 in_orcs01 122 171
+gef_fild10_c 138 284 in_orcs01 29 114
+gef_fild10_c 215 51 in_orcs01 162 53
+gef_fild10_c 223 205 in_orcs01 108 89
+gef_fild10_c 251 371 gef_fild09 225 28
+gef_fild10_c 370 56 gef_fild03 21 52
 
 # Caverna dos Orcs
 orcsdun01_a 32 172 in_orcs01 30 180
@@ -3975,6 +4033,79 @@ gl_church_a 301 46 gl_chyard 147 15
 gl_church_b 16 299 gl_chyard 147 284
 gl_church_b 156 4 glast_01 200 134
 gl_church_b 301 46 gl_chyard 147 15
+
+# Arredores de Rachel
+ra_fild12 295 208 airplane_01 245 60
+ra_fild12a 295 208 airplane_01 245 60
+ra_fild12a 36 225 rachel 270 125
+ra_fild12a 149 374 ra_fild08 165 36
+ra_fild12b 295 208 airplane_01 245 60
+ra_fild12b 36 225 rachel 270 125
+ra_fild12b 149 374 ra_fild08 165 36
+
+# Santuário de Rachel
+ra_san01a 139 139 ra_temin 27 314
+ra_san01b 139 139 ra_temin 27 314
+ra_san01 139 13 ra_san02 213 275
+ra_san01a 139 13 ra_san02 213 275
+ra_san01b 139 13 ra_san02 213 275
+ra_temin 28 319 ra_san01 140 135
+
+# Arredores de Veins
+ve_fild03a 355 223 ve_fild04 49 249
+ve_fild03b 355 223 ve_fild04 49 249
+ve_fild03a 222 43 ve_fild05 200 325
+ve_fild03b 222 43 ve_fild05 200 325
+ve_fild03a 168 240 thor_v01 21 229
+ve_fild03b 168 240 thor_v01 21 229
+ve_fild07a 147 371 veins 146 28							  
+ve_fild07a 127 130 nameless_n 257 217
+ve_fild07b 147 371 veins 146 28							  
+ve_fild07b 127 130 nameless_n 257 217
+
+# Caverna de Magma
+mag_dun01a 125 67 yuno_fild03 37 140
+mag_dun01b 125 67 yuno_fild03 37 140
+mag_dun01a 243 240 mag_dun02 48 37
+mag_dun01b 243 240 mag_dun02 48 37
+mag_dun02a 48 33 mag_dun01 243 240
+mag_dun02b 48 33 mag_dun01 243 240
+
+# Monastério
+abbey02 149 290 abbey03 120 9
+abbey03 119 5 abbey02 149 285
+abbey03a 119 5 abbey02 149 285
+abbey03b 119 5 abbey02 149 285
+
+# Ruínas de Juperos
+juperos_01a 51 249 jupe_cave 29 52
+juperos_01b 51 249 jupe_cave 29 52
+juperos_01a 245 87 ver_eju 13 148
+juperos_01b 245 87 ver_eju 13 148
+
+# Caverna Subterrânea do Lago do Abismo
+abyss_02 145 280 abyss_03 115 30
+abyss_03 115 25 abyss_02 145 275
+abyss_03a 115 25 abyss_02 145 275
+abyss_03b 115 25 abyss_02 145 275
+
+# Vulcão de Thor
+thor_v03a 30 262 thor_v02 187 58
+thor_v03b 30 262 thor_v02 187 58
+
+# Templo de Odin
+odin_tem02a 21 180 odin_tem01 373 182
+odin_tem02a 21 334 odin_tem01 379 334
+odin_tem02a 153 349 odin_tem03 120 54
+odin_tem02a 261 377 odin_tem03 247 40
+odin_tem02b 21 180 odin_tem01 373 182
+odin_tem02b 21 334 odin_tem01 379 334
+odin_tem02b 153 349 odin_tem03 120 54
+odin_tem02b 261 377 odin_tem03 247 40
+
+# Caverna Scaraba
+dic_dun02a 102 148 dic_dun01 290 99
+dic_dun02b 102 148 dic_dun01 290 99
 
 # Éden HQ
 moc_para01 17 187 moc_para01 132 159
@@ -4046,75 +4177,80 @@ moc_para0c 158 26 moc_para0c 55 27
 moc_para0c 179 90 moc_para0c 41 185
 moc_para0c 180 156 moc_para0c 29 185
 
-# Malangdo
+# Arredores de Louyang
+lou_fild01a 190 100 alberta 235 45 0 c r0
+lou_fild01b 190 100 alberta 235 45 0 c r0
+lou_fild01a 233 356 louyang 218 22
+lou_fild01b 233 356 louyang 218 22
 malangdo 218 81 lasagna 206 297 2000 c c r0 n
 malangdo 219 86 alberta 192 150 1000 c c r1 n
 malangdo 219 86 izlude 86 159 1000 c c r0 n
 
-# Zonda Staff ### ******Provisório******
-alberta 35 239 bif_fild02 291 232 20000 c r0 c r0 n
-alberta 35 239 eclage 100 28 20000 c r1 c r0 n
-alberta 35 239 splendide 271 386 20000 c r2 c r0 n
+# Zonda Staff ******X Y Provisório******
+alberta 35 239 bif_fild02 291 232 15000 c r0 c r0 n
+alberta 35 239 eclage 100 28 17000 c r1 c r0 n
+alberta 35 239 splendide 271 386 17000 c r2 c r0 n
 alberta 35 239 mid_camp 210 288 19000 c r3 c r0 n
-alberta 35 239 manuk 112 352 20000 c r4 c r0 n
-alberta 35 239 dic_fild01 149 279 20000 c r5 c r0 n
-prontera 145 87 bif_fild02 291 232 20000 c r0 c r0 n
-prontera 145 87 eclage 100 28 20000 c r1 c r0 n
-prontera 145 87 splendide 271 386 20000 c r2 c r0 n
+alberta 35 239 manuk 112 352 22000 c r4 c r0 n
+alberta 35 239 dic_fild01 149 279 24000 c r5 c r0 n
+prontera 145 87 bif_fild02 291 232 15000 c r0 c r0 n
+prontera 145 87 eclage 100 28 17000 c r1 c r0 n
+prontera 145 87 splendide 271 386 17000 c r2 c r0 n
 prontera 145 87 mid_camp 210 288 19000 c r3 c r0 n
-prontera 145 87 manuk 112 352 20000 c r4 c r0 n
-prontera 145 87 dic_fild01 149 279 20000 c r5 c r0 n
-morocc 157 257 bif_fild02 291 232 20000 c r0 c r0 n
-morocc 157 257 eclage 100 28 20000 c r1 c r0 n
-morocc 157 257 splendide 271 386 20000 c r2 c r0 n
+prontera 145 87 manuk 112 352 22000 c r4 c r0 n
+prontera 145 87 dic_fild01 149 279 24000 c r5 c r0 n
+morocc 157 257 bif_fild02 291 232 15000 c r0 c r0 n
+morocc 157 257 eclage 100 28 17000 c r1 c r0 n
+morocc 157 257 splendide 271 386 17000 c r2 c r0 n
 morocc 157 257 mid_camp 210 288 19000 c r3 c r0 n
-morocc 157 257 manuk 112 352 20000 c r4 c r0 n
-morocc 157 257 dic_fild01 149 279 20000 c r5 c r0 n
-payon 178 104 bif_fild02 291 232 20000 c r0 c r0 n
-payon 178 104 eclage 100 28 20000 c r1 c r0 n
-payon 178 104 splendide 271 386 20000 c r2 c r0 n
+morocc 157 257 manuk 112 352 22000 c r4 c r0 n
+morocc 157 257 dic_fild01 149 279 24000 c r5 c r0 n
+payon 178 104 bif_fild02 291 232 15000 c r0 c r0 n
+payon 178 104 eclage 100 28 17000 c r1 c r0 n
+payon 178 104 splendide 271 386 17000 c r2 c r0 n
 payon 178 104 mid_camp 210 288 19000 c r3 c r0 n
-payon 178 104 manuk 112 352 20000 c r4 c r0 n
-payon 178 104 dic_fild01 149 279 20000 c r5 c r0 n
-geffen 117 66 bif_fild02 291 232 20000 c r0 c r0 n
-geffen 117 66 eclage 100 28 20000 c r1 c r0 n
-geffen 117 66 splendide 271 386 20000 c r2 c r0 n
+payon 178 104 manuk 112 352 22000 c r4 c r0 n
+payon 178 104 dic_fild01 149 279 24000 c r5 c r0 n
+geffen 117 66 bif_fild02 291 232 15000 c r0 c r0 n
+geffen 117 66 eclage 100 28 17000 c r1 c r0 n
+geffen 117 66 splendide 271 386 17000 c r2 c r0 n
 geffen 117 66 mid_camp 210 288 19000 c r3 c r0 n
-geffen 117 66 manuk 112 352 20000 c r4 c r0 n
-geffen 117 66 dic_fild01 149 279 20000 c r5 c r0 n
-aldebaran 138 122 bif_fild02 291 232 20000 c r0 c r0 n
-aldebaran 138 122 eclage 100 28 20000 c r1 c r0 n
-aldebaran 138 122 splendide 271 386 20000 c r2 c r0 n
+geffen 117 66 manuk 112 352 22000 c r4 c r0 n
+geffen 117 66 dic_fild01 149 279 24000 c r5 c r0 n
+aldebaran 138 122 bif_fild02 291 232 15000 c r0 c r0 n
+aldebaran 138 122 eclage 100 28 17000 c r1 c r0 n
+aldebaran 138 122 splendide 271 386 17000 c r2 c r0 n
 aldebaran 138 122 mid_camp 210 288 19000 c r3 c r0 n
-aldebaran 138 122 manuk 112 352 20000 c r4 c r0 n
-aldebaran 138 122 dic_fild01 149 279 20000 c r5 c r0 n
-yuno 145 184 bif_fild02 291 232 20000 c r0 c r0 n
-yuno 145 184 eclage 100 28 20000 c r1 c r0 n
-yuno 145 184 splendide 271 386 20000 c r2 c r0 n
+aldebaran 138 122 manuk 112 352 22000 c r4 c r0 n
+aldebaran 138 122 dic_fild01 149 279 24000 c r5 c r0 n
+yuno 145 184 bif_fild02 291 232 15000 c r0 c r0 n
+yuno 145 184 eclage 100 28 17000 c r1 c r0 n
+yuno 145 184 splendide 271 386 17000 c r2 c r0 n
 yuno 145 184 mid_camp 210 288 19000 c r3 c r0 n
-yuno 145 184 manuk 112 352 20000 c r4 c r0 n
-yuno 145 184 dic_fild01 149 279 20000 c r5 c r0 n
-einbroch 248 205 bif_fild02 291 232 20000 c r0 c r0 n
-einbroch 248 205 eclage 100 28 20000 c r1 c r0 n
-einbroch 248 205 splendide 271 386 20000 c r2 c r0 n
+yuno 145 184 manuk 112 352 22000 c r4 c r0 n
+yuno 145 184 dic_fild01 149 279 24000 c r5 c r0 n
+einbroch 248 205 bif_fild02 291 232 15000 c r0 c r0 n
+einbroch 248 205 eclage 100 28 17000 c r1 c r0 n
+einbroch 248 205 splendide 271 386 17000 c r2 c r0 n
 einbroch 248 205 mid_camp 210 288 19000 c r3 c r0 n
-einbroch 248 205 manuk 112 352 20000 c r4 c r0 n
-einbroch 248 205 dic_fild01 149 279 20000 c r5 c r0 n
-lighthalzen 169 103 bif_fild02 291 232 20000 c r0 c r0 n
-lighthalzen 169 103 eclage 100 28 20000 c r1 c r0 n
-lighthalzen 169 103 splendide 271 386 20000 c r2 c r0 n
+einbroch 248 205 manuk 112 352 22000 c r4 c r0 n
+einbroch 248 205 dic_fild01 149 279 24000 c r5 c r0 n
+lighthalzen 169 103 bif_fild02 291 232 15000 c r0 c r0 n
+lighthalzen 169 103 eclage 100 28 17000 c r1 c r0 n
+lighthalzen 169 103 splendide 271 386 17000 c r2 c r0 n
 lighthalzen 169 103 mid_camp 210 288 19000 c r3 c r0 n
-lighthalzen 169 103 manuk 112 352 20000 c r4 c r0 n
-lighthalzen 169 103 dic_fild01 149 279 20000 c r5 c r0 n
-rachel 118 139 bif_fild02 291 232 20000 c r0 c r0 n
-rachel 118 139 eclage 100 28 20000 c r1 c r0 n
-rachel 118 139 splendide 271 386 20000 c r2 c r0 n
+lighthalzen 169 103 manuk 112 352 22000 c r4 c r0 n
+lighthalzen 169 103 dic_fild01 149 279 24000 c r5 c r0 n
+rachel 118 139 bif_fild02 291 232 15000 c r0 c r0 n
+rachel 118 139 eclage 100 28 17000 c r1 c r0 n
+rachel 118 139 splendide 271 386 17000 c r2 c r0 n
 rachel 118 139 mid_camp 210 288 19000 c r3 c r0 n
-rachel 118 139 manuk 112 352 20000 c r4 c r0 n
-rachel 118 139 dic_fild01 149 279 20000 c r5 c r0 n
-veins 198 133 bif_fild02 291 232 20000 c r0 c r0 n
-veins 198 133 eclage 100 28 20000 c r1 c r0 n
-veins 198 133 splendide 271 386 20000 c r2 c r0 n
+rachel 118 139 manuk 112 352 22000 c r4 c r0 n
+rachel 118 139 dic_fild01 149 279 24000 c r5 c r0 n
+veins 198 133 bif_fild02 291 232 15000 c r0 c r0 n
+veins 198 133 eclage 100 28 17000 c r1 c r0 n
+veins 198 133 splendide 271 386 17000 c r2 c r0 n
 veins 198 133 mid_camp 210 288 19000 c r3 c r0 n
-veins 198 133 manuk 112 352 20000 c r4 c r0 n
-veins 198 133 dic_fild01 149 279 20000 c r5 c r0 n
+veins 198 133 manuk 112 352 22000 c r4 c r0 n
+
+veins 198 133 dic_fild01 149 279 24000 c r5 c r0 n
