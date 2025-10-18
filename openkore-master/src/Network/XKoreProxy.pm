@@ -501,6 +501,15 @@ sub modifyPacketIn {
 		$msg = "";
 	}
 
+	    # Handle packet 0BC7 - send disconnect instead of closing game
+    if ($switch eq "0BC7") {
+        debug "Received packet 0BC7, enviando pacote de desconexao ao inves de fechar o client.\n", "xkoreProxy";
+        # Send disconnect packet to server
+        $messageSender->sendQuit() if $messageSender;
+        # Return empty message to prevent client from processing the original packet
+        return "";
+    }
+
 	# packet replay check: reset status for every different packet received
 	if ($self->{packetPending} && ($self->{packetPending} ne $msg)) {
 		debug "Removing pending packet from queue\n", "connection";
