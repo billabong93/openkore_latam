@@ -53,7 +53,6 @@ sub load {
             ['packet_pre/npc_talk', \&npcTalkPre, undef],
             ['packet_pre/npc_talk_responses', \&npcTalkRespPre, undef],
             ['packet/npc_talk_responses', \&npcTalkRespPost, undef],
-			['Command_pre/talk', \&latam_pre_talk_cmd, undef],
         );
         loadJSON();
     }
