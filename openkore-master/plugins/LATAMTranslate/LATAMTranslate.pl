@@ -1,5 +1,5 @@
 # ====================
-# LATAMTranslate v2.0
+# LATAMTranslate v2
 # Plugin author: Rubim, UnknownXD
 # Plugin modified by: roxleopardo, billabong93
 # ====================
@@ -15,6 +15,7 @@ use Actor;
 use utf8;
 use Log qw(message debug error);
 use JSON::Tiny qw(from_json to_json);
+use Translation qw(T TF);
 
 our %strings_cache;
 
@@ -51,7 +52,8 @@ sub load {
             ['packet_pre/system_chat', \&systemChatPre, undef],
             ['packet_pre/npc_talk', \&npcTalkPre, undef],
             ['packet_pre/npc_talk_responses', \&npcTalkRespPre, undef],
-            ['packet/npc_talk_responses', \&npcTalkRespPost, undef]
+            ['packet/npc_talk_responses', \&npcTalkRespPost, undef],
+			['Command_pre/talk', \&latam_pre_talk_cmd, undef],
         );
         loadJSON();
     }
@@ -215,8 +217,8 @@ sub npcTalkRespPost {
     }
 
     # Exibe respostas traduzidas
-	message "----------------------------------------\n";
-    message "[LATAMTranslate] Respostas:\n";
+	message "------------[LATAMTranslate]------------\n";
+    message "[#] Respostas:\n";
     for my $i (0 .. $#{$responses}) {
         next unless defined $responses->[$i];
         my $txt = $responses->[$i];
@@ -244,16 +246,18 @@ sub npcTalkRespPost {
 
     $npc_name = $::talk{name} // $npc_name;
 
-   if (!$binID_found && defined $::talk{ID}) {
-        $npc_index = unpack('C', substr($::talk{ID}, 0, 1));
+    if (!$binID_found && defined $::talk{ID}) {
+		$npc_index = unpack('C', substr($::talk{ID}, 0, 1));
     }
 
-my $message = sprintf(
-    "NPC %s (%d): Digite 'talk resp #' para escolher uma resposta.\n",
-    $npc_name,
-    $npc_index
-);
-message($message);
+	if (!defined $Globals::latam_last_resp_notice_time || time - $Globals::latam_last_resp_notice_time > 0.5) {
+    
+		message TF("NPC %s (%d): Digite 'talk resp #' para escolher uma resposta.\n",
+        $npc_name, $npc_index), "ai_npcTalk";
+    
+    	$Globals::latam_last_resp_notice_time = time;
+    	$Globals::latam_last_resp_npc = $npc_name;
+    }
 }
 
 sub publicChatPre {
