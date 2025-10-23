@@ -610,7 +610,7 @@ sub ai_skillUse {
 		$args{lv} = $lvl;
 	}
 	
-	if ($skill->getOwnerType == Skill::OWNER_CHAR) {
+       if ($skill->getOwnerType == Skill::OWNER_CHAR()) {
 		AI::queue("skill_use", \%args);
 	} else {
 		$owner->queue("skill_use", \%args);
