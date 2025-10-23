@@ -5566,22 +5566,32 @@ sub absunit {
 }
 
 sub autoNpcTalk {
-	my ($ID, $nameID) = @_;
+    my ($ID, $nameID) = @_;
 
-	return if (defined AI::findAction("NPC"));
+    return if (defined AI::findAction("NPC"));
 
-	if (my $recent = $ai_v{'npc_talk'}{'recent_cancel'}) {
-		my $now = time;
-		foreach my $npc_id (keys %{$recent}) {
-			delete $recent->{$npc_id} if ($now - $recent->{$npc_id} > 5);
-		}
-		if (exists $recent->{$nameID} && ($now - $recent->{$nameID}) <= 1) {
-			debug "Skipping autotalk for NPC $nameID due to recent manual cancel.\n";
-			return;
-		}
-	}
+    if (my $recent = $ai_v{'recent_talk_cancel'}) {
+            my $now = time;
+            foreach my $key (keys %{$recent}) {
+                    delete $recent->{$key} if ($now - $recent->{$key} > 5);
+            }
 
-	my $routeIndex = AI::findAction("route");
+            my $actor_numeric_id = defined $ID ? unpack('V', $ID) : undef;
+            my %keys = (
+                    (defined $actor_numeric_id ? ("actor:$actor_numeric_id" => 1) : ()),
+                    (defined $nameID ? ("actor:$nameID" => 1, "template:$nameID" => 1) : ()),
+            );
+
+            foreach my $key (keys %keys) {
+                    next unless exists $recent->{$key};
+                    if (($now - $recent->{$key}) <= 1) {
+                            debug "Skipping autotalk for NPC key $key due to recent manual cancel.\n";
+                            return;
+                    }
+            }
+    }
+
+    my $routeIndex = AI::findAction("route");
 	return if (defined $routeIndex && AI::args($routeIndex)->getSubtask && UNIVERSAL::isa(AI::args($routeIndex)->getSubtask, 'Task::TalkNPC'));
 
 	my $routeIndex = AI::findAction("route", 1);

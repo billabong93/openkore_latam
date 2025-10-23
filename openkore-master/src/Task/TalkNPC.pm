@@ -747,12 +747,19 @@ sub iterate {
 		$self->{time} = time;
 		$self->{stage} = AFTER_NPC_CANCEL;
 
-			my $id = $ai_v{'npc_talk'}{'ID'};
-			debug "$self->{target}: Sending talk cancel [id '".(unpack ('V', $id))."'] after NPC has done talking\n", "ai_npcTalk";
-			$messageSender->sendTalkCancel($id);
+                        my $id = $ai_v{'npc_talk'}{'ID'};
+                        debug "$self->{target}: Sending talk cancel [id '".(unpack ('V', $id))."'] after NPC has done talking\n", "ai_npcTalk";
+                        $messageSender->sendTalkCancel($id);
 
-			my $numeric_id = unpack('V', $id);
-			$ai_v{'npc_talk'}{'recent_cancel'}{$numeric_id} = time;
+                        my $recent_cancel = ($ai_v{'recent_talk_cancel'} //= {});
+                        my $actor_numeric_id = unpack('V', $id);
+                        $recent_cancel->{"actor:$actor_numeric_id"} = time if defined $actor_numeric_id;
+
+                        if (my $target = $self->{target}) {
+                                if (defined $target->{nameID}) {
+                                        $recent_cancel->{"template:$target->{nameID}"} = time;
+                                }
+                        }
 
 	# After a 'npc_talk_cancel' and a timeout we decide what to do next
 	} elsif ($self->{stage} == AFTER_NPC_CANCEL) {
