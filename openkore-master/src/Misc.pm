@@ -5570,6 +5570,17 @@ sub autoNpcTalk {
 
 	return if (defined AI::findAction("NPC"));
 
+	if (my $recent = $ai_v{'npc_talk'}{'recent_cancel'}) {
+		my $now = time;
+		foreach my $npc_id (keys %{$recent}) {
+			delete $recent->{$npc_id} if ($now - $recent->{$npc_id} > 5);
+		}
+		if (exists $recent->{$nameID} && ($now - $recent->{$nameID}) <= 1) {
+			debug "Skipping autotalk for NPC $nameID due to recent manual cancel.\n";
+			return;
+		}
+	}
+
 	my $routeIndex = AI::findAction("route");
 	return if (defined $routeIndex && AI::args($routeIndex)->getSubtask && UNIVERSAL::isa(AI::args($routeIndex)->getSubtask, 'Task::TalkNPC'));
 
