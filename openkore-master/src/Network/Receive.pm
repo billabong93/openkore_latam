@@ -3089,8 +3089,69 @@ sub homunculus_info {
 # effect: unknown, may be missing
 #
 # Minimap indicator.
+
+our $last_cart_update = 0;
+our $last_inventory_update = 0;
+our $last_storage_update = 0;
+our $last_map_change_time  = 0;
+
+# Atualização do timestamp no mapload
+Plugins::addHook('map_loaded', sub {
+    $last_map_change_time = time;
+});
+
 sub minimap_indicator {
 	my ($self, $args) = @_;
+
+
+    ########## Fix spam indicadores ############
+	
+    return unless defined $Globals::char;
+	
+    # Pra não falhar em quests (effect == 1)
+    if (defined $args->{effect} && $args->{effect} == 1) {
+        # Mesmo que haja atualização de inventário, mostrar o indicador
+        my $color_str = "[R:$args->{red}, G:$args->{green}, B:$args->{blue}, A:$args->{alpha}]";
+        my $indicator = T("*Quest!*");
+        message TF("%s shown %s at location %d, %d with the color %s\n",
+            $args->{actor}, $indicator, @{$args}{qw(x y)}, $color_str),
+            'effect';
+        return;
+    }
+
+    # Delay dos indicadores (s)
+    my $allow_due_to_map_change = (time - $last_map_change_time < 5);
+
+    unless ($allow_due_to_map_change) {
+        # Ignora se o armazém estiver aberto ou sendo carregado
+        if ($Globals::char->storage && ($Globals::char->storage->isReady || $Globals::char->storage->wasOpenedThisSession)) {
+            if (time - $last_storage_update < 1) {
+                return;
+            }
+            $last_storage_update = time;
+        }
+
+        # Ignora se o carrinho estiver sendo manipulado
+        if ($Globals::char->cart && scalar($Globals::char->cart->getItems()) > 0) {
+            if (time - $last_cart_update < 1) {
+                return;
+            }
+            $last_cart_update = time;
+        }
+
+        # Ignora se estiver processando lista de itens
+        if (defined $Network::Receive::current_item_list && $Network::Receive::current_item_list != 0) {
+            return;
+        }
+
+        # Ignora se estiver manipulando inventário
+        if ($Globals::char->{inventory} && scalar($Globals::char->{inventory}->getItems()) > 0) {
+            if (time - $last_inventory_update < 1) {
+                return;
+            }
+            $last_inventory_update = time;
+        }
+    }
 
 	my $color_str = "[R:$args->{red}, G:$args->{green}, B:$args->{blue}, A:$args->{alpha}]";
 	my $indicator = T("minimap indicator");
@@ -3699,6 +3760,8 @@ sub arrow_equipped {
 # 0A37 <index>.W <amount>.W <name id>.W <identified>.B <damaged>.B <refine>.B <card1>.W <card2>.W <card3>.W <card4>.W <equip location>.L <item type>.B <result>.B <expire time>.L <bindOnEquipType>.W { <option id>.W <option value>.W <option param>.B }*5 <favorite>.B <view id>.W (ZC_ITEM_PICKUP_ACK_V7)
 sub inventory_item_added {
 	my ($self, $args) = @_;
+
+	  local $Network::Receive::in_item_context = 1;
 
 	return unless changeToInGameState();
 
