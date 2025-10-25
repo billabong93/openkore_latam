@@ -1,28 +1,28 @@
 0 Item
-1 Equipamento para cabeça (Baixo)
+1 Equipamento para Cabeça (Baixo)
 2 Arma de Uma Mão
 4 Capa
-8 Acessório direito
+8 Acessório Direito
 10 Flecha
 16 Armadura
 32 Escudo
 34 Arma de Duas Mãos
 64 Calçado
-128 Acessório esquerdo
+128 Acessório Esquerdo
 136 Acessório
-256 Equipamento para cabeça (Topo)
-512 Equipamento para cabeça (Meio)
-513 Equipamento para cabeça (Meio/Baixo)
-768 Equipamento para cabeça (Topo/Meio)
-769 Equipamento para cabeça (Topo/Meio/Baixo)
-1024 Visual para cabeça (Topo)
-2048 Visual para cabeça (Meio)
-4096 Visual para cabeça (Baixo)
-8192 Visual para capa
+256 Equipamento para Cabeça (Topo)
+512 Equipamento para Cabeça (Meio)
+513 Equipamento para Cabeça (Meio/Baixo)
+768 Equipamento para Cabeça (Topo/Meio)
+769 Equipamento para Cabeça (Topo/Meio/Baixo)
+1024 Visual para Cabeça (Topo)
+2048 Visual para Cabeça (Meio)
+4096 Visual para Cabeça (Baixo)
+8192 Visual para Capa
 32768 Munição
 65536 Armadura Sombria
 131072 Arma Sombria
 262144 Escudo Sombrio
 524288 Calçado Sombrio
-1048576 Acessório direito Sobrio
-2097152 Acessório esquerdo Sobrio
+1048576 Acessório Direito Sombrio
+2097152 Acessório Esquerdo Sombrio
