@@ -17,7 +17,10 @@
 769 Equipamento para Cabeça (Topo/Meio/Baixo)
 1024 Visual para Cabeça (Topo)
 2048 Visual para Cabeça (Meio)
+3072 Visual para Cabeça (Topo/Meio)
 4096 Visual para Cabeça (Baixo)
+6144 Visual para Cabeça (Meio/Baixo)
+7168 Visual para Cabeça (Topo/Meio/Baixo)
 8192 Visual para Capa
 32768 Munição
 65536 Armadura Sombria
