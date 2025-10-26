@@ -1,0 +1,37 @@
+# Configuração do Web Dashboard para OpenKore
+# Coloque este arquivo em: control/webDashboard.txt (opcional)
+webDashboard 1
+# Porta do servidor web (padrão: 8080)
+port 7070
+
+# Host/IP para bind (padrão: 0.0.0.0 = aceita de qualquer IP)
+# Use 127.0.0.1 para aceitar apenas localhost
+host 0.0.0.0
+
+# Intervalo de atualização em segundos (no lado do cliente)
+# Valor padrão: 1 segundo
+# Recomendado: entre 1 e 5 segundos
+update_interval 1
+
+# Habilitar logs detalhados
+debug 0
+
+# Máximo de linhas de log para manter em memória
+max_log_lines 100
+
+# ==============================================
+# NOTAS:
+# ==============================================
+# 
+# 1. Reinicie o OpenKore após alterar estas configurações
+# 
+# 2. Para segurança, recomenda-se usar host 127.0.0.1 
+#    se for acessar apenas localmente
+# 
+# 3. Se quiser acesso remoto, use 0.0.0.0 mas tenha
+#    cuidado com segurança
+# 
+# 4. Certifique-se de que a porta escolhida não está
+#    sendo usada por outro programa
+# 
+# ==============================================
