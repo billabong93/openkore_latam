@@ -1,3 +1,64 @@
+#########################################################################
+# 🐙 Hydra / XKore - CONFIG
+# ✏️ Edite APENAS as chaves no bloco "### 🛠️ EDITÁVEIS ###"
+# 🔒 O RESTO ESTÁ ISOLADO EM "### 🔐 PROTEGIDO (NÃO MEXER) ###"
+#########################################################################
+
+### 🛠️ EDITÁVEIS (SOMENTE ESTES 5) - ALTERE APENAS AQUI ####################
+# ⚙️ Formato: chave espaço valor (sem '=')
+# ✅ Campos permitidos / notas:
+#   - XKore: 0 | 1 | 2 | 3
+#   - XKore_listenPort: 1024-65535
+#   - XKore_port: porta do DLL/hook (ex: 6901,6902,6903)
+#   - poseidonServer: IP ou hostname (ex: 172.65.175.75)
+#   - poseidonPort: porta TCP do Poseidon (ex: 24390,24391,24392)
+#   - XKore_publicIp:  IP ou hostname (ex: 172.65.175.75)
+
+XKore 3
+XKore_port 6901
+XKore_listenPort 6901
+poseidonServer 172.65.175.75
+poseidonPort 24390
+XKore_publicIp 172.65.175.75
+############################################################################
+
+### 🔐 PROTEGIDO (NÃO MEXER) - SEPARADO ################################################
+# Poseidon Settings: https://openkore.com/wiki/Poseidon
+poseidonTimeout 5
+bindIp
+forceMapIP
+
+# XKore (docs: https://openkore.com/wiki/XKore)
+# 1 = hook into RO client | 2 = stand-alone proxy | 3 = hook/proxy híbrido
+XKore_dll NetRedirect.dll
+XKore_injectDLL 0
+XKore_autoAttachIfOneExe 0
+XKore_silent 1
+XKore_bypassBotDetection 0
+XKore_exeName ragexe.exe
+
+# Xkore 0 - Config do socket no recv!
+ip_socket 0.0.0.0
+port_socket 5400
+
+# XKore 1 / Proxy configuration
+XKore_hookIp 0.0.0.0
+XKore_hookport 5400
+
+# XKore 2 / Proxy configuration
+XKore_listenIp 0.0.0.0
+XKore_ID
+#########################################################################################
+
+### ⚠️ REGRAS RÁPIDAS (LEIA)
+# - Só altere as 5 linhas do bloco "EDITÁVEIS".
+# - NÃO mova, remova ou altere outras chaves sem entender impacto.
+# - Não exponha XKore_listenPort na internet sem firewall/NAT/VPN.
+# - Se poseidonServer for IP público, restrinja por firewall e use autenticação.
+#########################################################################################
+
+
+
 # Please Read the Users Manual
 # The Manual is located at https://openkore.com/wiki/Manual
 
@@ -11,40 +72,6 @@ loginPinCode
 char
 otpSeed
 
-# Poseidon Settings: https://openkore.com/wiki/Poseidon
-# They must be the same as Query Server config in Poseidon.txt
-poseidonServer 172.65.175.75
-poseidonPort 24390
-poseidonTimeout 5
-
-bindIp
-forceMapIP
-
-# 1 = hook into RO client, 2 = Act as stand-alone proxy, proxy = act as true proxy
-# https://openkore.com/wiki/XKore
-
-XKore 0
-XKore_port 6901
-XKore_dll NetRedirect.dll
-XKore_injectDLL 0
-XKore_autoAttachIfOneExe 0
-XKore_silent 1
-XKore_bypassBotDetection 0
-XKore_exeName ragexe.exe
-
-# Xkore 0 - Config do socket no recv!
-ip_socket 172.65.175.75
-port_socket 5400
-
-# XKore 1 / Proxy configuration
-XKore_hookIp 172.65.175.75
-XKore_hookport 5400
-
-# XKore 2 / Proxy configuration
-XKore_listenIp 0.0.0.0
-XKore_listenPort 6901
-XKore_publicIp 172.65.175.75
-XKore_ID
 
 # It is not advised to set secureAdminPassword if you're using Xkore 2
 secureAdminPassword 1
