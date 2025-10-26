@@ -14,7 +14,7 @@
 #   - poseidonPort: porta TCP do Poseidon (ex: 24390,24391,24392)
 #   - XKore_publicIp:  IP ou hostname (ex: 172.65.175.75)
 
-XKore 3
+XKore 0
 XKore_port 6901
 XKore_listenPort 6901
 poseidonServer 172.65.175.75
