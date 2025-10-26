@@ -3094,11 +3094,53 @@ our $last_cart_update = 0;
 our $last_inventory_update = 0;
 our $last_storage_update = 0;
 our $last_map_change_time  = 0;
+our $minimap_indicator_suppress_until = 0;
+our %minimap_indicator_suppress_actor_until;
+our %minimap_indicator_suppress_coord_until;
+
+use constant MINIMAP_INDICATOR_SUPPRESS_DURATION => 2;
 
 # Atualização do timestamp no mapload
 Plugins::addHook('map_loaded', sub {
     $last_map_change_time = time;
 });
+
+sub _extend_minimap_indicator_suppression {
+    my ($duration) = @_;
+    $duration ||= MINIMAP_INDICATOR_SUPPRESS_DURATION;
+
+    my $candidate = time + $duration;
+    if ($candidate > $minimap_indicator_suppress_until) {
+        $minimap_indicator_suppress_until = $candidate;
+    }
+}
+
+sub _suppress_minimap_indicator_for_actor {
+    my ($actorID, $duration) = @_;
+    return unless defined $actorID;
+
+    $duration ||= MINIMAP_INDICATOR_SUPPRESS_DURATION;
+    my $candidate = time + $duration;
+    my $current   = $minimap_indicator_suppress_actor_until{$actorID} // 0;
+
+    if ($candidate > $current) {
+        $minimap_indicator_suppress_actor_until{$actorID} = $candidate;
+    }
+}
+
+sub _suppress_minimap_indicator_for_coord {
+    my ($x, $y, $duration) = @_;
+    return unless defined $x && defined $y;
+
+    $duration ||= MINIMAP_INDICATOR_SUPPRESS_DURATION;
+    my $candidate = time + $duration;
+    my $key       = join ',', $x, $y;
+    my $current   = $minimap_indicator_suppress_coord_until{$key} // 0;
+
+    if ($candidate > $current) {
+        $minimap_indicator_suppress_coord_until{$key} = $candidate;
+    }
+}
 
 sub minimap_indicator {
 	my ($self, $args) = @_;
@@ -3107,6 +3149,31 @@ sub minimap_indicator {
     ########## Fix spam indicadores ############
 	
     return unless defined $Globals::char;
+	
+	my $now = time;
+
+    if (defined(my $actor_id = $args->{npcID})) {
+        if (my $until = $minimap_indicator_suppress_actor_until{$actor_id}) {
+            if ($now <= $until) {
+                return;
+            }
+            delete $minimap_indicator_suppress_actor_until{$actor_id};
+        }
+    }
+
+    if (defined $args->{x} && defined $args->{y}) {
+        my $key = join ',', $args->{x}, $args->{y};
+        if (my $until = $minimap_indicator_suppress_coord_until{$key}) {
+            if ($now <= $until) {
+                return;
+            }
+            delete $minimap_indicator_suppress_coord_until{$key};
+        }
+    }
+
+    if ($now <= $minimap_indicator_suppress_until) {
+        return;
+    }
 	
     # Pra não falhar em quests (effect == 1)
     if (defined $args->{effect} && $args->{effect} == 1) {
@@ -3120,23 +3187,23 @@ sub minimap_indicator {
     }
 
     # Delay dos indicadores (s)
-    my $allow_due_to_map_change = (time - $last_map_change_time < 5);
+    my $allow_due_to_map_change = ($now - $last_map_change_time < 5);
 
     unless ($allow_due_to_map_change) {
         # Ignora se o armazém estiver aberto ou sendo carregado
         if ($Globals::char->storage && ($Globals::char->storage->isReady || $Globals::char->storage->wasOpenedThisSession)) {
-            if (time - $last_storage_update < 1) {
+            if ($now - $last_storage_update < 1) {
                 return;
             }
-            $last_storage_update = time;
+            $last_storage_update = $now;
         }
 
         # Ignora se o carrinho estiver sendo manipulado
         if ($Globals::char->cart && scalar($Globals::char->cart->getItems()) > 0) {
-            if (time - $last_cart_update < 1) {
+            if ($now - $last_cart_update < 1) {
                 return;
             }
-            $last_cart_update = time;
+            $last_cart_update = $now;
         }
 
         # Ignora se estiver processando lista de itens
@@ -3146,10 +3213,10 @@ sub minimap_indicator {
 
         # Ignora se estiver manipulando inventário
         if ($Globals::char->{inventory} && scalar($Globals::char->{inventory}->getItems()) > 0) {
-            if (time - $last_inventory_update < 1) {
+            if ($now - $last_inventory_update < 1) {
                 return;
             }
-            $last_inventory_update = time;
+            $last_inventory_update = $now;
         }
     }
 
@@ -3858,6 +3925,9 @@ sub inventory_item_removed {
 		inventoryItemRemoved($item->{binID}, $args->{amount});
 		Plugins::callHook('packet_item_removed', {index => $item->{binID}});
 	}
+	
+	_suppress_minimap_indicator_for_actor($accountID);
+    _extend_minimap_indicator_suppression();
 }
 
 # 0299
@@ -4600,54 +4670,60 @@ sub cash_shop_buy_result {
 
 }
 
-sub sprite_change {
-	my ($self, $args) = @_;
-
-	my ($ID, $type, $value1, $value2) = @{$args}{qw(ID type value1 value2)};
-	my $player = ($ID ne $accountID)? $playersList->getByID($ID) : $char;
-	return unless $player;
-
-	if ($type == 0) {
-		$player->{jobID} = $value1;
-		message TF("%s changed Job to: %s\n", $player, $jobs_lut{$value1}), "parseMsg_statuslook";
-
-	} elsif ($type == 2) {
-		if ($value1 ne $player->{weapon}) {
-			message TF("%s changed Weapon to %s (%d)\n", $player, itemName({nameID => $value1}), $value1), "parseMsg_statuslook", 2;
-			$player->{weapon} = $value1;
+ sub sprite_change {
+ 	my ($self, $args) = @_;
+ 
+ 	my ($ID, $type, $value1, $value2) = @{$args}{qw(ID type value1 value2)};
+ 	my $player = ($ID ne $accountID)? $playersList->getByID($ID) : $char;
+ 	return unless $player;
+ 
+ 	if ($type == 0) {
+ 		$player->{jobID} = $value1;
+ 		message TF("%s changed Job to: %s\n", $player, $jobs_lut{$value1}), "parseMsg_statuslook";
+ 
+ 	} elsif ($type == 2) {
+ 		if ($value1 ne $player->{weapon}) {
+ 			message TF("%s changed Weapon to %s (%d)\n", $player, itemName({nameID => $value1}), $value1), "parseMsg_statuslook", 2;
+ 			$player->{weapon} = $value1;
+ 		}
+ 		if ($value2 ne $player->{shield}) {
+ 			message TF("%s changed Shield to %s (%d)\n", $player, itemName({nameID => $value2}), $value2), "parseMsg_statuslook", 2;
+ 			$player->{shield} = $value2;
+ 		}
+    } elsif ($type == 3) {
+		if ($ID ne $accountID) {
+			message TF("%s changed Lower headgear to %s (%d)\n", $player, headgearName($value1), $value1), "parseMsg_statuslook";
 		}
-		if ($value2 ne $player->{shield}) {
-			message TF("%s changed Shield to %s (%d)\n", $player, itemName({nameID => $value2}), $value2), "parseMsg_statuslook", 2;
-			$player->{shield} = $value2;
-		}
-	} elsif ($type == 3) {
-		message TF("%s changed Lower headgear to %s (%d)\n", $player, headgearName($value1), $value1), "parseMsg_statuslook";
 		$player->{headgear}{low} = $value1;
 	} elsif ($type == 4) {
+	if ($ID ne $accountID) {
 		message TF("%s changed Upper headgear to %s (%d)\n", $player, headgearName($value1), $value1), "parseMsg_statuslook";
-		$player->{headgear}{top} = $value1;
-	} elsif ($type == 5) {
-		message TF("%s changed Middle headgear to %s (%d)\n", $player, headgearName($value1), $value1), "parseMsg_statuslook";
-		$player->{headgear}{mid} = $value1;
-	} elsif ($type == 6) {
- 		message TF("%s changed Hair color to: %s (%d)\n", $player, $haircolors{$value1}, $value1), "parseMsg_statuslook";
-		$player->{hair_color} = $value1;
-	} elsif ($type == 9) {
-		if ($player->{shoes} && $value1 ne $player->{shoes}) {
-			message TF("%s changed Shoes to: %s\n", $player, itemName({nameID => $value1})), "parseMsg_statuslook", 2;
-		}
-		$player->{shoes} = $value1;
-	} elsif ($type == 12) {
- 		message TF("%s changed Robe to: SPRITE_ROBE_ID=%d\n", $player, $value1, $value1), "parseMsg_statuslook", 2;
-	} elsif ($type== 7 || $type == 13) {
-		# Type 7 looks like body palette or body color. Type 13 looks like body2
-		debug sprintf("%s changed type= %d. value1=%d, value2=%d\n", $player, $type, $value1, $value2);
-	} else {
-		error TF("%s changed unknown sprite type (%d), write about it to OpenKore developer\n", $player, $type), "parseMsg_statuslook";
 	}
-	Plugins::callHook('sprite_job_change');
-}
-
+	$player->{headgear}{top} = $value1;
+	} elsif ($type == 5) {
+	if ($ID ne $accountID) {
+		message TF("%s changed Middle headgear to %s (%d)\n", $player, headgearName($value1), $value1), "parseMsg_statuslook";
+	}
+	$player->{headgear}{mid} = $value1;
+ 	} elsif ($type == 6) {
+  		message TF("%s changed Hair color to: %s (%d)\n", $player, $haircolors{$value1}, $value1), "parseMsg_statuslook";
+ 		$player->{hair_color} = $value1;
+ 	} elsif ($type == 9) {
+ 		if ($player->{shoes} && $value1 ne $player->{shoes}) {
+ 			message TF("%s changed Shoes to: %s\n", $player, itemName({nameID => $value1})), "parseMsg_statuslook", 2;
+		}
+ 		$player->{shoes} = $value1;
+ 	} elsif ($type == 12) {
+  		message TF("%s changed Robe to: SPRITE_ROBE_ID=%d\n", $player, $value1, $value1), "parseMsg_statuslook", 2;
+ 	} elsif ($type== 7 || $type == 13) {
+ 		# Type 7 looks like body palette or body color. Type 13 looks like body2
+ 		debug sprintf("%s changed type= %d. value1=%d, value2=%d\n", $player, $type, $value1, $value2);
+ 	} else {
+ 		error TF("%s changed unknown sprite type (%d), write about it to OpenKore developer\n", $player, $type), "parseMsg_statuslook";
+ 	}
+ 	Plugins::callHook('sprite_job_change');
+ }
+ 
 sub progress_bar {
 	my($self, $args) = @_;
 	message TF("Progress bar loading (time: %d).\n", $args->{time}), 'info';
@@ -7077,6 +7153,12 @@ sub item_used {
 				message TF("You failed to use unknown item #%d - %d left\n", $itemID, $remaining), "useItem", 1;
 			}
 		}
+		
+		_suppress_minimap_indicator_for_actor($accountID);
+		if (defined $char->{pos_to}{x} && defined $char->{pos_to}{y}) {
+			_suppress_minimap_indicator_for_coord($char->{pos_to}{x}, $char->{pos_to}{y});
+		}
+		_extend_minimap_indicator_suppression();
 	} else {
 		my $actor = Actor::get($ID);
 		my $itemDisplay = itemNameSimple($itemID);
@@ -7133,6 +7215,9 @@ sub item_appeared {
 		item	=> $item,
 		type => $args->{type}
 	});
+	
+	_suppress_minimap_indicator_for_coord($args->{x}, $args->{y});
+    _extend_minimap_indicator_suppression();
 }
 
 sub item_exists {
@@ -7165,6 +7250,9 @@ sub item_exists {
 		show_effect => $args->{show_effect},
 		effect_type => $args->{effect_type}
 	});
+	
+	_suppress_minimap_indicator_for_coord($args->{x}, $args->{y});
+    _extend_minimap_indicator_suppression();
 }
 
 # Makes an item disappear from the ground.
@@ -10817,7 +10905,9 @@ sub equip_item {
 		}
 		message TF("You equip %s (%d) - %s (type %s)\n", $item->{name}, $item->{binID}, $equipTypes_lut{$item->{type_equip}}, $args->{type}), 'inventory';
 	}
-	$ai_v{temp}{waitForEquip}-- if $ai_v{temp}{waitForEquip};
+	_suppress_minimap_indicator_for_actor($accountID);
+    _extend_minimap_indicator_suppression();
+    $ai_v{temp}{waitForEquip}-- if $ai_v{temp}{waitForEquip};
 }
 
 # Acknowledgement for adding an equip to the equip switch window
@@ -10846,6 +10936,8 @@ sub equip_item_switch {
 
 		message TF("[Equip Switch] You equip %s (%d) - %s (type %s)\n", $item->{name}, $item->{binID}, $equipTypes_lut{$item->{type_equip}}, $args->{type}), 'inventory';
 	}
+	_suppress_minimap_indicator_for_actor($accountID);
+	_extend_minimap_indicator_suppression();
 	$ai_v{temp}{waitForEquip}-- if $ai_v{temp}{waitForEquip};
 }
 
@@ -11808,6 +11900,9 @@ sub unequip_item {
 	if ($item) {
 		message TF("You unequip %s (%d) - %s\n",$item->{name}, $item->{binID},$equipTypes_lut{$item->{type_equip}}), 'inventory';
 	}
+	
+	_suppress_minimap_indicator_for_actor($accountID);
+    _extend_minimap_indicator_suppression();
 }
 
 # Acknowledgement for removing an equip to the equip switch window
@@ -11839,6 +11934,9 @@ sub unequip_item_switch {
 	if ($item) {
 		message TF("[Equip Switch] You unequip %s (%d) - %s\n",$item->{name}, $item->{binID},$equipTypes_lut{$item->{type_equip}}), 'inventory';
 	}
+	
+	_suppress_minimap_indicator_for_actor($accountID);
+    _extend_minimap_indicator_suppression();
 }
 
 # TODO: only used to report failure? $args->{success}
