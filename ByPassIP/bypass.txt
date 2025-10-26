@@ -8,5 +8,5 @@
 IP = 172.65.175.75
 
 # Ponteiros/endereço (hex ou decimal). Se variar no seu cliente, ajuste aqui:
-TAADDRESS_ADDR = 0x01495ED0
-DOMAIN_PTR_ADDR = 0x0111F418
+TAADDRESS_ADDR = 0x0144C1E8
+DOMAIN_PTR_ADDR = 0x010D6C98
