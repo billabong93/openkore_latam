@@ -409,22 +409,29 @@ sub onChatGuild   { my (undef,$a)=@_; _push_chat('guild',   $a->{MsgUser}     ||
 
 
 sub onLogMessage {
-    my (undef, $domain, $level, $message) = @_;
+    # Assinatura correta para o hook de Log nas builds atuais:
+    my ($type, $domain, $level, $verbosity, $message, @rest) = @_;
     return unless defined $message;
 
+    # Filtros básicos pra não poluir:
+    return if $message eq '' || $message =~ /^\s+$/;       # vazio/espaco
+    return if $message =~ /^[01]\s*$/;                     # evita verbosidade 0/1
+    return if length($message) <= 1 && $message !~ /[A-Za-zÀ-ÿ0-9]/;
+
     my $clean = $message;
-    $clean =~ s/\r?\n/ /g;                 # 1 linha
-    $clean =~ s/[\x00-\x1F\x7F]//g;        # controla/ansi fora
+    $clean =~ s/\r?\n/ /g;          # 1 linha
+    $clean =~ s/[\x00-\x1F\x7F]//g; # remove control chars
     return if $clean eq '';
 
     push @chat_messages, {
         time    => time(),
         type    => 'console',
-        name    => $domain // '',
+        name    => (defined $domain ? $domain : ''),
         message => $clean
     };
     shift @chat_messages if @chat_messages > $max_chat;
 }
+
 
 
 sub get_all_data {
