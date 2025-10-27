@@ -34,7 +34,7 @@ my $hooks = Plugins::addHooks(
 # ============================ Estado ================================
 my $server_socket;
 my $port = 8888;
-my $host = '127.0.0.1';
+my $host = '0.0.0.0';
 my $max_port_tries = 10;
 
 my @console_logs;    # [{time,level,domain,message}]
@@ -51,6 +51,8 @@ my %session_stats = (
 );
 
 my $log_hook;
+
+my $last_check_time = 0;  # Variável global para rastrear o tempo da última verificação
 
 # =========================== Ciclo vida =============================
 sub onUnload {
@@ -194,8 +196,6 @@ sub handle_request {
         send_json($client, { logs => \@console_logs });
     } elsif ($path eq '/api/chat') {
         send_json($client, { messages => \@chat_messages });
-    } elsif ($path eq '/api/stats') {
-        send_json($client, get_session_stats());
     } elsif ($path eq '/api/monsters') {
         send_json($client, get_monsters_list());
     } elsif ($path eq '/api/target') {
@@ -211,12 +211,26 @@ sub handle_post_request {
     my $data = eval { JSON->new->utf8->decode($body) };
     $data = {} unless $data && ref $data eq 'HASH';
 
-    if ($path eq '/api/command') {
+    if ($path eq '/api/command' ) {
         if (defined $data->{command} && $data->{command} ne '') {
             Commands::run($data->{command});
             send_json($client, { success => 1 });
             return;
         }
+	} elsif ($path eq '/api/ai') {
+    my $mode = '';
+    $mode = lc $data->{mode} if $data && defined $data->{mode};
+
+    my %allowed = map { $_ => 1 } qw(off auto manual);
+    unless ($allowed{$mode}) {
+        send_json($client, { success => 0, error => 'invalid_mode', allowed => [qw(off auto manual)] });
+        return;
+    }
+
+    Commands::run("ai $mode");
+    send_json($client, { success => 1, mode => $mode });
+    return;
+	
     } elsif ($path eq '/api/chat/send') {
         if (defined $data->{message} && $data->{message} ne '') {
             Commands::run("c " . $data->{message});
@@ -456,6 +470,48 @@ sub _pct {
     return $p;
 }
 
+sub get_statuses_data {
+    my @out;
+
+    # 1) Estrutura moderna: $char->{statuses} (hash)
+    if ($char && $char->{statuses} && ref $char->{statuses} eq 'HASH') {
+        while (my ($k, $v) = each %{ $char->{statuses} }) {
+            next unless $v;
+            my $active = (ref($v) eq 'HASH') ? ($v->{active} // 1) : ($v ? 1 : 0);
+            next unless $active;
+            my $rem = (ref($v) eq 'HASH') ? ($v->{time_left} // $v->{timeLeft} // $v->{tick} // undef) : undef;
+            push @out, {
+                name      => "$k",
+                time_left => (defined $rem ? int($rem) : undef),
+            };
+        }
+    }
+
+    # 2) Fallback (algumas builds): $char->{statusesID} (hash de ids)
+    if ($char && ref($char->{statusesID}) eq 'HASH') {
+        while (my ($id, $flag) = each %{ $char->{statusesID} }) {
+            next unless $flag;
+            # nome legível quando não há mapa direto
+            push @out, { name => "ID:$id", time_left => undef };
+        }
+    }
+
+    # 3) Último recurso: tentar $char->{status} / $char->{status_active}
+    if ($char && ref($char->{status}) eq 'HASH') {
+        while (my ($k,$v) = each %{ $char->{status} }) {
+            next unless $v;
+            push @out, { name => "$k", time_left => undef };
+        }
+    }
+
+    # Dedup simples por nome
+    my %seen;
+    @out = grep { !$seen{ lc($_->{name}//'') }++ } @out;
+
+    return \@out;
+}
+
+
 sub get_character_data {
     return undef unless $char;
 
@@ -497,6 +553,7 @@ sub get_character_data {
         points_free    => $char->{points_free}  || 0,
         points_skill   => $char->{points_skill} || 0,
         stats          => \%stats,
+        statuses       => get_statuses_data(),
     };
 }
 
@@ -512,11 +569,61 @@ sub get_map_data {
         };
     }
 
+    # posição atual
     my ($cx, $cy) = (0, 0);
-    if ($char && $char->{pos_to}) {
-        $cx = $char->{pos_to}{x} || 0;
-        $cy = $char->{pos_to}{y} || 0;
+    if ($char) {
+        if ($char->{pos_to}) {
+            $cx = $char->{pos_to}{x} || 0;
+            $cy = $char->{pos_to}{y} || 0;
+        } elsif ($char->{pos}) {
+            $cx = $char->{pos}{x} || 0;
+            $cy = $char->{pos}{y} || 0;
+        }
     }
+
+    # destino/rota (tenta várias fontes do OpenKore)
+    my ($dx, $dy) = (undef, undef);
+    my @path_points = ();
+    eval {
+        no warnings 'once';
+        # 1) rota planejada pelo AI (sequência de tiles)
+        if (defined $AI::ai_v{route} && ref $AI::ai_v{route} eq 'HASH') {
+            if (my $sol = $AI::ai_v{route}{solution}) {
+                if (ref $sol eq 'ARRAY' && @$sol) {
+                    for my $p (@$sol) {
+                        next unless $p && ref $p eq 'HASH';
+                        push @path_points, { x => int($p->{x}||0), y => int($p->{y}||0) };
+                    }
+                    # último ponto da solução é o destino
+                    my $last = $sol->[-1];
+                    if ($last) {
+                        $dx = int($last->{x}||0);
+                        $dy = int($last->{y}||0);
+                    }
+                }
+            }
+            # fallback: destino explícito
+            if (!defined $dx && $AI::ai_v{route}{dest} && ref $AI::ai_v{route}{dest} eq 'HASH') {
+                $dx = int($AI::ai_v{route}{dest}{x}||0);
+                $dy = int($AI::ai_v{route}{dest}{y}||0);
+            }
+        }
+        # 2) movimento simples (quando só está andando até um tile)
+        if (!defined $dx && defined $AI::ai_v{move} && ref $AI::ai_v{move} eq 'HASH') {
+            if ($AI::ai_v{move}{pos} && ref $AI::ai_v{move}{pos} eq 'HASH') {
+                $dx = int($AI::ai_v{move}{pos}{x}||0);
+                $dy = int($AI::ai_v{move}{pos}{y}||0);
+            } elsif ($AI::ai_v{move}{pos_to} && ref $AI::ai_v{move}{pos_to} eq 'HASH') {
+                $dx = int($AI::ai_v{move}{pos_to}{x}||0);
+                $dy = int($AI::ai_v{move}{pos_to}{y}||0);
+            }
+        }
+        # 3) último recurso: usar pos_to do char como "destino"
+        if (!defined $dx && $char && $char->{pos_to}) {
+            $dx = int($char->{pos_to}{x}||0);
+            $dy = int($char->{pos_to}{y}||0);
+        }
+    };
 
     my @players;
     if ($playersList) {
@@ -554,12 +661,15 @@ sub get_map_data {
         name    => $map_name,
         width   => $mw, height => $mh,
         char_x  => $cx, char_y => $cy,
+        dest_x  => $dx, dest_y => $dy,     # <<< NOVO
+        path    => \@path_points,          # <<< NOVO (array de {x,y})
         players => \@players,
         portals => \@portals,
         monsters=> \@monsters,
         ai_state=> $ai_state,
     };
 }
+
 
 sub get_inventory_data {
     my %out = ( count => 0, items => [] );
@@ -644,28 +754,6 @@ sub get_skills_data {
     return { skills => \@skills };
 }
 
-sub get_session_stats {
-    my $uptime = time() - ($session_stats{start_time} || time());
-
-    my $exp_now  = ($char && defined $char->{exp})  ? $char->{exp}  : $session_stats{exp_start};
-    my $zeny_now = ($char && defined $char->{zeny}) ? $char->{zeny} : $session_stats{zeny_start};
-
-    my $exp_gain  = ($exp_now  || 0) - ($session_stats{exp_start}  || 0);
-    my $zeny_gain = ($zeny_now || 0) - ($session_stats{zeny_start} || 0);
-
-    my $hours = $uptime > 0 ? ($uptime / 3600.0) : 0;
-    my $exp_h  = $hours > 0 ? int($exp_gain  / $hours) : 0;
-    my $zeny_h = $hours > 0 ? int($zeny_gain / $hours) : 0;
-
-    return {
-        uptime        => int($uptime),
-        exp_per_hour  => $exp_h,
-        zeny_per_hour => $zeny_h,
-        kills         => $session_stats{kills},
-        deaths        => $session_stats{deaths},
-    };
-}
-
 sub get_monsters_list {
     my @monsters;
 
@@ -723,156 +811,716 @@ sub get_dashboard_html {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>OpenKore Dashboard Pro (Beta 0.1) 27/10/25</title>
+<title>OpenKore Dashboard Pro</title>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
-body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; background:#0a0e27; color:#fff; overflow:hidden; }
-.dashboard { display:grid; grid-template-columns:300px 1fr 400px; grid-template-rows:60px 1fr; height:100vh; gap:10px; padding:10px; }
-.header { grid-column:1/-1; background:linear-gradient(135deg,#667eea 0%,#764ba2 100%); padding:10px 20px; border-radius:10px; display:flex; justify-content:space-between; align-items:center; box-shadow:0 4px 15px rgba(0,0,0,0.3); }
-.header h1 { font-size:1.5em; display:flex; align-items:center; gap:10px; }
-.status-dot { width:12px; height:12px; border-radius:50%; background:#44ff44; animation:pulse 2s infinite; }
-@keyframes pulse { 0%,100%{opacity:1; box-shadow:0 0 10px #44ff44;} 50%{opacity:.5; box-shadow:0 0 20px #44ff44;} }
-.ai-controls { display:flex; gap:10px; }
-.ai-btn { padding:8px 15px; border:none; border-radius:5px; cursor:pointer; font-weight:bold; transition:all .2s; font-size:.9em; }
-.ai-btn.off{background:#ff4444;color:#fff;} .ai-btn.on{background:#44ff44;color:#000;} .ai-btn.auto{background:#ffaa00;color:#000;}
-.ai-btn:hover{transform:translateY(-2px); box-shadow:0 4px 10px rgba(0,0,0,0.3);}
-.sidebar-left,.sidebar-right,.main-content{ display:flex; flex-direction:column; gap:10px; overflow-y:auto; }
-.card { background:rgba(255,255,255,0.05); backdrop-filter:blur(10px); border-radius:10px; padding:15px; border:1px solid rgba(255,255,255,0.1); box-shadow:0 4px 15px rgba(0,0,0,0.2); position:relative; }
-.card.minimized .card-content{ display:none; }
-.card-title { font-size:1.1em; font-weight:bold; margin-bottom:10px; padding-bottom:10px; border-bottom:2px solid rgba(255,255,255,0.2); display:flex; justify-content:space-between; align-items:center; cursor:pointer; user-select:none; }
-.card-title:hover{ background:rgba(255,255,255,0.05); margin:-5px -5px 10px -5px; padding:5px 5px 15px 5px; border-radius:5px; }
-.minimize-btn{ background:rgba(255,255,255,0.1); border:none; color:#fff; width:24px; height:24px; border-radius:4px; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:1.2em; line-height:1; }
-.minimize-btn:hover{ background:rgba(255,255,255,0.2); }
-.stat-row{ display:flex; justify-content:space-between; padding:8px; margin:5px 0; background:rgba(0,0,0,0.2); border-radius:5px; font-size:.9em; }
-.stat-label{color:#a8daff;font-weight:500;} .stat-value{color:#ffd700;font-weight:bold;}
-.progress-bar{ width:100%; height:20px; background:rgba(0,0,0,0.3); border-radius:10px; overflow:hidden; margin:8px 0; }
-.progress-fill{ height:100%; transition:width .3s; display:flex; align-items:center; justify-content:center; font-size:.85em; font-weight:bold; }
-.progress-fill.hp{background:linear-gradient(90deg,#ff4444,#ff6b6b);} .progress-fill.sp{background:linear-gradient(90deg,#4444ff,#6b6bff);} .progress-fill.exp{background:linear-gradient(90deg,#44ff44,#6bff6b);} .progress-fill.weight{background:linear-gradient(90deg,#ffaa00,#ffcc00);}
-#mapContainer{ position:relative; width:100%; height:450px; background:#000; border-radius:10px; overflow:hidden; border:2px solid rgba(255,255,255,0.2); display:flex; align-items:center; justify-content:center; }
-#mapCanvas{ position:absolute; cursor:crosshair; }
-.map-info{ position:absolute; top:10px; left:10px; background:rgba(0,0,0,0.8); padding:8px 12px; border-radius:5px; font-size:.85em; z-index:10; }
-.stats-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
-.stat-box{ background:rgba(0,0,0,0.3); padding:12px; border-radius:8px; text-align:center; }
-.stat-box-value{ font-size:1.6em; font-weight:bold; color:#ffd700; }
-.stat-box-label{ font-size:.85em; color:#ccc; margin-top:5px; }
-.stat-upgrade-btn{ background:rgba(68,255,68,0.2); border:1px solid #44ff44; color:#44ff44; padding:3px 8px; border-radius:3px; cursor:pointer; font-size:.75em; margin-top:5px; display:none; }
-.stat-upgrade-btn.show{ display:inline-block; }
-.stat-upgrade-btn:hover{ background:rgba(68,255,68,0.3); }
-.inventory-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(70px,1fr)); gap:8px; max-height:350px; overflow-y:auto; }
-.item{ background:rgba(0,0,0,0.3); padding:6px; border-radius:8px; border:1px solid rgba(255,255,255,0.1); text-align:center; cursor:pointer; transition:all .2s; position:relative; }
-.item:hover{ transform:translateY(-2px); border-color:#ffd700; box-shadow:0 4px 10px rgba(255,215,0,0.3);}
-.item.equipped{ border-color:#ffd700; background:rgba(255,215,0,0.1); }
-.item-icon{ width:40px; height:40px; margin:0 auto 5px; background:rgba(0,0,0,0.5); border-radius:5px; display:flex; align-items:center; justify-content:center; }
-.item-name{ font-size:.7em; color:#ffd700; margin-bottom:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.item-amount{ font-size:.65em; color:#ccc; }
-.context-menu{ position:fixed; background:rgba(20,20,40,0.95); border:1px solid rgba(255,255,255,0.2); border-radius:8px; padding:5px; z-index:10000; box-shadow:0 4px 20px rgba(0,0,0,0.5); backdrop-filter:blur(10px); }
-.context-menu-item{ padding:8px 15px; cursor:pointer; border-radius:4px; font-size:.9em; white-space:nowrap; }
-.context-menu-item:hover{ background:rgba(255,255,255,0.1); }
-.context-menu-item.danger{ color:#ff6b6b; }
-.skills-list{ display:flex; flex-direction:column; gap:8px; max-height:400px; overflow-y:auto; }
-.skill-item{ background:rgba(0,0,0,0.3); padding:10px; border-radius:8px; border:1px solid rgba(255,255,255,0.1); display:flex; align-items:center; gap:10px; }
-.skill-icon{ width:32px; height:32px; background:rgba(0,0,0,0.5); border-radius:5px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
-.skill-info{ flex:1; } .skill-name{ font-weight:bold; color:#ffd700; font-size:.9em; margin-bottom:3px; }
-.skill-details{ font-size:.75em; color:#ccc; }
-.skill-btns{ display:flex; gap:5px; }
-.skill-btn{ padding:4px 8px; border:1px solid rgba(255,255,255,0.3); border-radius:4px; cursor:pointer; font-size:.75em; background:rgba(0,0,0,0.3); color:#fff; transition:all .2s; }
-.skill-btn:hover{ background:rgba(255,255,255,0.1); }
-.monsters-list{ display:flex; flex-direction:column; gap:8px; max-height:450px; overflow-y:auto; }
-.monster-item{ background:rgba(0,0,0,0.3); padding:8px; border-radius:8px; border:1px solid rgba(255,255,255,0.1); display:flex; align-items:center; gap:10px; cursor:pointer; transition:all .2s; }
-.monster-item:hover{ background:rgba(255,68,68,0.2); border-color:#ff4444; }
-.monster-icon{ width:40px; height:40px; background:rgba(0,0,0,0.5); border-radius:5px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
-.monster-name{ font-weight:bold; color:#ff6b6b; font-size:.85em; margin-bottom:2px; }
-.monster-hp{ font-size:.75em; color:#ccc; } .monster-distance{ font-size:.75em; color:#ffaa00; }
-.console-container,.chat-container{ background:rgba(0,0,0,0.4); padding:10px; border-radius:8px; max-height:350px; overflow-y:auto; font-family:'Courier New',monospace; font-size:.8em; }
-.log-entry,.chat-entry{ margin:3px 0; padding:4px; border-left:3px solid #4444ff; padding-left:8px; word-wrap:break-word; }
-.log-entry.error{ border-left-color:#ff4444; color:#ff6b6b; } .log-entry.warning{ border-left-color:#ffaa00; color:#ffcc66; }
-.chat-entry.public{ border-left-color:#44ff44; } .chat-entry.private{ border-left-color:#ff44ff; } .chat-entry.system{ border-left-color:#ffaa00; }
-.chat-input-group{ display:flex; gap:8px; margin-top:10px; } .chat-input{ flex:1; background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.2); color:#fff; padding:8px; border-radius:5px; font-size:.85em; }
-.send-btn{ background:rgba(68,255,68,0.2); border:1px solid #44ff44; color:#fff; padding:8px 15px; border-radius:5px; cursor:pointer; font-size:.85em; }
-.send-btn:hover{ background:rgba(68,255,68,0.3); }
-.session-stats{ display:grid; grid-template-columns:repeat(2,1fr); gap:10px; }
-.session-stat{ background:rgba(0,0,0,0.3); padding:12px; border-radius:8px; text-align:center; }
-.session-stat-value{ font-size:1.3em; font-weight:bold; color:#44ff44; } .session-stat-label{ font-size:.75em; color:#ccc; margin-top:3px; }
-.target-display{ background:rgba(255,68,68,0.2); border:2px solid #ff4444; padding:12px; border-radius:8px; display:flex; align-items:center; gap:12px; }
-.target-icon{ width:48px; height:48px; background:rgba(0,0,0,0.5); border-radius:8px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
-.target-name{ font-size:1.1em; font-weight:bold; color:#ff6b6b; margin-bottom:5px; }
-::-webkit-scrollbar{ width:6px; } ::-webkit-scrollbar-track{ background:rgba(0,0,0,0.2); border-radius:3px; } ::-webkit-scrollbar-thumb{ background:rgba(255,255,255,0.3); border-radius:3px; } ::-webkit-scrollbar-thumb:hover{ background:rgba(255,255,255,0.5); }
-.command-panel{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
-.cmd-btn{ background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); color:#fff; padding:8px; border-radius:5px; cursor:pointer; font-size:.8em; transition:all .2s; }
-.cmd-btn:hover{ background:rgba(255,255,255,0.2); transform:translateY(-2px); }
+:root {
+  --primary: #6366f1;
+  --primary-dark: #4f46e5;
+  --secondary: #10b981;
+  --danger: #ef4444;
+  --warning: #f59e0b;
+  --dark: #0f172a;
+  --darker: #020617;
+  --light: #f8fafc;
+  --gray: #64748b;
+  --gray-dark: #334155;
+  --card-bg: rgba(30, 41, 59, 0.7);
+  --card-border: rgba(255, 255, 255, 0.1);
+  --glass: rgba(255, 255, 255, 0.05);
+}
+
+body { 
+  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; 
+  background: linear-gradient(135deg, var(--darker) 0%, var(--dark) 100%);
+  color: var(--light);
+  overflow: hidden;
+  height: 100vh;
+}
+
+.dashboard { 
+  display: grid; 
+  grid-template-columns: 320px 1fr 380px; 
+  grid-template-rows: 70px 1fr; 
+  height: 100vh; 
+  gap: 12px; 
+  padding: 12px;
+  background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000"><polygon fill="%231e293b" points="0,1000 1000,1000 1000,0"/></svg>') no-repeat bottom right;
+}
+
+.header { 
+  grid-column: 1/-1; 
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+  padding: 0 24px;
+  border-radius: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 8px 32px rgba(99, 102, 241, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(20px);
+}
+
+.header h1 { 
+  font-size: 1.4em; 
+  font-weight: 700;
+  display: flex; 
+  align-items: center; 
+  gap: 12px; 
+  text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+
+.status-dot { 
+  width: 12px; 
+  height: 12px; 
+  border-radius: 50%; 
+  background: var(--secondary);
+  box-shadow: 0 0 20px var(--secondary);
+  animation: pulse 2s infinite; 
+}
+
+@keyframes pulse { 
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(1.1); }
+}
+
+.ai-controls { display: flex; gap: 8px; }
+.ai-btn { 
+  padding: 10px 20px; 
+  border: none; 
+  border-radius: 12px; 
+  cursor: pointer; 
+  font-weight: 600; 
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  font-size: 0.85em;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.ai-btn.off { background: var(--danger); color: white; }
+.ai-btn.on { background: var(--secondary); color: white; }
+.ai-btn.auto { background: var(--warning); color: white; }
+.ai-btn.manual { background: var(--primary); color: white; }
+.ai-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.3); }
+
+.sidebar-left, .sidebar-right, .main-content { 
+  display: flex; 
+  flex-direction: column; 
+  gap: 12px; 
+  overflow-y: auto; 
+}
+
+.card { 
+  background: var(--card-bg);
+  backdrop-filter: blur(20px);
+  border-radius: 16px;
+  padding: 20px;
+  border: 1px solid var(--card-border);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  position: relative;
+  transition: all 0.3s ease;
+}
+.card:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+}
+.card.minimized .card-content { display: none; }
+.card.minimized { padding-bottom: 20px; }
+
+.card-title { 
+  font-size: 1.1em; 
+  font-weight: 700; 
+  margin-bottom: 16px; 
+  padding-bottom: 12px; 
+  border-bottom: 2px solid rgba(255, 255, 255, 0.1); 
+  display: flex; 
+  justify-content: space-between; 
+  align-items: center; 
+  cursor: pointer; 
+  user-select: none;
+  color: var(--light);
+}
+.card-title:hover { 
+  background: rgba(255, 255, 255, 0.05); 
+  margin: -12px -12px 12px -12px; 
+  padding: 12px; 
+  border-radius: 12px; 
+}
+
+.minimize-btn { 
+  background: var(--glass); 
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--light); 
+  width: 28px; 
+  height: 28px; 
+  border-radius: 8px; 
+  cursor: pointer; 
+  display: flex; 
+  align-items: center; 
+  justify-content: center; 
+  font-size: 1.1em; 
+  font-weight: bold;
+  transition: all 0.2s ease;
+}
+.minimize-btn:hover { background: rgba(255, 255, 255, 0.15); }
+
+.stat-row { 
+  display: flex; 
+  justify-content: space-between; 
+  padding: 10px 12px; 
+  margin: 6px 0; 
+  background: var(--glass); 
+  border-radius: 10px; 
+  font-size: 0.9em; 
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+.stat-label { color: #94a3b8; font-weight: 500; } 
+.stat-value { color: var(--light); font-weight: 600; }
+
+.progress-bar { 
+  width: 100%; 
+  height: 24px; 
+  background: rgba(0, 0, 0, 0.3); 
+  border-radius: 12px; 
+  overflow: hidden; 
+  margin: 10px 0; 
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.progress-fill { 
+  height: 100%; 
+  transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1); 
+  display: flex; 
+  align-items: center; 
+  justify-content: center; 
+  font-size: 0.8em; 
+  font-weight: 700;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+}
+.progress-fill.hp { background: linear-gradient(90deg, #ef4444, #f87171); }
+.progress-fill.sp { background: linear-gradient(90deg, #3b82f6, #60a5fa); }
+.progress-fill.exp { background: linear-gradient(90deg, #10b981, #34d399); }
+.progress-fill.weight { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+
+#mapContainer { 
+  position: relative; 
+  width: 100%; 
+  height: 300px; 
+  background: var(--darker); 
+  border-radius: 12px; 
+  overflow: hidden; 
+  border: 2px solid var(--card-border);
+  display: flex; 
+  align-items: center; 
+  justify-content: center; 
+}
+#mapCanvas { position: absolute; cursor: crosshair; }
+.map-info { 
+  position: absolute; 
+  top: 12px; 
+  left: 12px; 
+  background: rgba(15, 23, 42, 0.9); 
+  padding: 10px 14px; 
+  border-radius: 10px; 
+  font-size: 0.8em; 
+  z-index: 10;
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--card-border);
+}
+
+.stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.stat-box { 
+  background: var(--glass); 
+  padding: 16px; 
+  border-radius: 12px; 
+  text-align: center; 
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  transition: all 0.2s ease;
+}
+.stat-box:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+.stat-box-value { font-size: 1.8em; font-weight: 800; color: var(--secondary); }
+.stat-box-label { font-size: 0.8em; color: #94a3b8; margin-top: 6px; }
+.stat-upgrade-btn { 
+  background: rgba(16, 185, 129, 0.2); 
+  border: 1px solid var(--secondary); 
+  color: var(--secondary); 
+  padding: 6px 12px; 
+  border-radius: 8px; 
+  cursor: pointer; 
+  font-size: 0.8em; 
+  margin-top: 8px; 
+  display: none;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+.stat-upgrade-btn.show { display: inline-block; }
+.stat-upgrade-btn:hover { background: rgba(16, 185, 129, 0.3); transform: scale(1.05); }
+
+.inventory-grid { 
+  display: grid; 
+  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); 
+  gap: 10px; 
+  max-height: 300px; 
+  overflow-y: auto; 
+}
+.item { 
+  background: var(--glass); 
+  padding: 10px; 
+  border-radius: 12px; 
+  border: 1px solid var(--card-border); 
+  text-align: center; 
+  cursor: pointer; 
+  transition: all 0.3s ease;
+  position: relative;
+}
+.item:hover { 
+  transform: translateY(-4px) scale(1.02); 
+  border-color: var(--primary);
+  box-shadow: 0 8px 25px rgba(99, 102, 241, 0.3);
+}
+.item.equipped { 
+  border-color: var(--secondary); 
+  background: rgba(16, 185, 129, 0.1); 
+}
+.item-icon { 
+  width: 48px; 
+  height: 48px; 
+  margin: 0 auto 8px; 
+  background: rgba(0, 0, 0, 0.3); 
+  border-radius: 8px; 
+  display: flex; 
+  align-items: center; 
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.item-name { 
+  font-size: 0.75em; 
+  color: var(--light); 
+  margin-bottom: 4px; 
+  overflow: hidden; 
+  text-overflow: ellipsis; 
+  white-space: nowrap; 
+  font-weight: 600;
+}
+.item-amount { font-size: 0.7em; color: #94a3b8; font-weight: 500; }
+
+.context-menu { 
+  position: fixed; 
+  background: rgba(30, 41, 59, 0.95); 
+  border: 1px solid var(--card-border); 
+  border-radius: 12px; 
+  padding: 8px; 
+  z-index: 10000; 
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5); 
+  backdrop-filter: blur(20px);
+  min-width: 160px;
+}
+.context-menu-item { 
+  padding: 10px 16px; 
+  cursor: pointer; 
+  border-radius: 8px; 
+  font-size: 0.85em; 
+  white-space: nowrap;
+  transition: all 0.2s ease;
+  font-weight: 500;
+}
+.context-menu-item:hover { background: rgba(255, 255, 255, 0.1); }
+.context-menu-item.danger { color: var(--danger); }
+.context-menu-item.danger:hover { background: rgba(239, 68, 68, 0.1); }
+
+.skills-list { display: flex; flex-direction: column; gap: 10px; max-height: 350px; overflow-y: auto; }
+.skill-item { 
+  background: var(--glass); 
+  padding: 14px; 
+  border-radius: 12px; 
+  border: 1px solid var(--card-border); 
+  display: flex; 
+  align-items: center; 
+  gap: 12px;
+  transition: all 0.2s ease;
+}
+.skill-item:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateX(4px);
+}
+.skill-icon { 
+  width: 40px; 
+  height: 40px; 
+  background: rgba(0, 0, 0, 0.3); 
+  border-radius: 8px; 
+  display: flex; 
+  align-items: center; 
+  justify-content: center; 
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.skill-info { flex: 1; } 
+.skill-name { font-weight: 700; color: var(--light); font-size: 0.9em; margin-bottom: 4px; }
+.skill-details { font-size: 0.8em; color: #94a3b8; }
+.skill-btns { display: flex; gap: 6px; }
+.skill-btn { 
+  padding: 6px 12px; 
+  border: 1px solid rgba(255, 255, 255, 0.2); 
+  border-radius: 8px; 
+  cursor: pointer; 
+  font-size: 0.8em; 
+  background: rgba(0, 0, 0, 0.3); 
+  color: var(--light); 
+  transition: all 0.2s ease;
+  font-weight: 600;
+}
+.skill-btn:hover { background: rgba(255, 255, 255, 0.1); transform: scale(1.05); }
+
+.monsters-list { display: flex; flex-direction: column; gap: 10px; max-height: 400px; overflow-y: auto; }
+.monster-item { 
+  background: var(--glass); 
+  padding: 12px; 
+  border-radius: 12px; 
+  border: 1px solid var(--card-border); 
+  display: flex; 
+  align-items: center; 
+  gap: 12px; 
+  cursor: pointer; 
+  transition: all 0.3s ease;
+}
+.monster-item:hover { 
+  background: rgba(239, 68, 68, 0.1); 
+  border-color: var(--danger);
+  transform: translateX(4px);
+}
+.monster-icon { 
+  width: 48px; 
+  height: 48px; 
+  background: rgba(0, 0, 0, 0.3); 
+  border-radius: 8px; 
+  display: flex; 
+  align-items: center; 
+  justify-content: center; 
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.monster-name { font-weight: 700; color: #f87171; font-size: 0.9em; margin-bottom: 4px; }
+.monster-hp { font-size: 0.8em; color: #94a3b8; } 
+.monster-distance { font-size: 0.8em; color: var(--warning); font-weight: 600; }
+
+.console-container, .chat-container { 
+  background: rgba(0, 0, 0, 0.3); 
+  padding: 16px; 
+  border-radius: 12px; 
+  max-height: 300px; 
+  overflow-y: auto; 
+  font-family: 'JetBrains Mono', 'Fira Code', monospace; 
+  font-size: 0.8em;
+  border: 1px solid var(--card-border);
+}
+.log-entry, .chat-entry { 
+  margin: 6px 0; 
+  padding: 8px; 
+  border-left: 4px solid var(--primary); 
+  padding-left: 12px; 
+  word-wrap: break-word;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+}
+.log-entry.error { border-left-color: var(--danger); color: #fca5a5; } 
+.log-entry.warning { border-left-color: var(--warning); color: #fde68a; }
+.chat-entry.public { border-left-color: var(--secondary); } 
+.chat-entry.private { border-left-color: #ec4899; } 
+.chat-entry.system { border-left-color: var(--warning); }
+
+.chat-input-group { display: flex; gap: 10px; margin-top: 12px; } 
+.chat-input { 
+  flex: 1; 
+  background: var(--glass); 
+  border: 1px solid var(--card-border); 
+  color: var(--light); 
+  padding: 12px; 
+  border-radius: 10px; 
+  font-size: 0.85em;
+  transition: all 0.2s ease;
+}
+.chat-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+.send-btn { 
+  background: rgba(16, 185, 129, 0.2); 
+  border: 1px solid var(--secondary); 
+  color: var(--light); 
+  padding: 12px 20px; 
+  border-radius: 10px; 
+  cursor: pointer; 
+  font-size: 0.85em;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+.send-btn:hover { 
+  background: rgba(16, 185, 129, 0.3); 
+  transform: translateY(-1px);
+}
+
+.session-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.session-stat { 
+  background: var(--glass); 
+  padding: 16px; 
+  border-radius: 12px; 
+  text-align: center;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+.session-stat-value { font-size: 1.5em; font-weight: 800; color: var(--secondary); }
+.session-stat-label { font-size: 0.8em; color: #94a3b8; margin-top: 4px; }
+
+.target-display { 
+  background: rgba(239, 68, 68, 0.1); 
+  border: 2px solid var(--danger); 
+  padding: 16px; 
+  border-radius: 12px; 
+  display: flex; 
+  align-items: center; 
+  gap: 16px;
+  backdrop-filter: blur(10px);
+}
+.target-icon { 
+  width: 56px; 
+  height: 56px; 
+  background: rgba(0, 0, 0, 0.3); 
+  border-radius: 12px; 
+  display: flex; 
+  align-items: center; 
+  justify-content: center; 
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.target-name { font-size: 1.2em; font-weight: 800; color: #f87171; margin-bottom: 8px; }
+
+.command-panel { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.cmd-btn { 
+  background: var(--glass); 
+  border: 1px solid var(--card-border); 
+  color: var(--light); 
+  padding: 12px 8px; 
+  border-radius: 10px; 
+  cursor: pointer; 
+  font-size: 0.8em; 
+  transition: all 0.3s ease;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.cmd-btn:hover { 
+  background: rgba(255, 255, 255, 0.1); 
+  transform: translateY(-2px);
+  border-color: var(--primary);
+}
+
+.statuses-wrap { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.status-chip { 
+  padding: 6px 12px; 
+  border-radius: 20px; 
+  font-size: 0.75em; 
+  font-weight: 600;
+  background: rgba(99, 102, 241, 0.15);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  color: #a5b4fc;
+  backdrop-filter: blur(10px);
+  transition: all 0.2s ease;
+}
+.status-chip.warn { 
+  background: rgba(245, 158, 11, 0.15);
+  border-color: rgba(245, 158, 11, 0.3);
+  color: #fde68a;
+}
+.status-chip.bad { 
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #fca5a5;
+}
+.status-time { opacity: 0.8; margin-left: 6px; font-weight: 500; font-size: 0.9em; }
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.05); border-radius: 4px; }
+::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.3); }
+
+/* Loading animation */
+@keyframes shimmer {
+  0% { background-position: -1000px 0; }
+  100% { background-position: 1000px 0; }
+}
+.loading {
+  animation: shimmer 2s infinite linear;
+  background: linear-gradient(to right, transparent 0%, rgba(255,255,255,0.1) 50%, transparent 100%);
+  background-size: 1000px 100%;
+}
+
+/* Responsive */
+@media (max-width: 1400px) {
+  .dashboard { grid-template-columns: 300px 1fr 350px; }
+}
+
+/* Glass morphism effects */
+.glass {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Floating animation */
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+.floating {
+  animation: float 3s ease-in-out infinite;
+}
 </style>
 </head>
 <body>
 <div class="dashboard">
   <div class="header">
-    <h1><span class="status-dot" id="statusDot"></span>OpenKore Dashboard Pro (Beta 0.1) 27/10/25</h1>
+    <h1>
+      <span class="status-dot" id="statusDot"></span>
+      OpenKore Dashboard Pro
+      <span style="font-size: 0.7em; opacity: 0.8; font-weight: 400;">v2.0</span>
+    </h1>
     <div class="ai-controls">
-      <button class="ai-btn off"  onclick="setAI('off')">AI OFF</button>
-      <button class="ai-btn on"   onclick="setAI('on')">AI ON</button>
-      <button class="ai-btn auto" onclick="setAI('auto')">AI AUTO</button>
+      <button class="ai-btn off" onclick="setAI('off')">⏹️ OFF</button>
+      <button class="ai-btn auto" onclick="setAI('auto')">🤖 AUTO</button>
+      <button class="ai-btn manual" onclick="setAI('manual')">🎮 MANUAL</button>
     </div>
   </div>
 
   <div class="sidebar-left">
     <div class="card" id="cardChar">
-      <div class="card-title" onclick="toggleCard('cardChar')">📊 Personagem
+      <div class="card-title" onclick="toggleCard('cardChar')">
+        <span>👤 Personagem</span>
         <button class="minimize-btn" onclick="event.stopPropagation(); toggleCard('cardChar')">−</button>
       </div>
       <div class="card-content">
-        <div class="stat-row"><span class="stat-label">Nome:</span><span class="stat-value" id="charName">-</span></div>
-        <div class="stat-row"><span class="stat-label">Level / Job:</span><span class="stat-value" id="charLevel">-</span></div>
-        <div class="stat-row"><span class="stat-label">Zeny:</span><span class="stat-value" id="charZeny">-</span></div>
-        <div style="margin-top:10px;">
-          <div class="stat-label">HP</div><div class="progress-bar"><div class="progress-fill hp" id="hpBar">0%</div></div>
-          <div class="stat-label">SP</div><div class="progress-bar"><div class="progress-fill sp" id="spBar">0%</div></div>
-          <div class="stat-label">EXP Base</div><div class="progress-bar"><div class="progress-fill exp" id="expBar">0%</div></div>
-          <div class="stat-label">EXP Job</div><div class="progress-bar"><div class="progress-fill exp" id="expJobBar">0%</div></div>
-          <div class="stat-label">Peso</div><div class="progress-bar"><div class="progress-fill weight" id="weightBar">0%</div></div>
+        <div class="stat-row">
+          <span class="stat-label">Nome:</span>
+          <span class="stat-value" id="charName">-</span>
         </div>
+        <div class="stat-row">
+          <span class="stat-label">Level / Job:</span>
+          <span class="stat-value" id="charLevel">-</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Zeny:</span>
+          <span class="stat-value" id="charZeny">-</span>
+        </div>
+        
+        <div style="margin-top: 16px;">
+          <div class="stat-label">HP</div>
+          <div class="progress-bar"><div class="progress-fill hp" id="hpBar">0%</div></div>
+          
+          <div class="stat-label">SP</div>
+          <div class="progress-bar"><div class="progress-fill sp" id="spBar">0%</div></div>
+          
+          <div class="stat-label">EXP Base</div>
+          <div class="progress-bar"><div class="progress-fill exp" id="expBar">0%</div></div>
+          
+          <div class="stat-label">EXP Job</div>
+          <div class="progress-bar"><div class="progress-fill exp" id="expJobBar">0%</div></div>
+          
+          <div class="stat-label">Peso</div>
+          <div class="progress-bar"><div class="progress-fill weight" id="weightBar">0%</div></div>
+        </div>
+
+        <div class="stat-label" style="margin-top: 16px;">Status Ativos</div>
+        <div id="charStatuses" class="statuses-wrap"></div>
       </div>
     </div>
 
     <div class="card" id="cardStats">
-      <div class="card-title" onclick="toggleCard('cardStats')">💪 Atributos
-        <span style="font-size:.85em;color:#44ff44;">Pts: <span id="statPoints">0</span></span>
-        <button class="minimize-btn" onclick="event.stopPropagation(); toggleCard('cardStats')">−</button>
+      <div class="card-title" onclick="toggleCard('cardStats')">
+        <span>💪 Atributos</span>
+        <span style="font-size: 0.8em; color: var(--secondary); font-weight: 600;">
+          Pts: <span id="statPoints">0</span>
+        </span>
       </div>
       <div class="card-content">
         <div class="stats-grid">
-          <div class="stat-box"><div class="stat-box-value" id="statStr">0</div><div class="stat-box-label">STR</div><button class="stat-upgrade-btn" id="btnStr" onclick="upgradeStat('str')">+</button></div>
-          <div class="stat-box"><div class="stat-box-value" id="statAgi">0</div><div class="stat-box-label">AGI</div><button class="stat-upgrade-btn" id="btnAgi" onclick="upgradeStat('agi')">+</button></div>
-          <div class="stat-box"><div class="stat-box-value" id="statVit">0</div><div class="stat-box-label">VIT</div><button class="stat-upgrade-btn" id="btnVit" onclick="upgradeStat('vit')">+</button></div>
-          <div class="stat-box"><div class="stat-box-value" id="statInt">0</div><div class="stat-box-label">INT</div><button class="stat-upgrade-btn" id="btnInt" onclick="upgradeStat('int')">+</button></div>
-          <div class="stat-box"><div class="stat-box-value" id="statDex">0</div><div class="stat-box-label">DEX</div><button class="stat-upgrade-btn" id="btnDex" onclick="upgradeStat('dex')">+</button></div>
-          <div class="stat-box"><div class="stat-box-value" id="statLuk">0</div><div class="stat-box-label">LUK</div><button class="stat-upgrade-btn" id="btnLuk" onclick="upgradeStat('luk')">+</button></div>
+          <div class="stat-box">
+            <div class="stat-box-value" id="statStr">0</div>
+            <div class="stat-box-label">FOR</div>
+            <button class="stat-upgrade-btn" id="btnStr" onclick="upgradeStat('str')">↑</button>
+          </div>
+          <div class="stat-box">
+            <div class="stat-box-value" id="statAgi">0</div>
+            <div class="stat-box-label">AGI</div>
+            <button class="stat-upgrade-btn" id="btnAgi" onclick="upgradeStat('agi')">↑</button>
+          </div>
+          <div class="stat-box">
+            <div class="stat-box-value" id="statVit">0</div>
+            <div class="stat-box-label">VIT</div>
+            <button class="stat-upgrade-btn" id="btnVit" onclick="upgradeStat('vit')">↑</button>
+          </div>
+          <div class="stat-box">
+            <div class="stat-box-value" id="statInt">0</div>
+            <div class="stat-box-label">INT</div>
+            <button class="stat-upgrade-btn" id="btnInt" onclick="upgradeStat('int')">↑</button>
+          </div>
+          <div class="stat-box">
+            <div class="stat-box-value" id="statDex">0</div>
+            <div class="stat-box-label">DES</div>
+            <button class="stat-upgrade-btn" id="btnDex" onclick="upgradeStat('dex')">↑</button>
+          </div>
+          <div class="stat-box">
+            <div class="stat-box-value" id="statLuk">0</div>
+            <div class="stat-box-label">SOR</div>
+            <button class="stat-upgrade-btn" id="btnLuk" onclick="upgradeStat('luk')">↑</button>
+          </div>
         </div>
       </div>
     </div>
 
     <div class="card" id="cardSession">
-      <div class="card-title" onclick="toggleCard('cardSession')">📈 Estatísticas
+      <div class="card-title" onclick="toggleCard('cardSession')">
+        <span>📈 Estatísticas</span>
         <button class="minimize-btn" onclick="event.stopPropagation(); toggleCard('cardSession')">−</button>
       </div>
       <div class="card-content">
         <div class="session-stats">
-          <div class="session-stat"><div class="session-stat-value" id="sessionUptime">0:00:00</div><div class="session-stat-label">Tempo Online</div></div>
-          <div class="session-stat"><div class="session-stat-value" id="sessionExpHour">0</div><div class="session-stat-label">EXP/hora</div></div>
-          <div class="session-stat"><div class="session-stat-value" id="sessionZenyHour">0</div><div class="session-stat-label">Zeny/hora</div></div>
-          <div class="session-stat"><div class="session-stat-value" id="sessionKills">0</div><div class="session-stat-label">Kills</div></div>
+          <div class="session-stat">
+            <div class="session-stat-value" id="sessionUptime">0:00:00</div>
+            <div class="session-stat-label">Tempo Online</div>
+          </div>
+          <div class="session-stat">
+            <div class="session-stat-value" id="sessionExpHour">0</div>
+            <div class="session-stat-label">EXP/hora</div>
+          </div>
+          <div class="session-stat">
+            <div class="session-stat-value" id="sessionZenyHour">0</div>
+            <div class="session-stat-label">Zeny/hora</div>
+          </div>
+          <div class="session-stat">
+            <div class="session-stat-value" id="sessionKills">0</div>
+            <div class="session-stat-label">Kills</div>
+          </div>
         </div>
       </div>
     </div>
   </div>
 
   <div class="main-content">
-    <div class="card" id="targetCard" style="display:none;">
+    <div class="card" id="targetCard" style="display: none;">
       <div class="target-display">
-        <div class="target-icon"><img id="targetIcon" src="" alt="Target"></div>
-        <div class="target-info">
+        <div class="target-icon">
+          <img id="targetIcon" src="" alt="Target" style="width: 40px; height: 40px; border-radius: 8px;">
+        </div>
+        <div class="target-info" style="flex: 1;">
           <div class="target-name" id="targetName">-</div>
           <div class="stat-label">HP</div>
-          <div class="progress-bar" style="margin:5px 0;"><div class="progress-fill hp" id="targetHpBar">0%</div></div>
-          <div style="display:flex;justify-content:space-between;font-size:.85em;color:#ccc;">
+          <div class="progress-bar" style="margin: 8px 0;">
+            <div class="progress-fill hp" id="targetHpBar">0%</div>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-size: 0.85em; color: #94a3b8;">
             <span>Lv: <span id="targetLevel">-</span></span>
             <span>Dist: <span id="targetDistance">-</span>m</span>
           </div>
@@ -881,42 +1529,47 @@ body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; background:#0a0e
     </div>
 
     <div class="card" id="cardCommands">
-      <div class="card-title" onclick="toggleCard('cardCommands')">⚡ Comandos
+      <div class="card-title" onclick="toggleCard('cardCommands')">
+        <span>⚡ Comandos Rápidos</span>
         <button class="minimize-btn" onclick="event.stopPropagation(); toggleCard('cardCommands')">−</button>
       </div>
       <div class="card-content">
         <div class="command-panel">
-          <button class="cmd-btn" onclick="sendCommand('pause')">⏸️ Pause</button>
-          <button class="cmd-btn" onclick="sendCommand('reload all')">🔄 Reload</button>
+          <button class="cmd-btn" onclick="sendCommand('pause')">⏸️ Pausar</button>
+          <button class="cmd-btn" onclick="sendCommand('reload all')">🔄 Recarregar</button>
           <button class="cmd-btn" onclick="sendCommand('s')">📊 Status</button>
-          <button class="cmd-btn" onclick="sendCommand('i')">🎒 Inv</button>
+          <button class="cmd-btn" onclick="sendCommand('i')">🎒 Inventário</button>
           <button class="cmd-btn" onclick="sendCommand('skills')">✨ Skills</button>
           <button class="cmd-btn" onclick="sendCommand('exp')">📈 EXP</button>
           <button class="cmd-btn" onclick="sendCommand('relog')">🔌 Relog</button>
           <button class="cmd-btn" onclick="sendCommand('respawn')">💀 Respawn</button>
         </div>
         <div class="chat-input-group">
-          <input type="text" class="chat-input" id="customCommand" placeholder="Comando..." onkeypress="if(event.key==='Enter')sendCustomCommand()">
-          <button class="send-btn" onclick="sendCustomCommand()">Enviar</button>
+          <input type="text" class="chat-input" id="customCommand" placeholder="Digite um comando..." onkeypress="if(event.key==='Enter')sendCustomCommand()">
+          <button class="send-btn" onclick="sendCustomCommand()">Executar</button>
         </div>
       </div>
     </div>
 
     <div class="card" id="cardInv">
-      <div class="card-title" onclick="toggleCard('cardInv')">🎒 Inventário (<span id="invCount">0</span>)
+      <div class="card-title" onclick="toggleCard('cardInv')">
+        <span>🎒 Inventário (<span id="invCount">0</span>)</span>
         <button class="minimize-btn" onclick="event.stopPropagation(); toggleCard('cardInv')">−</button>
       </div>
-      <div class="card-content"><div class="inventory-grid" id="inventoryGrid"></div></div>
+      <div class="card-content">
+        <div class="inventory-grid" id="inventoryGrid"></div>
+      </div>
     </div>
 
     <div class="card" id="cardChat">
-      <div class="card-title" onclick="toggleCard('cardChat')">💬 Chat
+      <div class="card-title" onclick="toggleCard('cardChat')">
+        <span>💬 Chat do Jogo</span>
         <button class="minimize-btn" onclick="event.stopPropagation(); toggleCard('cardChat')">−</button>
       </div>
       <div class="card-content">
         <div class="chat-container" id="chatContainer"></div>
         <div class="chat-input-group">
-          <input type="text" class="chat-input" id="chatInput" placeholder="Mensagem..." onkeypress="if(event.key==='Enter')sendChat()">
+          <input type="text" class="chat-input" id="chatInput" placeholder="Digite uma mensagem..." onkeypress="if(event.key==='Enter')sendChat()">
           <button class="send-btn" onclick="sendChat()">Enviar</button>
         </div>
       </div>
@@ -925,7 +1578,8 @@ body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; background:#0a0e
 
   <div class="sidebar-right">
     <div class="card" id="cardMap">
-      <div class="card-title" onclick="toggleCard('cardMap')">🗺️ Mapa - <span id="mapName">-</span>
+      <div class="card-title" onclick="toggleCard('cardMap')">
+        <span>🗺️ Mapa - <span id="mapName">-</span></span>
         <button class="minimize-btn" onclick="event.stopPropagation(); toggleCard('cardMap')">−</button>
       </div>
       <div class="card-content">
@@ -936,32 +1590,51 @@ body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; background:#0a0e
           </div>
           <canvas id="mapCanvas"></canvas>
         </div>
-        <div class="stat-row"><span class="stat-label">Players:</span><span class="stat-value" id="playersCount">0</span></div>
-        <div class="stat-row"><span class="stat-label">Monstros:</span><span class="stat-value" id="monstersCount">0</span></div>
-        <div class="stat-row"><span class="stat-label">Portais:</span><span class="stat-value" id="portalsCount">0</span></div>
+        <div class="stat-row">
+          <span class="stat-label">Jogadores:</span>
+          <span class="stat-value" id="playersCount">0</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Monstros:</span>
+          <span class="stat-value" id="monstersCount">0</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Portais:</span>
+          <span class="stat-value" id="portalsCount">0</span>
+        </div>
       </div>
     </div>
 
     <div class="card" id="cardMonsters">
-      <div class="card-title" onclick="toggleCard('cardMonsters')">👹 Monstros Próximos
+      <div class="card-title" onclick="toggleCard('cardMonsters')">
+        <span>👹 Monstros Próximos</span>
         <button class="minimize-btn" onclick="event.stopPropagation(); toggleCard('cardMonsters')">−</button>
       </div>
-      <div class="card-content"><div class="monsters-list" id="monstersList"></div></div>
+      <div class="card-content">
+        <div class="monsters-list" id="monstersList"></div>
+      </div>
     </div>
 
     <div class="card" id="cardSkills">
-      <div class="card-title" onclick="toggleCard('cardSkills')">✨ Skills
-        <span style="font-size:.85em;color:#44ff44;">Pts: <span id="skillPoints">0</span></span>
-        <button class="minimize-btn" onclick="event.stopPropagation(); toggleCard('cardSkills')">−</button>
+      <div class="card-title" onclick="toggleCard('cardSkills')">
+        <span>✨ Skills</span>
+        <span style="font-size: 0.8em; color: var(--secondary); font-weight: 600;">
+          Pts: <span id="skillPoints">0</span>
+        </span>
       </div>
-      <div class="card-content"><div class="skills-list" id="skillsList"></div></div>
+      <div class="card-content">
+        <div class="skills-list" id="skillsList"></div>
+      </div>
     </div>
 
     <div class="card" id="cardConsole">
-      <div class="card-title" onclick="toggleCard('cardConsole')">💻 Console
+      <div class="card-title" onclick="toggleCard('cardConsole')">
+        <span>💻 Console</span>
         <button class="minimize-btn" onclick="event.stopPropagation(); toggleCard('cardConsole')">−</button>
       </div>
-      <div class="card-content"><div class="console-container" id="consoleContainer"></div></div>
+      <div class="card-content">
+        <div class="console-container" id="consoleContainer"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -1011,27 +1684,25 @@ function showContextMenu(e,item){
 }
 
 async function updateDashboard(){
-  try{
-    const [data,stats,monsters,target]=await Promise.all([
-      fetch('/api/all').then(r=>r.json()),
-      fetch('/api/stats').then(r=>r.json()),
-      fetch('/api/monsters').then(r=>r.json()),
-      fetch('/api/target').then(r=>r.json())
-    ]);
-    updateCharacter(data.character);
-    updateMap(data.map);
-    updateInventory(data.inventory);
-    updateSkills(data.skills);
-    updateSessionStats(stats);
-    updateMonstersList(monsters.monsters);
-    updateTarget(target);
-    updateConsole();
-    updateChat();
-    document.getElementById('statusDot').style.background='#44ff44';
-  }catch(e){
-    console.error('Erro:', e);
-    document.getElementById('statusDot').style.background='#ff4444';
-  }
+    try{
+        const [data, monsters, target] = await Promise.all([
+            fetch('/api/all').then(r => r.json()),
+            fetch('/api/monsters').then(r => r.json()),
+            fetch('/api/target').then(r => r.json())
+        ]);
+        updateCharacter(data.character);
+        updateMap(data.map);
+        updateInventory(data.inventory);
+        updateSkills(data.skills);
+        updateMonstersList(monsters.monsters);
+        updateTarget(target);
+        updateConsole();
+        updateChat();
+        document.getElementById('statusDot').style.background = '#44ff44';
+    } catch (e) {
+        console.error('Erro:', e);
+        document.getElementById('statusDot').style.background = '#ff4444';
+    }
 }
 
 function updateCharacter(char){
@@ -1060,6 +1731,36 @@ function updateCharacter(char){
     document.getElementById('statDex').textContent=char.stats.dex||0;
     document.getElementById('statLuk').textContent=char.stats.luk||0;
   }
+    // Statuses
+  const stWrap = document.getElementById('charStatuses');
+  if (stWrap) {
+    stWrap.innerHTML = '';
+    const sts = (char.statuses || []);
+    if (sts.length === 0) {
+      stWrap.innerHTML = '<span style="opacity:.6;font-size:.8em;">Sem status ativos</span>';
+    } else {
+      for (const s of sts) {
+        const name = (s.name || '').toString();
+        // heurísticas simples de cor
+        const lower = name.toLowerCase();
+        let cls = 'status-chip';
+        if (/(poison|curse|blind|stone|silence|stun|bleeding|confuse|freeze|sleep)/.test(lower)) cls += ' bad';
+        else if (/(endure|provoke|cart|cloak|sight|magnificat|agility|bless|increase agi|impositio|kyrie|assumptio|soul|edp|adrenaline|angelus|overthrust|berserk|concentration)/.test(lower)) cls += '';
+        else if (/(weight|overweight|hunger)/.test(lower)) cls += ' warn';
+
+        const span = document.createElement('span');
+        span.className = cls;
+        let html = name.replace(/_/g,' ');
+        if (typeof s.time_left === 'number' && s.time_left > 0) {
+          const sec = Math.max(0, Math.floor(s.time_left));
+          html += `<span class="status-time">(${sec}s)</span>`;
+        }
+        span.innerHTML = html;
+        stWrap.appendChild(span);
+      }
+    }
+  }
+
 }
 
 function updateProgressBar(id,pct,text){
@@ -1088,57 +1789,109 @@ function updateMap(map){
 
 function drawMap(){
   if(!mapData) return;
-  const container=document.getElementById('mapContainer');
-  const cw=container.offsetWidth-4, ch=container.offsetHeight-4;
+  const container = document.getElementById('mapContainer');
+  const cw = container.offsetWidth - 4, ch = container.offsetHeight - 4;
 
-  if(mapImageLoaded && mapImg.complete && mapImg.naturalWidth>0){
-    canvas.width=mapImg.naturalWidth; canvas.height=mapImg.naturalHeight;
-    const scale=Math.min(cw/canvas.width, ch/canvas.height);
-    canvas.style.width=(canvas.width*scale)+'px';
-    canvas.style.height=(canvas.height*scale)+'px';
-    ctx.drawImage(mapImg,0,0);
-  }else{
-    const w=mapData.width||100, h=mapData.height||100;
-    canvas.width=w; canvas.height=h;
-    const scale=Math.min(cw/w, ch/h);
-    canvas.style.width=(w*scale)+'px';
-    canvas.style.height=(h*scale)+'px';
-    ctx.fillStyle='#1a1a2e'; ctx.fillRect(0,0,canvas.width,canvas.height);
-    ctx.strokeStyle='rgba(255,255,255,0.1)'; ctx.lineWidth=1;
-    for(let i=0;i<=10;i++){
+  // base/mapa
+  if (mapImageLoaded && mapImg.complete && mapImg.naturalWidth > 0) {
+    canvas.width  = mapImg.naturalWidth;
+    canvas.height = mapImg.naturalHeight;
+    const scale = Math.min(cw / canvas.width, ch / canvas.height);
+    canvas.style.width  = (canvas.width  * scale) + 'px';
+    canvas.style.height = (canvas.height * scale) + 'px';
+    ctx.drawImage(mapImg, 0, 0);
+  } else {
+    const w = mapData.width || 100, h = mapData.height || 100;
+    canvas.width = w; canvas.height = h;
+    const scale = Math.min(cw / w, ch / h);
+    canvas.style.width  = (w * scale) + 'px';
+    canvas.style.height = (h * scale) + 'px';
+    ctx.fillStyle = '#1a1a2e'; ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.strokeStyle = 'rgba(255,255,255,0.1)'; ctx.lineWidth = 1;
+    for (let i=0;i<=10;i++){
       const x=(canvas.width/10)*i, y=(canvas.height/10)*i;
       ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,canvas.height); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(canvas.width,y); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(canvas.width,y);  ctx.stroke();
     }
   }
 
-  const scaleX=canvas.width/(mapData.width||1);
-  const scaleY=canvas.height/(mapData.height||1);
+  const scaleX = canvas.width  / (mapData.width  || 1);
+  const scaleY = canvas.height / (mapData.height || 1);
+  const sx = (x) => x * scaleX;
+  const sy = (y) => (mapData.height - y) * scaleY;
 
-  if(mapData.portals){
+  // Portais
+  if (mapData.portals){
     ctx.fillStyle='#aa00ff'; ctx.strokeStyle='#ff00ff'; ctx.lineWidth=2;
-    mapData.portals.forEach(p=>{ const x=p.x*scaleX, y=(mapData.height-p.y)*scaleY; ctx.beginPath(); ctx.arc(x,y,8,0,Math.PI*2); ctx.fill(); ctx.stroke(); });
+    mapData.portals.forEach(p => {
+      const x = sx(p.x||0), y = sy(p.y||0);
+      ctx.beginPath(); ctx.arc(x,y,8,0,Math.PI*2); ctx.fill(); ctx.stroke();
+    });
   }
-  if(mapData.monsters){
-    mapData.monsters.forEach(m=>{
-      const x=m.x*scaleX, y=(mapData.height-m.y)*scaleY;
+
+  // Monstros
+  if (mapData.monsters){
+    mapData.monsters.forEach(m => {
+      const x = sx(m.x||0), y = sy(m.y||0);
       ctx.fillStyle='#ff4444'; ctx.beginPath(); ctx.arc(x,y,6,0,Math.PI*2); ctx.fill();
-      if(m.hp_max>0){
-        const hp=m.hp/m.hp_max, bw=20, bh=3;
+      if (m.hp_max > 0){
+        const hp = m.hp / m.hp_max, bw=20, bh=3;
         ctx.fillStyle='rgba(0,0,0,0.5)'; ctx.fillRect(x-bw/2, y-12, bw, bh);
         ctx.fillStyle='#44ff44'; ctx.fillRect(x-bw/2, y-12, bw*hp, bh);
       }
     });
   }
-  if(mapData.players){
+
+  // Jogadores
+  if (mapData.players){
     ctx.fillStyle='#4444ff';
-    mapData.players.forEach(p=>{ const x=p.x*scaleX, y=(mapData.height-p.y)*scaleY; ctx.beginPath(); ctx.arc(x,y,5,0,Math.PI*2); ctx.fill(); });
+    mapData.players.forEach(p => {
+      const x = sx(p.x||0), y = sy(p.y||0);
+      ctx.beginPath(); ctx.arc(x,y,5,0,Math.PI*2); ctx.fill();
+    });
   }
-  const cx=mapData.char_x*scaleX, cy=(mapData.height-mapData.char_y)*scaleY;
+
+  // Linha de rota/destino
+  const hasDest = (typeof mapData.dest_x === 'number' && typeof mapData.dest_y === 'number');
+  const cx = sx(mapData.char_x||0), cy = sy(mapData.char_y||0);
+
+  if (Array.isArray(mapData.path) && mapData.path.length > 0) {
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = 'rgba(255,215,0,0.9)'; // dourado
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    for (const p of mapData.path) {
+      const px = sx(p.x||0), py = sy(p.y||0);
+      ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+  } else if (hasDest) {
+    // linha reta tracejada até destino (fallback)
+    const dx = sx(mapData.dest_x), dy = sy(mapData.dest_y);
+    const same = (dx === cx && dy === cy);
+    if (!same) {
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6,6]);
+      ctx.strokeStyle = 'rgba(0,200,255,0.9)';
+      ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(dx, dy); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+
+  // Marcador de destino (X)
+  if (hasDest) {
+    const dx = sx(mapData.dest_x), dy = sy(mapData.dest_y);
+    ctx.lineWidth = 2; ctx.strokeStyle = '#00c8ff';
+    ctx.beginPath(); ctx.moveTo(dx-6, dy-6); ctx.lineTo(dx+6, dy+6); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(dx-6, dy+6); ctx.lineTo(dx+6, dy-6); ctx.stroke();
+  }
+
+  // Personagem
   ctx.fillStyle='rgba(68,255,68,0.3)'; ctx.beginPath(); ctx.arc(cx,cy,14,0,Math.PI*2); ctx.fill();
-  ctx.fillStyle='#44ff44'; ctx.beginPath(); ctx.arc(cx,cy,9,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#44ff44'; ctx.beginPath(); ctx.arc(cx,cy,9,0,Math.PI*2);  ctx.fill();
   ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.stroke();
 }
+
 
 canvas.addEventListener('click', (e)=>{
   if(!mapData) return;
@@ -1201,7 +1954,7 @@ function updateMonstersList(monsters){
         <div class="monster-icon"><img src="https://static.divine-pride.net/images/mobs/png/${m.nameID}.png" onerror="this.style.display='none'"></div>
         <div class="monster-info">
           <div class="monster-name">${m.name}</div>
-          <div class="monster-hp">HP: ${hp}%</div>
+          <div class="monster-hp">HP: ${m.hp}%</div>
           <div class="monster-distance">${m.distance||0}m</div>
         </div>
       `;
@@ -1223,15 +1976,6 @@ function updateTarget(t){
   }else{
     card.style.display='none';
   }
-}
-
-function updateSessionStats(s){
-  if(!s) return;
-  const h=Math.floor(s.uptime/3600), m=Math.floor((s.uptime%3600)/60), sec=s.uptime%60;
-  document.getElementById('sessionUptime').textContent=`${h}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
-  document.getElementById('sessionExpHour').textContent=(s.exp_per_hour||0).toLocaleString('pt-BR');
-  document.getElementById('sessionZenyHour').textContent=(s.zeny_per_hour||0).toLocaleString('pt-BR');
-  document.getElementById('sessionKills').textContent=s.kills||0;
 }
 
 async function updateConsole(){
@@ -1283,5 +2027,4 @@ async function apiPost(url, data){
 </html>};
 }
 
-# ============================ EOF ================================
 1;
