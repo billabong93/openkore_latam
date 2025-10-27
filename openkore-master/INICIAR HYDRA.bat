@@ -1,3 +1,4 @@
 @echo off
-perl src\Poseidon\poseidon.pl
-pause
+ cd /d "%~dp0"
+ perl src\Poseidon\poseidon.pl
+ pause
