@@ -55,9 +55,9 @@ sub iterate {
 	processPortalRecording();
 	Benchmark::end("ai_prepare") if DEBUG;
 
-	Plugins::callHook('AI_start', {state => AI::state});
+	Plugins::callHook('AI_start', {state => AI::state()});
 
-	return if AI::state == AI::OFF;
+	return if AI::state() == AI::OFF();
 	if ($net->clientAlive() && !$sentWelcomeMessage && timeOut($timeout{welcomeText})) {
 		$messageSender->injectAdminMessage($Settings::welcomeText) if ($config{'verbose'} && !$config{'XKore_silent'});
 		$sentWelcomeMessage = 1;
@@ -111,7 +111,7 @@ sub iterate {
 
 
 	Misc::checkValidity("AI part 1");
-	return unless AI::state == AI::AUTO;
+	return unless AI::state() == AI::AUTO();
 
 
 	##### AUTOMATIC AI STARTS HERE #####
@@ -348,10 +348,10 @@ sub processMisc {
 # for a certain period of time.
 sub processClientSuspend {
 	my $result = 0;
-	if (AI::action eq 'clientSuspend' && timeOut(AI::args)) {
+	if (AI::action() eq 'clientSuspend' && timeOut(AI::args)) {
 		debug "AI suspend by clientSuspend dequeued\n";
 		AI::dequeue;
-	} elsif (AI::action eq "clientSuspend" && $net->clientAlive()) {
+	} elsif (AI::action() eq "clientSuspend" && $net->clientAlive()) {
 		# When XKore mode is turned on, clientSuspend will increase it's timeout
 		# every time the user tries to do something manually.
 		my $args = AI::args;
@@ -405,7 +405,7 @@ sub processClientSuspend {
 
 		# Client suspended, do not continue with AI
 		$result = 1;
-	} elsif (AI::action eq "clientSuspend") { # Should be called only if AI Suspend itself. (this mode used in AI::CoreLogic::processItemsTake and AI::CoreLogic::processAllowedMaps)
+	} elsif (AI::action() eq "clientSuspend") { # Should be called only if AI Suspend itself. (this mode used in AI::CoreLogic::processItemsTake and AI::CoreLogic::processAllowedMaps)
 		# Client suspended, do not continue with AI
 		$result = 1;
 	}
@@ -413,7 +413,7 @@ sub processClientSuspend {
 }
 
 sub processLook {
-	if (AI::action eq "look" && timeOut($timeout{'ai_look'})) {
+	if (AI::action() eq "look" && timeOut($timeout{'ai_look'})) {
 		$timeout{'ai_look'}{'time'} = time;
 		$messageSender->sendLook(AI::args->{'look_body'}, AI::args->{'look_head'});
 		AI::dequeue;
@@ -423,7 +423,7 @@ sub processLook {
 =pod
 ##### TALK WITH NPC ######
 sub processNPCTalk {
-	return if (AI::action ne "NPC");
+	return if (AI::action() ne "NPC");
 	my $args = AI::args;
 	my $task = $args->{task};
 	if (!$task) {
@@ -450,7 +450,7 @@ sub processNPCTalk {
 ##### DROPPING #####
 # Drop one or more items from inventory.
 sub processDrop {
-	if (AI::action eq "drop" && timeOut(AI::args)) {
+	if (AI::action() eq "drop" && timeOut(AI::args)) {
 		my $item = AI::args->{'items'}[0];
 		my $amount = AI::args->{max};
 
@@ -634,7 +634,7 @@ sub processEscapeUnknownMaps {
 	# portal. With this, kore should automaticly go into the portal on the other side
 	# Todo: Make kore do a random walk searching for portal if there's no portal arround.
 
-	if (AI::action eq "escape" && AI::state == AI::AUTO) {
+	if (AI::action() eq "escape" && AI::state() == AI::AUTO()) {
 		my $skip = 0;
 		if (timeOut($timeout{ai_route_escape}) && $timeout{ai_route_escape}{time}){
 			AI::dequeue;
@@ -706,7 +706,7 @@ sub processEscapeUnknownMaps {
 
 ##### DELAYED-TELEPORT #####
 sub processDelayedTeleport {
-	if (AI::action eq 'teleport') {
+	if (AI::action() eq 'teleport') {
 		if ($char->{last_skill_used_is_continuous}) {
 			$messageSender->sendStopSkillUse($char->{last_continuous_skill_used});
 		}
@@ -729,7 +729,7 @@ sub processSkillUse {
 	#there might be line of sight problem too
 	#or the player disappers from the area
 
-	if (AI::action eq "skill_use" && AI::args->{suspended}) {
+	if (AI::action() eq "skill_use" && AI::args->{suspended}) {
 		AI::args->{giveup}{time} += time - AI::args->{suspended};
 		AI::args->{minCastTime}{time} += time - AI::args->{suspended};
 		AI::args->{maxCastTime}{time} += time - AI::args->{suspended};
@@ -737,7 +737,7 @@ sub processSkillUse {
 	}
 
 	SKILL_USE: {
-		last SKILL_USE if (AI::action ne "skill_use");
+		last SKILL_USE if (AI::action() ne "skill_use");
 		my $args = AI::args;
 
 		if ($args->{monsterID} && $skillsArea{$args->{skillHandle}} == 2) {
@@ -837,20 +837,20 @@ sub processSkillUse {
 sub processTake {
 	##### TAKE #####
 
-	if (AI::action eq "take" && AI::args->{suspended}) {
+	if (AI::action() eq "take" && AI::args->{suspended}) {
 		AI::args->{ai_take_giveup}{time} += time - AI::args->{suspended};
 		delete AI::args->{suspended};
 	}
 
-	if (AI::action eq "take" && !(my $item = $items{AI::args->{ID}})) {
+	if (AI::action() eq "take" && !(my $item = $items{AI::args->{ID}})) {
 		AI::dequeue;
 
-	} elsif (AI::action eq "take" && timeOut(AI::args->{ai_take_giveup})) {
+	} elsif (AI::action() eq "take" && timeOut(AI::args->{ai_take_giveup})) {
 		message TF("Failed to take %s (%s) from (%s, %s) to (%s, %s)\n", $item->{name}, $item->{binID}, $char->{pos}{x}, $char->{pos}{y}, $item->{pos}{x}, $item->{pos}{y});
 		$item->{take_failed}++;
 		AI::dequeue;
 
-	} elsif (AI::action eq "take") {
+	} elsif (AI::action() eq "take") {
 		my $myPos = $char->{pos};
 		my $dist = blockDistance($item->{pos}, $myPos);
 		debug "Planning to take $item->{name} ($item->{binID}), distance $dist\n", "drop";
@@ -886,7 +886,7 @@ sub processTake {
 }
 
 sub processEquip {
-	if (AI::action eq "equip") {
+	if (AI::action() eq "equip") {
 		# Just wait until everything is equipped or timedOut
 		if (!$ai_v{temp}{waitForEquip} || timeOut($timeout{ai_equip_giveup})) {
 			AI::dequeue;
@@ -896,13 +896,13 @@ sub processEquip {
 }
 
 sub processDeal {
-	if (AI::action ne "deal" && %currentDeal) {
+	if (AI::action() ne "deal" && %currentDeal) {
 		my %plugin_args = ( return => 0 );
 		Plugins::callHook('deal_queue' => \%plugin_args);
 		return if ($plugin_args{return});
 		
 		AI::queue('deal');
-	} elsif (AI::action eq "deal") {
+	} elsif (AI::action() eq "deal") {
 		if (%currentDeal) {
 			if (!$currentDeal{you_finalize} && timeOut($timeout{ai_dealAuto}) &&
 				(!$config{dealAuto_names} || existsInList($config{dealAuto_names}, $currentDeal{name})) &&
@@ -1008,7 +1008,7 @@ sub processAutoBreakTime {
 
 ##### DEAD #####
 sub processDead {
-	if (AI::action eq "dead" && !$char->{dead}) {
+	if (AI::action() eq "dead" && !$char->{dead}) {
 		AI::dequeue;
 		$char->setStatus('Dead', 0);
 
@@ -1035,7 +1035,7 @@ sub processDead {
 			}
 		}
 
-	} elsif (AI::action ne "dead" && AI::action ne "deal" && $char->{'dead'}) {
+	} elsif (AI::action() ne "dead" && AI::action() ne "deal" && $char->{'dead'}) {
 		AI::clear();
 		AI::queue("dead");
 		$char->setStatus('Dead', 1);
@@ -1047,12 +1047,12 @@ sub processDead {
 		}
 	}
 
-	if (AI::action eq "dead" && $config{dcOnDeath} != -1 && time - $char->{dead_time} >= $timeout{ai_dead_respawn}{timeout}) {
+	if (AI::action() eq "dead" && $config{dcOnDeath} != -1 && time - $char->{dead_time} >= $timeout{ai_dead_respawn}{timeout}) {
 		$messageSender->sendRestart(0);
 		$char->{'dead_time'} = time;
 	}
 
-	if (AI::action eq "dead" && $config{dcOnDeath} && $config{dcOnDeath} != -1) {
+	if (AI::action() eq "dead" && $config{dcOnDeath} && $config{dcOnDeath} != -1) {
 		error T("Auto disconnecting on death!\n");
 		chatLog("k", T("*** You died, auto disconnect! ***\n"));
 		$messageSender->sendQuit();
@@ -1071,7 +1071,7 @@ sub processDead {
 #     timeout => 0.5, # 0.5 seconds between transfers
 #   }
 sub processTransferItems {
-	return if AI::action ne 'transferItems';
+	return if AI::action() ne 'transferItems';
 	return if !timeOut( AI::args );
 
 	{
@@ -1167,7 +1167,7 @@ sub processTransferItems {
 # Put one or more items in cart.
 # TODO: check for cart weight & number of items
 sub processCartAdd {
-	if (AI::action eq "cartAdd" && timeOut(AI::args)) {
+	if (AI::action() eq "cartAdd" && timeOut(AI::args)) {
 		my $item = AI::args->{items}[0];
 		my $invItem = $char->inventory->get($item->{index});
 		if ($invItem) {
@@ -1182,7 +1182,7 @@ sub processCartAdd {
 #### CART Get ####
 # Get one or more items from cart.
 sub processCartGet {
-	if (AI::action eq "cartGet" && timeOut(AI::args)) {
+	if (AI::action() eq "cartGet" && timeOut(AI::args)) {
 		my $item = AI::args->{items}[0];
 		my $amount = $item->{amount};
 		my $cartItem = $char->cart->get($item->{index});
@@ -1197,7 +1197,7 @@ sub processCartGet {
 
 sub processAutoMakeArrow {
 	####### AUTO MAKE ARROW #######
-	if ((AI::isIdle || AI::is(qw/route move autoBuy storageAuto follow sitAuto items_take items_gather/))
+	if ((AI::isIdle() || AI::is(qw/route move autoBuy storageAuto follow sitAuto items_take items_gather/))
 	 && timeOut($AI::Timeouts::autoArrow, 0.2) && $config{autoMakeArrows} && defined binFind(\@skillsID, 'AC_MAKINGARROW') ) {
 		my $max = @arrowCraftID;
 		my $nMake = 0;
@@ -1235,7 +1235,7 @@ sub processAutoMakeArrow {
 sub processAutoStorage {
 	return if ($shopstarted || $buyershopstarted);
 	# storageAuto - chobit aska 20030128
-	if ((AI::isIdle || AI::is("route", "sitAuto", "follow"))
+	if ((AI::isIdle() || AI::is("route", "sitAuto", "follow"))
 		  && $config{storageAuto} && ($config{storageAuto_npc} ne "" || $config{storageAuto_useChatCommand} || $config{storageAuto_useItem})
 		  && !$ai_v{sitAuto_forcedBySitCommand}
 		  && !AI::inQueue("buyAuto")
@@ -1265,7 +1265,7 @@ sub processAutoStorage {
 			Plugins::callHook('AI_storage_auto_queued');
 		}
 
-	} elsif ((AI::isIdle || AI::is("route", "attack"))
+	} elsif ((AI::isIdle() || AI::is("route", "attack"))
 		  && $config{storageAuto}
 		  && ($config{storageAuto_npc} ne "" || $config{storageAuto_useChatCommand} || $config{storageAuto_useItem})
 		  && !$ai_v{sitAuto_forcedBySitCommand}
@@ -1340,7 +1340,7 @@ sub processAutoStorage {
 		$attackOnRoute = AI::args($routeIndex)->{attackOnRoute} if (defined $routeIndex);
 
 		# Only autostorage when we're on an attack route, or not moving
-		if ((!defined($routeIndex) || $attackOnRoute > 1 || AI::isIdle) && $needitem ne "" &&
+		if ((!defined($routeIndex) || $attackOnRoute > 1 || AI::isIdle()) && $needitem ne "" &&
 			$char->inventory->isReady() && ai_canOpenStorage()){
 	 		message TF("Auto-storaging due to insufficient %s\n", $needitem);
 			AI::queue("storageAuto");
@@ -1350,7 +1350,7 @@ sub processAutoStorage {
 	}
 
 
-	if (AI::action eq "storageAuto" && AI::args->{done}) {
+	if (AI::action() eq "storageAuto" && AI::args->{done}) {
 		# Autostorage finished; trigger sellAuto unless autostorage was already triggered by it
 		my $forcedBySell = AI::args->{forcedBySell};
 		my $forcedByBuy = AI::args->{forcedByBuy};
@@ -1369,7 +1369,7 @@ sub processAutoStorage {
 			}
 		}
 
-	} elsif (AI::action eq "storageAuto" && timeOut($timeout{'ai_storageAuto'})) {
+	} elsif (AI::action() eq "storageAuto" && timeOut($timeout{'ai_storageAuto'})) {
 		# Main autostorage block
 		my $args = AI::args;
 
@@ -1463,7 +1463,7 @@ sub processAutoStorage {
 						} else {
 							warning T("No fallback npc specified, disabling storageAuto\n");
 							configModify("storageAuto", 0);
-							AI::dequeue if (AI::action eq "storageAuto");
+							AI::dequeue if (AI::action() eq "storageAuto");
 						}
 						return;
 					}
@@ -1774,7 +1774,7 @@ sub processAutoStorage {
 #####AUTO SELL#####
 sub processAutoSell {
 	return if ($shopstarted || $buyershopstarted);
-	if ((AI::isIdle || AI::action eq "route" || AI::action eq "sitAuto" || AI::action eq "follow")
+	if ((AI::isIdle() || AI::action() eq "route" || AI::action() eq "sitAuto" || AI::action() eq "follow")
 		&& (($config{'itemsMaxWeight_sellOrStore'} && percent_weight($char) >= $config{'itemsMaxWeight_sellOrStore'})
 			|| ($config{'itemsMaxNum_sellOrStore'} && $char->inventory->size() >= $config{'itemsMaxNum_sellOrStore'})
 			|| (!$config{'itemsMaxWeight_sellOrStore'} && percent_weight($char) >= $config{'itemsMaxWeight'})
@@ -1798,7 +1798,7 @@ sub processAutoSell {
 		}
 	}
 
-	if (AI::action eq "sellAuto" && AI::args->{'done'}) {
+	if (AI::action() eq "sellAuto" && AI::args->{'done'}) {
 
 		if (exists AI::args->{'error'}) {
 			error AI::args->{'error'}.".\n";
@@ -1817,7 +1817,7 @@ sub processAutoSell {
 			AI::queue("buyAuto", {forcedBySell => 1});
 			Plugins::callHook('AI_buy_auto_queued');
 		}
-	} elsif (AI::action eq "sellAuto" && timeOut($timeout{'ai_sellAuto'})) {
+	} elsif (AI::action() eq "sellAuto" && timeOut($timeout{'ai_sellAuto'})) {
 		my $args = AI::args;
 
 		if (exists $args->{sentSellPacket_time} && exists $args->{'sentEmptyList'}) {
@@ -1971,7 +1971,7 @@ sub processAutoBuy {
 	return if ($shopstarted || $buyershopstarted);
 	my $needitem;
 	if (
-		 (AI::isIdle || AI::action eq "route" || AI::action eq "follow")
+		 (AI::isIdle() || AI::action() eq "route" || AI::action() eq "follow")
 	  && timeOut($timeout{'ai_buyAuto'})
 	  && $char->inventory->isReady()
 	  && !AI::inQueue("sellAuto")
@@ -2019,7 +2019,7 @@ sub processAutoBuy {
 		$timeout{'ai_buyAuto'}{'time'} = time;
 	}
 
-	if (AI::action eq "buyAuto" && AI::args->{'done'}) {
+	if (AI::action() eq "buyAuto" && AI::args->{'done'}) {
 
 		if (exists AI::args->{'error'}) {
 			error AI::args->{'error'}.".\n";
@@ -2041,7 +2041,7 @@ sub processAutoBuy {
 			Plugins::callHook('AI_storage_auto_queued');
 		}
 
-	} elsif (AI::action eq "buyAuto" && timeOut($timeout{ai_buyAuto_wait})) {
+	} elsif (AI::action() eq "buyAuto" && timeOut($timeout{ai_buyAuto_wait})) {
 		Plugins::callHook('AI_buy_auto');
 		my $args = AI::args;
 
@@ -2294,7 +2294,7 @@ sub processAutoBuy {
 
 ##### AUTO-CART ADD/GET ####
 sub processAutoCart {
-	if ((AI::isIdle || AI::is(qw/route move buyAuto follow sitAuto items_take items_gather/))) {
+	if ((AI::isIdle() || AI::is(qw/route move buyAuto follow sitAuto items_take items_gather/))) {
 		my $timeout = $timeout{ai_cartAutoCheck}{timeout} || 2;
 		if (timeOut($AI::Timeouts::autoCart, $timeout) && $char->cartActive) {
 			my @addItems;
@@ -2347,7 +2347,7 @@ sub processAutoCart {
 
 ##### LOCKMAP #####
 sub processLockMap {
-	if (AI::isIdle && $config{'lockMap'}
+	if (AI::isIdle() && $config{'lockMap'}
 		&& !$ai_v{'sitAuto_forcedBySitCommand'}
 		&& ($field->baseName ne $config{'lockMap'}
 			|| ($config{'lockMap_x'} && ($char->{pos_to}{x} < $config{'lockMap_x'} - $config{'lockMap_randX'} || $char->{pos_to}{x} > $config{'lockMap_x'} + $config{'lockMap_randX'}))
@@ -2404,7 +2404,7 @@ sub processLockMap {
 
 sub processRescueSlave {
 	if (
-		(AI::isIdle || (AI::is('route') && AI::args()->{isRandomWalk}))
+		(AI::isIdle() || (AI::is('route') && AI::args()->{isRandomWalk}))
 		&& $char->{slaves}
 	) {
 		my $slave = AI::SlaveManager::mustRescue();
@@ -2445,7 +2445,7 @@ sub processRandomWalk_stopDuringSlaveAttack {
 
 sub processMoveNearSlave {
 	if (
-		AI::isIdle
+		AI::isIdle()
 		&& $char->{slaves}
 		&& !AI::SlaveManager::isIdle()
 	) {
@@ -2468,7 +2468,7 @@ sub processMoveNearSlave {
 
 ##### RANDOM WALK #####
 sub processRandomWalk {
-	if (AI::isIdle && (AI::SlaveManager::isIdle()) && $config{route_randomWalk} && !$ai_v{sitAuto_forcedBySitCommand}
+	if (AI::isIdle() && (AI::SlaveManager::isIdle()) && $config{route_randomWalk} && !$ai_v{sitAuto_forcedBySitCommand}
 		&& (!$field->isCity || $config{route_randomWalk_inTown})
 		&& length($field->{rawMap})
 		){
@@ -2523,18 +2523,18 @@ sub processFollow {
 	}
 	
 	return unless (
-		(AI::isIdle || (AI::is('route') && AI::args()->{isRandomWalk})) ||
-		(AI::action eq "follow") ||
-		((AI::action eq "route" && AI::action(1) eq "follow") || (AI::action eq "move" && AI::action(2) eq "follow"))
+		(AI::isIdle() || (AI::is('route') && AI::args()->{isRandomWalk})) ||
+		(AI::action() eq "follow") ||
+		((AI::action() eq "route" && AI::action(1) eq "follow") || (AI::action() eq "move" && AI::action(2) eq "follow"))
 	);
 	
 	# stop follow when talking with NPC
-	if (AI::action eq 'route' && defined(AI::args(0)->getSubtask())) {
+	if (AI::action() eq 'route' && defined(AI::args(0)->getSubtask())) {
 		my $rrr = AI::args(0)->getSubtask();
 		return if ($rrr->getName() eq 'TalkNPC');
 	}
 	if ($config{'sitAuto_follow'} && (percent_hp($char) < $config{'sitAuto_hp_lower'} || percent_sp($char) < $config{'sitAuto_sp_lower'}) && $field->isCity) {
-	my $action = AI::action;
+	my $action = AI::action();
 		if ($action eq "sitting" && !$char->{sitting} && ($char->{skills}{NV_BASIC}{lv} >= 3 || $char->{skills}{SU_BASIC_SKILL}{lv} == 1)){
 			sit();
 		}
@@ -2569,7 +2569,7 @@ sub processFollow {
 	}
 
 	# if we are not doing anything else now...
-	if (AI::action eq "follow") {
+	if (AI::action() eq "follow") {
 		if (AI::args->{'suspended'}) {
 			if (AI::args->{'ai_follow_lost'}) {
 				AI::args->{'ai_follow_lost_end'}{'time'} += time - AI::args->{'suspended'};
@@ -2613,7 +2613,7 @@ sub processFollow {
 				}
 			}
 		}
-	} elsif (((AI::action eq "route" && AI::action(1) eq "follow") || (AI::action eq "move" && AI::action(2) eq "follow")) && !$args->{ai_follow_lost}) {
+	} elsif (((AI::action() eq "route" && AI::action(1) eq "follow") || (AI::action() eq "move" && AI::action(2) eq "follow")) && !$args->{ai_follow_lost}) {
 		my $ID = $args->{ID};
 		my $player = $players{$ID};
 		if (
@@ -2626,7 +2626,7 @@ sub processFollow {
 		) {
 			debug "Master $player has moved since we started routing to it - Adjusting route\n", "ai_attack";
 			AI::dequeue;
-			AI::dequeue if (AI::action eq "route");
+			AI::dequeue if (AI::action() eq "route");
 
 			$args->{move_timeout} = time;
 			$args->{masterLastMoveTime} = $player->{time_move};
@@ -2642,7 +2642,7 @@ sub processFollow {
 		}
 	}
 
-	if (AI::action eq "follow" && $args->{'following'} && (
+	if (AI::action() eq "follow" && $args->{'following'} && (
 		( $players{$args->{'ID'}} && $players{$args->{'ID'}}{'dead'} ) || (
 			( !$players{$args->{'ID'}} || !%{$players{$args->{'ID'}}} )
 			&& $players_old{$args->{'ID'}} && $players_old{$args->{'ID'}}{'dead'}
@@ -2731,7 +2731,7 @@ sub processFollow {
 
 	##### FOLLOW-LOST #####
 
-	if (AI::action eq "follow" && $args->{'ai_follow_lost'}) {
+	if (AI::action() eq "follow" && $args->{'ai_follow_lost'}) {
 		if ($args->{'ai_follow_lost_char_last_pos'}{'x'} == $chars[$config{'char'}]{'pos_to'}{'x'} && $args->{'ai_follow_lost_char_last_pos'}{'y'} == $chars[$config{'char'}]{'pos_to'}{'y'}) {
 			$args->{'lost_stuck'}++;
 		} else {
@@ -2812,7 +2812,7 @@ sub processFollow {
 ##### SITAUTO-IDLE #####
 sub processSitAutoIdle {
 	if ($config{sitAuto_idle}) {
-		if (!AI::isIdle) {
+		if (!AI::isIdle()) {
 			$timeout{ai_sit_idle}{time} = time;
 		}
 
@@ -2826,7 +2826,7 @@ sub processSitAutoIdle {
 ##### SIT AUTO #####
 sub processSitAuto {
 	my $weight = percent_weight($char);
-	my $action = AI::action;
+	my $action = AI::action();
 	my $lower_ok = (percent_hp($char) >= $config{'sitAuto_hp_lower'} && percent_sp($char) >= $config{'sitAuto_sp_lower'});
 	my $upper_ok = (percent_hp($char) >= $config{'sitAuto_hp_upper'} && percent_sp($char) >= $config{'sitAuto_sp_upper'});
 
@@ -2842,7 +2842,7 @@ sub processSitAuto {
 
 	} elsif ($action eq "sitAuto" && $ai_v{'sitAuto_forceStop'}) {
 		AI::dequeue;
-		stand() if (!AI::isIdle && !AI::is(qw(follow sitting clientSuspend)) && !$config{'sitAuto_idle'} && $char->{sitting});
+		stand() if (!AI::isIdle() && !AI::is(qw(follow sitting clientSuspend)) && !$config{'sitAuto_idle'} && $char->{sitting});
 
 	# Stand if our HP is high enough
 	} elsif ($action eq "sitAuto" && $upper_ok) {
@@ -2862,9 +2862,9 @@ sub processSitAuto {
 		}
 		AI::dequeue;
 		debug "HP is now > $config{sitAuto_hp_upper}\n", "sitAuto";
-		stand() if (!AI::isIdle && !AI::is(qw(follow sitting clientSuspend)) && !$config{'sitAuto_idle'} && $char->{sitting});
+		stand() if (!AI::isIdle() && !AI::is(qw(follow sitting clientSuspend)) && !$config{'sitAuto_idle'} && $char->{sitting});
 
-	} elsif (!$ai_v{'sitAuto_forceStop'} && ($weight < 50 || $config{'sitAuto_over_50'}) && AI::action ne "sitAuto" && ($char->{skills}{NV_BASIC}{lv} >= 3 || $char->{skills}{SU_BASIC_SKILL}{lv} == 1)) {
+	} elsif (!$ai_v{'sitAuto_forceStop'} && ($weight < 50 || $config{'sitAuto_over_50'}) && AI::action() ne "sitAuto" && ($char->{skills}{NV_BASIC}{lv} >= 3 || $char->{skills}{SU_BASIC_SKILL}{lv} == 1)) {
 		if ($action eq "" || $action eq "follow"
 		|| ($action eq "route" && !AI::args->{noSitAuto})
 		|| ($action eq "mapRoute" && !AI::args->{noSitAuto})
@@ -2881,7 +2881,7 @@ sub processSitAuto {
 
 ##### AUTO-COMMAND USE #####
 sub processAutoCommandUse {
-	if (AI::isIdle || AI::is(qw(route mapRoute follow sitAuto take items_gather items_take attack skill_use))) {
+	if (AI::isIdle() || AI::is(qw(route mapRoute follow sitAuto take items_gather items_take attack skill_use))) {
 		my $i = 0;
 		while (exists $config{"doCommand_$i"}) {
 			if ($config{"doCommand_$i"} && checkSelfCondition("doCommand_$i")) {
@@ -2898,7 +2898,7 @@ sub processAutoCommandUse {
 
 ##### AUTO-ITEM USE #####
 sub processAutoItemUse {
-	if ((AI::isIdle || AI::is(qw(route mapRoute follow sitAuto take items_gather items_take attack skill_use)))
+	if ((AI::isIdle() || AI::is(qw(route mapRoute follow sitAuto take items_gather items_take attack skill_use)))
 	  && timeOut($timeout{ai_item_use_auto})) {
 		my $i = 0;
 		while (exists $config{"useSelf_item_$i"}) {
@@ -2924,8 +2924,8 @@ sub processAutoItemUse {
 
 ##### AUTO-SKILL USE #####
 sub processAutoSkillUse {
-	if (AI::isIdle || AI::is(qw(route mapRoute follow sitAuto take items_gather items_take attack teleport) )
-	|| (AI::action eq "skill_use" && AI::args->{tag} eq "attackSkill")) {
+	if (AI::isIdle() || AI::is(qw(route mapRoute follow sitAuto take items_gather items_take attack teleport) )
+	|| (AI::action() eq "skill_use" && AI::args->{tag} eq "attackSkill")) {
 		my %self_skill;
 		for (my $i = 0; exists $config{"useSelf_skill_$i"}; $i++) {
 			if ($config{"useSelf_skill_$i"} && checkSelfCondition("useSelf_skill_$i")) {
@@ -2987,7 +2987,7 @@ sub processAutoSkillUse {
 
 ##### PARTY-SKILL USE #####
 sub processPartySkillUse {
-	if (AI::isIdle || AI::is(qw(route mapRoute follow sitAuto take items_gather items_take attack move))){
+	if (AI::isIdle() || AI::is(qw(route mapRoute follow sitAuto take items_gather items_take attack move))){
 		my $realMyPos = calcPosFromPathfinding($field, $char);
 		my %party_skill;
 		PARTYSKILL:
@@ -3097,7 +3097,7 @@ sub processPartySkillUse {
 
 ##### MONSTER SKILL USE #####
 sub processMonsterSkillUse {
-	if (AI::isIdle || AI::is(qw(route mapRoute follow sitAuto take items_gather items_take attack move))) {
+	if (AI::isIdle() || AI::is(qw(route mapRoute follow sitAuto take items_gather items_take attack move))) {
 		my $i = 0;
 		my $prefix = "monsterSkill_$i";
 		while ($config{$prefix}) {
@@ -3134,7 +3134,7 @@ sub processMonsterSkillUse {
 ##### AUTO-EQUIP #####
 sub processAutoEquip {
 	Benchmark::begin("ai_autoEquip") if DEBUG;
-	if ((AI::isIdle || AI::is(qw(route mapRoute follow sitAuto skill_use take items_gather items_take attack)))
+	if ((AI::isIdle() || AI::is(qw(route mapRoute follow sitAuto skill_use take items_gather items_take attack)))
 	  && timeOut($timeout{ai_item_equip_auto}) && $char->inventory->isReady()) {
 
 		my $ai_index_attack = AI::findAction("attack");
@@ -3201,7 +3201,7 @@ sub processAutoAttack {
 	return if (AI::inQueue("attack"));
 	
 	return if (!$field);
-	if ((AI::isIdle || AI::is(qw/route follow sitAuto take items_gather items_take/) || (AI::action eq "mapRoute" && AI::args->{stage} eq 'Getting Map Solution'))
+	if ((AI::isIdle() || AI::is(qw/route follow sitAuto take items_gather items_take/) || (AI::action() eq "mapRoute" && AI::args->{stage} eq 'Getting Map Solution'))
 	     # Don't auto-attack monsters while taking loot, and itemsTake/GatherAuto >= 2
 	  && !($config{'itemsTakeAuto'} >= 2 && AI::is("take", "items_take"))
 	  && !($config{'itemsGatherAuto'} >= 2 && AI::is("take", "items_gather"))
@@ -3394,16 +3394,16 @@ sub processAutoAttack {
 ##### ITEMS TAKE #####
 # Look for loot to pickup when your monster died.
 sub processItemsTake {
-	if (AI::action eq "items_take" && AI::args->{suspended}) {
+	if (AI::action() eq "items_take" && AI::args->{suspended}) {
 		AI::args->{ai_items_take_start}{time} += time - AI::args->{suspended};
 		AI::args->{ai_items_take_end}{time} += time - AI::args->{suspended};
 		delete AI::args->{suspended};
 	}
-	if (AI::action eq "items_take" && (percent_weight($char) >= $config{itemsMaxWeight})) {
+	if (AI::action() eq "items_take" && (percent_weight($char) >= $config{itemsMaxWeight})) {
 		AI::dequeue;
 		ai_clientSuspend(0, $timeout{ai_attack_waitAfterKill}{timeout}) unless (ai_getAggressives());
 	}
-	if (AI::action eq "items_take" && timeOut(AI::args->{ai_items_take_start})
+	if (AI::action() eq "items_take" && timeOut(AI::args->{ai_items_take_start})
 	 && timeOut(AI::args->{ai_items_take_delay})) {
 		my $foundID;
 		my ($dist, $dist_to);
@@ -3436,7 +3436,7 @@ sub processItemsTake {
 ##### ITEMS AUTO-GATHER #####
 sub processItemsAutoGather {
 	return if (AI::inQueue("take", "items_gather"));
-	if ( (AI::isIdle || AI::action eq "follow"
+	if ( (AI::isIdle() || AI::action() eq "follow"
 		|| ( AI::is("route", "mapRoute") && (!AI::args->{ID} || $config{'itemsGatherAuto'} >= 2) ))
 	  && $config{'itemsGatherAuto'}
 	  && (!$config{itemsGatherAuto_notInTown} || !$field->isCity)
@@ -3482,16 +3482,16 @@ sub processItemsAutoGather {
 
 ##### ITEMS GATHER #####
 sub processItemsGather {
-	if (AI::action eq "items_gather" && AI::args->{suspended}) {
+	if (AI::action() eq "items_gather" && AI::args->{suspended}) {
 		AI::args->{ai_items_gather_giveup}{time} += time - AI::args->{suspended};
 		delete AI::args->{suspended};
 	}
-	if (AI::action eq "items_gather" && !($items{AI::args->{ID}} && %{$items{AI::args->{ID}}})) {
+	if (AI::action() eq "items_gather" && !($items{AI::args->{ID}} && %{$items{AI::args->{ID}}})) {
 		my $ID = AI::args->{ID};
 		message TF("Failed to gather %s (%s) : Lost target\n", $items_old{$ID}{name}, $items_old{$ID}{binID}), "drop";
 		AI::dequeue;
 
-	} elsif (AI::action eq "items_gather") {
+	} elsif (AI::action() eq "items_gather") {
 		my $ID = AI::args->{ID};
 		my $minPlayerDist = $config{itemsGatherAutoMinPlayerDistance} || 6;
 
@@ -3632,7 +3632,7 @@ sub processAutoTeleport {
 	}
 
 	##### TELEPORT IDLE / PORTAL #####
-	if ($config{teleportAuto_idle} && (AI::action ne "" || !AI::SlaveManager::isIdle)) {
+	if ($config{teleportAuto_idle} && (AI::action() ne "" || !AI::SlaveManager::isIdle)) {
 		$timeout{ai_teleport_idle}{time} = time;
 	}
 
@@ -3685,7 +3685,7 @@ sub processAllowedMaps {
 
 ##### AUTO RESPONSE #####
 sub processAutoResponse {
-	if (AI::action eq "autoResponse") {
+	if (AI::action() eq "autoResponse") {
 		my $args = AI::args;
 
 		if ($args->{mapChanged} || !$config{autoResponse}) {
@@ -3732,11 +3732,11 @@ sub processSendEmotion {
 
 ##### AUTO SHOP OPEN #####
 sub processAutoShopOpen {
-	if ($config{'shopAuto_open'} && !AI::isIdle) {
+	if ($config{'shopAuto_open'} && !AI::isIdle()) {
 		$timeout{ai_shop}{time} = time;
 	}
 
-	if ($config{'shopAuto_open'} && AI::isIdle && $conState == 5 && !$char->{sitting} && timeOut($timeout{ai_shop}) && !$shopstarted
+	if ($config{'shopAuto_open'} && AI::isIdle() && $conState == 5 && !$char->{sitting} && timeOut($timeout{ai_shop}) && !$shopstarted
 		&& $field->baseName eq $config{'lockMap'} && !$taskManager->countTasksByName('openShop')) {
 		if ($config{'shop_useSkill'}) {
 			my $skill = new Skill(auto => "MC_VENDING");
@@ -3766,11 +3766,11 @@ sub processAutoShopOpen {
 
 ##### AUTO BUYER SHOP OPEN #####
 sub processAutoBuyerShopOpen {
-	if ($config{'buyerShopAuto_open'} && !AI::isIdle) {
+	if ($config{'buyerShopAuto_open'} && !AI::isIdle()) {
 		$timeout{ai_shop}{time} = time;
 	}
 
-	if ($config{'buyerShopAuto_open'} && AI::isIdle && $net->getState() == Network::IN_GAME && !$char->{sitting} && timeOut($timeout{ai_shop}) && timeOut($timeout{ai_buyer_shopCheck}) && !$buyershopstarted
+	if ($config{'buyerShopAuto_open'} && AI::isIdle() && $net->getState() == Network::IN_GAME && !$char->{sitting} && timeOut($timeout{ai_shop}) && timeOut($timeout{ai_buyer_shopCheck}) && !$buyershopstarted
 		&& $field->baseName eq $config{'lockMap'} && !$taskManager->countTasksByName('openShop')) {
 		if (!$char->{skills}{ALL_BUYING_STORE}{lv}) {
 			my $item = $char->inventory->getByNameID(12548);

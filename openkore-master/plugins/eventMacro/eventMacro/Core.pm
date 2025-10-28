@@ -28,7 +28,9 @@ sub new {
 	$self->{automacros_index_to_AI_check_state} = {};
 
 	$self->{Event_Related_Hooks} = {};
-	$self->{Hook_Handles} = {};
+        $self->{Hook_Handles} = {};
+        $self->{Plugin_Event_Sub} = undef;
+        $self->{Log_Event_Sub} = undef;
 
 	$self->{Event_Related_Static_Variables} = {};
 
@@ -113,8 +115,10 @@ sub unload {
 }
 
 sub clean_hooks {
-	my ($self) = @_;
-	foreach (values %{$self->{Hook_Handles}}) {Plugins::delHook($_)}
+        my ($self) = @_;
+        foreach my $hook_name (keys %{$self->{Hook_Handles}}) {
+                $self->_remove_hook_handle($hook_name);
+        }
 }
 
 sub set_automacro_checking_status {
@@ -510,15 +514,9 @@ sub create_callbacks {
 
 	}
 
-	my $event_sub = sub {
-		my $name = shift;
-		my $args = shift;
-		my $check_list_hash = $self->{Event_Related_Hooks}{$name};
-		$self->manage_event_callbacks('hook', $name, $args, $check_list_hash);
-	};
-	foreach my $hook_name (keys %{$self->{Event_Related_Hooks}}) {
-		$self->{Hook_Handles}{$hook_name} = Plugins::addHook( $hook_name, $event_sub, undef );
-	}
+        foreach my $hook_name (keys %{$self->{Event_Related_Hooks}}) {
+                $self->_ensure_hook_handle($hook_name);
+        }
 }
 
 sub manage_nested_automacro_var {
@@ -1441,15 +1439,7 @@ sub manage_dynamic_hook_add_and_delete {
 		debug "[eventMacro] Condition '".$condition->get_name()."', of index '".$condition_index."' on automacro '".$automacro->get_name()."' added hook '".$hook_name."' to callbacks.\n", "eventMacro", 3;
 		$self->{Event_Related_Hooks}{$hook_name}{$automacro_index}{$condition_index} = undef;
 
-		unless (exists $self->{Hook_Handles}{$hook_name}) {
-			my $event_sub = sub {
-				my $name = shift;
-				my $args = shift;
-				my $check_list_hash = $self->{Event_Related_Hooks}{$name};
-				$self->manage_event_callbacks('hook', $name, $args, $check_list_hash);
-			};
-			$self->{Hook_Handles}{$hook_name} = Plugins::addHook( $hook_name, $event_sub, undef );
-		}
+                $self->_ensure_hook_handle($hook_name);
 
 	} else {
 		if (!exists $self->{Event_Related_Hooks}{$hook_name}{$automacro_index}{$condition_index}) {
@@ -1463,12 +1453,74 @@ sub manage_dynamic_hook_add_and_delete {
 		unless (scalar keys %{$self->{Event_Related_Hooks}{$hook_name}{$automacro_index}}) {
 			delete $self->{Event_Related_Hooks}{$hook_name}{$automacro_index};
 			unless (scalar keys %{$self->{Event_Related_Hooks}{$hook_name}}) {
-				delete $self->{Event_Related_Hooks}{$hook_name};
-				Plugins::delHook($self->{Hook_Handles}{$hook_name});
-				delete $self->{Hook_Handles}{$hook_name};
-			}
-		}
-	}
+                                delete $self->{Event_Related_Hooks}{$hook_name};
+                                $self->_remove_hook_handle($hook_name);
+                        }
+                }
+        }
+}
+
+sub _ensure_hook_handle {
+        my ($self, $hook_name) = @_;
+
+        return if (exists $self->{Hook_Handles}{$hook_name});
+
+        if ($hook_name eq 'log') {
+                $self->{Log_Event_Sub} ||= sub {
+                        my ($type, $domain, $level, $globalVerbosity, $message, $user_data, $near, $far) = @_;
+
+                        return if (defined $domain && $domain eq 'eventMacro');
+                        return unless (exists $self->{Event_Related_Hooks}{log});
+
+                        $message =~ s/[\r\n]*$// if defined $message;
+
+                        my $args = {
+                                Msg              => $message,
+                                MsgType          => $type,
+                                Domain           => $domain,
+                                Level            => $level,
+                                GlobalVerbosity  => $globalVerbosity,
+                                Near             => $near,
+                                Far              => $far,
+                        };
+
+                        $self->manage_event_callbacks('hook', 'log', $args, $self->{Event_Related_Hooks}{log});
+                };
+
+                my $handle = Log::addHook($self->{Log_Event_Sub});
+                $self->{Hook_Handles}{$hook_name} = { type => 'log', handle => $handle };
+
+        } else {
+                $self->{Plugin_Event_Sub} ||= sub {
+                        my $name = shift;
+                        my $args = shift;
+
+                        return unless (exists $self->{Event_Related_Hooks}{$name});
+
+                        my $check_list_hash = $self->{Event_Related_Hooks}{$name};
+                        $self->manage_event_callbacks('hook', $name, $args, $check_list_hash);
+                };
+
+                my $handle = Plugins::addHook( $hook_name, $self->{Plugin_Event_Sub}, undef );
+                $self->{Hook_Handles}{$hook_name} = { type => 'plugin', handle => $handle };
+        }
+}
+
+sub _remove_hook_handle {
+        my ($self, $hook_name) = @_;
+
+        my $handle_info = delete $self->{Hook_Handles}{$hook_name};
+        return unless ($handle_info);
+
+        if (ref $handle_info eq 'HASH') {
+                if (defined $handle_info->{type} && $handle_info->{type} eq 'log') {
+                        Log::delHook($handle_info->{handle});
+                } else {
+                        Plugins::delHook($handle_info->{handle});
+                }
+        } else {
+                Plugins::delHook($handle_info);
+        }
 }
 
 sub AI_start_checker {
