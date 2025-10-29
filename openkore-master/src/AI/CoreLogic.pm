@@ -1777,7 +1777,6 @@ sub processAutoStorage {
 }
 
 #####AUTO SELL#####
-#####AUTO SELL#####
 sub processAutoSell {
 	return if ($shopstarted || $buyershopstarted);
 	if ((AI::isIdle || AI::action eq "route" || AI::action eq "sitAuto" || AI::action eq "follow")
@@ -1809,53 +1808,22 @@ sub processAutoSell {
 		if (exists AI::args->{'error'}) {
 			error AI::args->{'error'}.".\n";
 		}
-		
+		message T("Auto-sell sequence completed.\n"), "success";
+
 		my $forcedByBuy = AI::args->{'forcedByBuy'};
 		my $forcedByStorage = AI::args->{'forcedByStorage'};
-		
-		# Verifica se ainda há itens para vender
-		my $hasMoreItems = 0;
-		for my $item (@{$char->inventory}) {
-			next if ($item->{equipped} || !$item->{sellable});
-			my $control = items_control($item->{name}, $item->{nameID});
-			if ($control->{'sell'} && $item->{'amount'} > $control->{keep}) {
-				$hasMoreItems = 1;
-				last;
-			}
-		}
-		
-		if ($hasMoreItems) {
-			# Ainda há itens para vender, continua o ciclo
-			message T("More items to sell, continuing in 2 seconds...\n"), "sell";
-			AI::dequeue;
-			# Pequeno delay para evitar anti-bot
-			AI::queue("sellAuto", {
-				forcedByBuy => $forcedByBuy,
-				forcedByStorage => $forcedByStorage,
-				waitTime => time + 2  # Aguarda 2 segundos antes de continuar
-			});
-			Plugins::callHook('AI_sell_auto_queued');
-		} else {
-			# Terminou de vender tudo
-			message T("Auto-sell sequence completed.\n"), "success";
-			AI::dequeue;
+		AI::dequeue;
 
-			if ($forcedByStorage) {
-				AI::queue("buyAuto", {forcedByStorage => 1});
-				Plugins::callHook('AI_buy_auto_queued');
+		if ($forcedByStorage) {
+			AI::queue("buyAuto", {forcedByStorage => 1});
+			Plugins::callHook('AI_buy_auto_queued');
 
-			} elsif (!$forcedByBuy) {
-				AI::queue("buyAuto", {forcedBySell => 1});
-				Plugins::callHook('AI_buy_auto_queued');
-			}
+		} elsif (!$forcedByBuy) {
+			AI::queue("buyAuto", {forcedBySell => 1});
+			Plugins::callHook('AI_buy_auto_queued');
 		}
 	} elsif (AI::action eq "sellAuto" && timeOut($timeout{'ai_sellAuto'})) {
 		my $args = AI::args;
-
-		# Respeita o delay antes de continuar vendendo
-		if (exists $args->{waitTime} && time < $args->{waitTime}) {
-			return;
-		}
 
 		if (exists $args->{sentSellPacket_time} && exists $args->{'sentEmptyList'}) {
 			$args->{'done'} = 1;
@@ -1971,27 +1939,14 @@ sub processAutoSell {
 
 			Plugins::callHook('AI_sell_auto');
 
-			# MODIFICADO: Vende apenas 10 tipos de itens por vez para evitar anti-bot
+			# Form list of items to sell
 			my @sellItems;
-			my $itemTypeCount = 0;
-			my $maxItemTypes = $config{'sellAuto_maxItemTypes'} || 10;
-			
-			# Inicializa contador de lotes se não existir
-			if (!exists $args->{batchCount}) {
-				$args->{batchCount} = 0;
-			}
-			
 			for my $item (@{$char->inventory}) {
 				next if ($item->{equipped} || !$item->{sellable});
 
 				my $control = items_control($item->{name}, $item->{nameID});
 
 				if ($control->{'sell'} && $item->{'amount'} > $control->{keep}) {
-					$itemTypeCount++;
-					
-					# Para quando atingir o limite
-					last if ($itemTypeCount > $maxItemTypes);
-					
 					my %obj;
 					$obj{ID} = $item->{ID};
 					$obj{amount} = $item->{amount} - $control->{keep};
@@ -2001,11 +1956,6 @@ sub processAutoSell {
 
 			if (@sellItems == 0) {
 				$args->{'sentEmptyList'} = 1;
-			} else {
-				# Incrementa contador de lotes
-				$args->{batchCount}++;
-				message TF("Selling batch #%d: %d types of items (max: %d per batch)\n", 
-					$args->{batchCount}, scalar(@sellItems), $maxItemTypes), "sell";
 			}
 
 			completeNpcSell(\@sellItems);
