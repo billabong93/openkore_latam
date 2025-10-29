@@ -1943,7 +1943,7 @@ sub processAutoSell {
 
 			Plugins::callHook('AI_sell_auto');
 
-                        if (!$args->{selling}) {
+                       if (!$args->{selling}) {
                                my @sellItems;
                                for my $item (@{$char->inventory}) {
                                        next if ($item->{equipped} || !$item->{sellable});
@@ -1967,15 +1967,12 @@ sub processAutoSell {
                                $interval = 1 if $interval < 1;
 
                                $args->{sellInterval} = $interval;
-                               $args->{sellTimer} = {
-                                       timeout => $interval,
-                                       time => time - $interval,
-                               };
+                               $args->{sellNextTime} = time;
                                $args->{sellQueue} = \@sellItems;
                                $args->{selling} = 1;
                        }
 
-                        if ($args->{selling}) {
+                       if ($args->{selling}) {
                                my $interval = $args->{sellInterval};
                                if (!defined $interval) {
                                        $interval = $timeout{ai_transfer_items}{timeout};
@@ -1984,24 +1981,23 @@ sub processAutoSell {
                                        $args->{sellInterval} = $interval;
                                }
 
-                               my $timer = $args->{sellTimer} //= {
-                                       timeout => $interval,
-                                       time => time,
-                               };
-
-                               $timer->{timeout} = $interval if !defined $timer->{timeout} || $timer->{timeout} < $interval;
+                               my $now = time;
+                               my $next = $args->{sellNextTime};
+                               $args->{sellNextTime} = $next = $now - $interval unless defined $next;
 
                                if (@{$args->{sellQueue}}) {
-                                       return unless timeOut($timer);
+                                       return if $now < $next;
 
                                        my $sellItem = shift @{$args->{sellQueue}};
                                        $messageSender->sendSellBulk([$sellItem]);
 
-                                       $timer->{time} = time;
+                                       $args->{sellNextTime} = $now + $interval;
                                        return;
                                }
 
                                if (!$args->{sellFinalized}) {
+                                       return if $now < $next;
+
                                        undef %talk;
                                        delete $ai_v{'npc_talk'} if (exists $ai_v{'npc_talk'});
 
@@ -2018,10 +2014,10 @@ sub processAutoSell {
                                }
 
                                delete $args->{selling};
-                               delete $args->{sellTimer};
                                delete $args->{sellQueue};
                                delete $args->{sellFinalized};
                                delete $args->{sellInterval};
+                               delete $args->{sellNextTime};
 
                                delete $args->{'sentNpcTalk'};
                                delete $args->{'sentNpcTalk_time'};
