@@ -1943,7 +1943,7 @@ sub processAutoSell {
 
 			Plugins::callHook('AI_sell_auto');
 
-                       if (!$args->{selling}) {
+                      if (!$args->{selling}) {
                                my @sellItems;
                                for my $item (@{$char->inventory}) {
                                        next if ($item->{equipped} || !$item->{sellable});
@@ -1969,6 +1969,7 @@ sub processAutoSell {
                                $args->{sellInterval} = $interval;
                                $args->{sellNextTime} = time;
                                $args->{sellQueue} = \@sellItems;
+                               $args->{sellStaged} = [];
                                $args->{selling} = 1;
                        }
 
@@ -1989,7 +1990,7 @@ sub processAutoSell {
                                        return if $now < $next;
 
                                        my $sellItem = shift @{$args->{sellQueue}};
-                                       $messageSender->sendSellBulk([$sellItem]);
+                                       push @{$args->{sellStaged}}, $sellItem;
 
                                        $args->{sellNextTime} = $now + $interval;
                                        return;
@@ -1998,13 +1999,7 @@ sub processAutoSell {
                                if (!$args->{sellFinalized}) {
                                        return if $now < $next;
 
-                                       undef %talk;
-                                       delete $ai_v{'npc_talk'} if (exists $ai_v{'npc_talk'});
-
-                                       if ($messageSender->{send_sell_buy_complete}) {
-                                               $messageSender->sendSellBuyComplete;
-                                               $messageSender->sendSellBuyComplete;
-                                       }
+                                       completeNpcSell($args->{sellStaged} || []);
 
                                        $args->{sellFinalized} = 1;
                                        $args->{sentSellPacket_time} = time;
@@ -2015,6 +2010,7 @@ sub processAutoSell {
 
                                delete $args->{selling};
                                delete $args->{sellQueue};
+                               delete $args->{sellStaged};
                                delete $args->{sellFinalized};
                                delete $args->{sellInterval};
                                delete $args->{sellNextTime};
