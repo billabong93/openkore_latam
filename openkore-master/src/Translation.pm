@@ -33,6 +33,14 @@ use utf8;
 
 XSTools::bootModule("Translation");
 
+BEGIN {
+        unless (defined &Translation::_translate) {
+                *_translate = sub { };
+                *_load = sub { return undef; };
+                *_unload = sub { };
+        }
+}
+
 
 our @EXPORT = qw(T TF);
 our $_translation;

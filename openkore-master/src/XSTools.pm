@@ -61,12 +61,13 @@ sub boot {
 #
 # Throws XSTools::LoadException when this module cannot be loaded.
 sub bootModule {
-	my ($module) = @_;
-	my $symbolName = $module;
-	$symbolName =~ s/::/__/;
-	$symbolName = "boot_$symbolName";
+        my ($module) = @_;
+        return if $^C;
+        my $symbolName = $module;
+        $symbolName =~ s/::/__/;
+        $symbolName = "boot_$symbolName";
 
-	boot();
+        boot();
 	my $symbol = DynaLoader::dl_find_symbol_anywhere($symbolName);
 	if (!$symbol) {
 		XSTools::LoadException->throw(error => "Unable to find symbol $symbolName");
@@ -118,35 +119,40 @@ eval {
 };
 push @makefilePaths, $RealBin;
 
+my $should_compile = !$^C && !$ENV{OPENKORE_SKIP_XSTOOLS_COMPILE};
+
 # Initialize the library, auto-compile if necessary.
 eval {
-	boot();
+        boot();
 };
 if (my $e = caught('XSTools::LoadException')) {
-	if ($^O eq 'MSWin32') {
-		print $e->wrappedError();
-		print STDERR "Error: XSTools.dll is not found. Please check your installation.\n";
-		<STDIN>;
-		exit 1;
-	} else {
-		eval {
-			compile();
-			boot();
-		};
-		if (my $e = caught('XSTools::LoadException')) {
+        if ($^O eq 'MSWin32') {
+                print $e->wrappedError();
+                print STDERR "Error: XSTools.dll is not found. Please check your installation.\n";
+                <STDIN>;
+                exit 1;
+        } elsif ($should_compile) {
+                eval {
+                        compile();
+                        boot();
+                };
+                if (my $e = caught('XSTools::LoadException')) {
 			print $e->wrappedError();
 			exit 1;
 		} elsif (caught('XSTools::CompileException') || caught('XSTools::CompilationInterrupted')) {
 			exit 1;
-		} elsif (caught('XSTools::MakefileNotFound')) {
-			print STDERR "Makefile not found. Please check your installation.\n";
-			exit 1;
-		} elsif ($@) {
-			die $@;
-		}
-	}
+                } elsif (caught('XSTools::MakefileNotFound')) {
+                        print STDERR "Makefile not found. Please check your installation.\n";
+                        exit 1;
+                } elsif ($@) {
+                        die $@;
+                }
+        } elsif (!$^C) {
+                print $e->wrappedError();
+                exit 1;
+        }
 } elsif ($@) {
-	die $@;
+        die $@;
 }
 
 1;

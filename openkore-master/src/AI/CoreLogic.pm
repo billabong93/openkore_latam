@@ -18,6 +18,10 @@
 
 package AI::CoreLogic;
 use strict;
+use File::Basename qw(dirname);
+use File::Spec;
+use lib File::Spec->catdir(dirname(__FILE__), '..');
+use lib File::Spec->catdir(dirname(__FILE__), '..', 'deps');
 use Time::HiRes qw(time);
 use Carp::Assert;
 use IO::Socket;
@@ -1939,36 +1943,94 @@ sub processAutoSell {
 
 			Plugins::callHook('AI_sell_auto');
 
-			# Form list of items to sell
-			my @sellItems;
-			for my $item (@{$char->inventory}) {
-				next if ($item->{equipped} || !$item->{sellable});
+                        if (!$args->{selling}) {
+                               my @sellItems;
+                               for my $item (@{$char->inventory}) {
+                                       next if ($item->{equipped} || !$item->{sellable});
 
-				my $control = items_control($item->{name}, $item->{nameID});
+                                       my $control = items_control($item->{name}, $item->{nameID});
 
-				if ($control->{'sell'} && $item->{'amount'} > $control->{keep}) {
-					my %obj;
-					$obj{ID} = $item->{ID};
-					$obj{amount} = $item->{amount} - $control->{keep};
-					push @sellItems, \%obj;
-				}
-			}
+                                       if ($control->{'sell'} && $item->{'amount'} > $control->{keep}) {
+                                               my %obj;
+                                               $obj{ID} = $item->{ID};
+                                               $obj{amount} = $item->{amount} - $control->{keep};
+                                               push @sellItems, \%obj;
+                                       }
+                               }
 
-			if (@sellItems == 0) {
-				$args->{'sentEmptyList'} = 1;
-			}
+                               if (@sellItems == 0) {
+                                       $args->{'sentEmptyList'} = 1;
+                               }
 
-			completeNpcSell(\@sellItems);
+                               my $interval = $timeout{ai_transfer_items}{timeout};
+                               $interval = 0.15 unless defined $interval;
+                               $interval = 1 if $interval < 1;
 
-			delete $args->{'sentNpcTalk'};
-			delete $args->{'sentNpcTalk_time'};
-			delete $args->{'recv_sellList_time'};
+                               $args->{sellInterval} = $interval;
+                               $args->{sellTimer} = {
+                                       timeout => $interval,
+                                       time => time - $interval,
+                               };
+                               $args->{sellQueue} = \@sellItems;
+                               $args->{selling} = 1;
+                       }
 
-			$args->{sentSellPacket_time} = time;
+                        if ($args->{selling}) {
+                               my $interval = $args->{sellInterval};
+                               if (!defined $interval) {
+                                       $interval = $timeout{ai_transfer_items}{timeout};
+                                       $interval = 0.15 unless defined $interval;
+                                       $interval = 1 if $interval < 1;
+                                       $args->{sellInterval} = $interval;
+                               }
 
-			Plugins::callHook('AI_sell_auto_done');
-		}
-	}
+                               my $timer = $args->{sellTimer} //= {
+                                       timeout => $interval,
+                                       time => time,
+                               };
+
+                               $timer->{timeout} = $interval if !defined $timer->{timeout} || $timer->{timeout} < $interval;
+
+                               if (@{$args->{sellQueue}}) {
+                                       return unless timeOut($timer);
+
+                                       my $sellItem = shift @{$args->{sellQueue}};
+                                       $messageSender->sendSellBulk([$sellItem]);
+
+                                       $timer->{time} = time;
+                                       return;
+                               }
+
+                               if (!$args->{sellFinalized}) {
+                                       undef %talk;
+                                       delete $ai_v{'npc_talk'} if (exists $ai_v{'npc_talk'});
+
+                                       if ($messageSender->{send_sell_buy_complete}) {
+                                               $messageSender->sendSellBuyComplete;
+                                               $messageSender->sendSellBuyComplete;
+                                       }
+
+                                       $args->{sellFinalized} = 1;
+                                       $args->{sentSellPacket_time} = time;
+
+                                       Plugins::callHook('AI_sell_auto_done');
+                                       return;
+                               }
+
+                               delete $args->{selling};
+                               delete $args->{sellTimer};
+                               delete $args->{sellQueue};
+                               delete $args->{sellFinalized};
+                               delete $args->{sellInterval};
+
+                               delete $args->{'sentNpcTalk'};
+                               delete $args->{'sentNpcTalk_time'};
+                               delete $args->{'recv_sellList_time'};
+
+                               return;
+                       }
+                }
+        }
 }
 
 #####AUTO BUY#####
