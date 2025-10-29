@@ -1989,23 +1989,29 @@ sub processAutoSell {
 				my $next = $args->{sellNextTime};
 				$args->{sellNextTime} = $next = $now - $interval unless defined $next;
 
-				if (@{$args->{sellQueue}}) {
-					return if $now < $next;
+                               if (@{$args->{sellQueue}}) {
+                                       return if $now < $next;
 
-					my $sellItem = shift @{$args->{sellQueue}};
-					push @sellList, $sellItem;
+                                       my $sellItem = shift @{$args->{sellQueue}};
+                                       my $binID = $sellItem->{binID};
+                                       my $amount = $sellItem->{amount};
 
-					$args->{sellNextTime} = $now + $interval;
-					return;
-				}
+                                       if (defined $binID && $amount) {
+                                               my $arguments = "$binID $amount";
+                                               Commands::cmdSell('sell', $arguments);
+                                       }
 
-				if (!$args->{sellFinalized}) {
-					return if $now < $next;
+                                       $args->{sellNextTime} = $now + $interval;
+                                       return;
+                               }
 
-					completeNpcSell(\@sellList);
+                               if (!$args->{sellFinalized}) {
+                                       return if $now < $next;
 
-					$args->{sellFinalized} = 1;
-					$args->{sentSellPacket_time} = time;
+                                       Commands::cmdSell('sell', 'done');
+
+                                       $args->{sellFinalized} = 1;
+                                       $args->{sentSellPacket_time} = time;
 
 					Plugins::callHook('AI_sell_auto_done');
 					return;
