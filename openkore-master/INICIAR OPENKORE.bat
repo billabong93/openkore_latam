@@ -1,3 +1,2 @@
 @echo off
-perl openkore.pl
-pause
+powershell -Command "Start-Process perl -ArgumentList 'openkore.pl' -Verb RunAs"

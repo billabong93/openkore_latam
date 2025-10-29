@@ -63,6 +63,9 @@ sub new {
 	my $port = $config{XKore_listenPort} || 6901;
 	my $self = bless {}, $class;
 
+	# Kill any process using the listen port before starting
+	$self->killPortProcess($port);
+
 	# Reuse code from Network::DirectConnection to connect to the server
 	require Network::DirectConnection;
 	$self->{server} = new Network::DirectConnection($self);
@@ -96,6 +99,39 @@ sub new {
 	message T("X-Kore mode intialized.\n"), "startup";
 
 	return $self;
+}
+
+##
+# $Network_XKoreProxy->killPortProcess(port)
+#
+# Kill any process that is currently using the specified port
+sub killPortProcess {
+	my ($self, $port) = @_;
+	
+	return unless defined $port;
+	
+	my $os = $^O;
+	
+	if ($os eq 'MSWin32') {
+		# Windows
+		my $netstat_output = `netstat -ano | findstr :$port`;
+		if ($netstat_output =~ /LISTENING\s+(\d+)/) {
+			my $pid = $1;
+			warning TF("Killing process %s using port %s\n", $pid, $port), "xkoreProxy";
+			system("taskkill /F /PID $pid >nul 2>&1");
+		}
+	} else {
+		# Linux/Unix
+		my $lsof_output = `lsof -ti:$port 2>/dev/null`;
+		chomp($lsof_output);
+		if ($lsof_output && $lsof_output =~ /^\d+$/) {
+			warning TF("Killing process %s using port %s\n", $lsof_output, $port), "xkoreProxy";
+			system("kill -9 $lsof_output 2>/dev/null");
+		}
+	}
+	
+	# Small delay to ensure port is freed
+	usleep(100000); # 100ms
 }
 
 sub version {
