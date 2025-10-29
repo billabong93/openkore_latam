@@ -1943,83 +1943,85 @@ sub processAutoSell {
 
 			Plugins::callHook('AI_sell_auto');
 
-                      if (!$args->{selling}) {
-                               my @sellItems;
-                               for my $item (@{$char->inventory}) {
-                                       next if ($item->{equipped} || !$item->{sellable});
+			if (!$args->{selling}) {
+				my @sellItems;
+				for my $item (@{$char->inventory}) {
+					next if ($item->{equipped} || !$item->{sellable});
 
-                                       my $control = items_control($item->{name}, $item->{nameID});
+					my $control = items_control($item->{name}, $item->{nameID});
 
-                                       if ($control->{'sell'} && $item->{'amount'} > $control->{keep}) {
-                                               my %obj;
-                                               $obj{ID} = $item->{ID};
-                                               $obj{amount} = $item->{amount} - $control->{keep};
-                                               push @sellItems, \%obj;
-                                       }
-                               }
+					if ($control->{'sell'} && $item->{'amount'} > $control->{keep}) {
+						my %obj;
+						$obj{name} = $item->nameString();
+						$obj{ID} = $item->{ID};
+						$obj{binID} = $item->{binID};
+						$obj{amount} = $item->{amount} - $control->{keep};
+						push @sellItems, \%obj;
+					}
+				}
 
-                               if (@sellItems == 0) {
-                                       $args->{'sentEmptyList'} = 1;
-                               }
+				if (@sellItems == 0) {
+					$args->{'sentEmptyList'} = 1;
+				}
 
-                               my $interval = $timeout{ai_transfer_items}{timeout};
-                               $interval = 0.15 unless defined $interval;
-                               $interval = 1 if $interval < 1;
+				my $interval = $timeout{ai_transfer_items}{timeout};
+				$interval = 0.15 unless defined $interval;
+				$interval = 1 if $interval < 1;
 
-                               $args->{sellInterval} = $interval;
-                               $args->{sellNextTime} = time;
-                               $args->{sellQueue} = \@sellItems;
-                               $args->{sellStaged} = [];
-                               $args->{selling} = 1;
-                       }
+				@sellList = ();
 
-                       if ($args->{selling}) {
-                               my $interval = $args->{sellInterval};
-                               if (!defined $interval) {
-                                       $interval = $timeout{ai_transfer_items}{timeout};
-                                       $interval = 0.15 unless defined $interval;
-                                       $interval = 1 if $interval < 1;
-                                       $args->{sellInterval} = $interval;
-                               }
+				$args->{sellInterval} = $interval;
+				$args->{sellNextTime} = time;
+				$args->{sellQueue} = \@sellItems;
+				$args->{selling} = 1;
+			}
 
-                               my $now = time;
-                               my $next = $args->{sellNextTime};
-                               $args->{sellNextTime} = $next = $now - $interval unless defined $next;
+			if ($args->{selling}) {
+				my $interval = $args->{sellInterval};
+				if (!defined $interval) {
+					$interval = $timeout{ai_transfer_items}{timeout};
+					$interval = 0.15 unless defined $interval;
+					$interval = 1 if $interval < 1;
+					$args->{sellInterval} = $interval;
+				}
 
-                               if (@{$args->{sellQueue}}) {
-                                       return if $now < $next;
+				my $now = time;
+				my $next = $args->{sellNextTime};
+				$args->{sellNextTime} = $next = $now - $interval unless defined $next;
 
-                                       my $sellItem = shift @{$args->{sellQueue}};
-                                       push @{$args->{sellStaged}}, $sellItem;
+				if (@{$args->{sellQueue}}) {
+					return if $now < $next;
 
-                                       $args->{sellNextTime} = $now + $interval;
-                                       return;
-                               }
+					my $sellItem = shift @{$args->{sellQueue}};
+					push @sellList, $sellItem;
 
-                               if (!$args->{sellFinalized}) {
-                                       return if $now < $next;
+					$args->{sellNextTime} = $now + $interval;
+					return;
+				}
 
-                                       completeNpcSell($args->{sellStaged} || []);
+				if (!$args->{sellFinalized}) {
+					return if $now < $next;
 
-                                       $args->{sellFinalized} = 1;
-                                       $args->{sentSellPacket_time} = time;
+					completeNpcSell(\@sellList);
 
-                                       Plugins::callHook('AI_sell_auto_done');
-                                       return;
-                               }
+					$args->{sellFinalized} = 1;
+					$args->{sentSellPacket_time} = time;
 
-                               delete $args->{selling};
-                               delete $args->{sellQueue};
-                               delete $args->{sellStaged};
-                               delete $args->{sellFinalized};
-                               delete $args->{sellInterval};
-                               delete $args->{sellNextTime};
+					Plugins::callHook('AI_sell_auto_done');
+					return;
+				}
 
-                               delete $args->{'sentNpcTalk'};
-                               delete $args->{'sentNpcTalk_time'};
-                               delete $args->{'recv_sellList_time'};
+				delete $args->{selling};
+				delete $args->{sellQueue};
+				delete $args->{sellFinalized};
+				delete $args->{sellInterval};
+				delete $args->{sellNextTime};
 
-                               return;
+				delete $args->{'sentNpcTalk'};
+				delete $args->{'sentNpcTalk_time'};
+				delete $args->{'recv_sellList_time'};
+
+				return;
                        }
                 }
         }
