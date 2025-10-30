@@ -5143,8 +5143,10 @@ sub cmdSell {
 	} else {
 		my @items = Actor::Item::getMultiple($args[0]);
 		if (@items > 0) {
+		    my $was_empty = @sellList ? 0 : 1;
+		    my $items_added = 0;
 			foreach my $item (@items) {
-				my %obj;
+					my %obj;
 
 				if (defined(findIndex(\@sellList, "binID", $item->{binID}))) {
 					error TF("%s (%s) is already in the sell list.\n", $item->nameString, $item->{binID});
@@ -5161,14 +5163,15 @@ sub cmdSell {
 					$obj{amount} = $args[1];
 				}
 				push @sellList, \%obj;
+				$items_added = 1;
 				message TF("Added to sell list: %s (%s) x %s\n", $obj{name}, $obj{binID}, $obj{amount}), "info";
 			}
-			message T("Type 'sell done' to sell everything in your sell list.\n"), "info";
+			message T("Type 'sell done' to sell everything in your sell list.\n"), "info" if $was_empty && $items_added;
 
 		} else {
 			error TF("Error in function 'sell' (Sell Inventory Item)\n" .
-				"'%s' is not a valid item index #; no item has been added to the sell list.\n",
-				$args[0]);
+			"'%s' is not a valid item index #; no item has been added to the sell list.\n",
+			$args[0]);
 		}
 	}
 }
