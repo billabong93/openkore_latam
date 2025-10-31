@@ -29,6 +29,7 @@ DEFAULTS = {
     "6902_EXE_PATH": r"C:\Gravity\Ragnarok_6902\ragexe.exe",
     "6903_EXE_PATH": r"C:\Gravity\Ragnarok_6903\ragexe.exe",
     "IP": "172.65.175.75",
+    "AUTOMATICO": "false",
 }
 
 # Timings
@@ -76,6 +77,8 @@ def ensure_bypass_file():
         f"6903_EXE_PATH = {DEFAULTS['6903_EXE_PATH']}\n\n"
         "# IP (será combinado com a porta escolhida)\n"
         f"IP = {DEFAULTS['IP']}\n\n"
+        "# Modo automático: se true, abre 3 instâncias sem mostrar menu\n"
+        f"AUTOMATICO = {DEFAULTS['AUTOMATICO']}\n\n"
         "# Ponteiros encontrados (atualizados automaticamente):\n"
         "# TAADDRESS_ADDR = 0x00000000\n"
         "# DOMAIN_PTR_ADDR = 0x00000000\n"
@@ -138,6 +141,7 @@ def get_cfg():
         key = f"{p}_EXE_PATH"
         cfg[key] = kv.get(key.upper(), DEFAULTS[key])
     cfg["IP"] = kv.get("IP", DEFAULTS["IP"])
+    cfg["AUTOMATICO"] = kv.get("AUTOMATICO", DEFAULTS["AUTOMATICO"]).lower() == "true"
     return cfg
 
 # ---------------- Memory Search Functions ----------------
@@ -524,30 +528,55 @@ def patch_instance(exe_path, ip, port, stagger_msg=""):
     
     return success
 
+def launch_all_instances(cfg, ip):
+    """Abre todas as 3 instâncias automaticamente"""
+    print(f"\n{Fore.CYAN}{Style.BRIGHT}╔══════════════════════════════════════════════════╗{Style.RESET_ALL}")
+    print(f"{Fore.CYAN}{Style.BRIGHT}║      MODO AUTOMÁTICO: Abrindo 3 instâncias       ║{Style.RESET_ALL}")
+    print(f"{Fore.CYAN}{Style.BRIGHT}╚══════════════════════════════════════════════════╝{Style.RESET_ALL}\n")
+    
+    ok_all = True
+    for idx, port in enumerate(PORT_OPTIONS, start=1):
+        exe_path = cfg.get(f"{port}_EXE_PATH")
+        ok = patch_instance(exe_path, ip, port, stagger_msg=f"[{idx}/3] ")
+        ok_all = ok_all and ok
+        
+        if idx < len(PORT_OPTIONS):
+            print(f"{Fore.CYAN}Aguardando {BETWEEN_LAUNCH_SLEEP}s antes do próximo...{Style.RESET_ALL}")
+            time.sleep(BETWEEN_LAUNCH_SLEEP)
+    
+    return ok_all
+
 # ---------------- main ----------------
 def main():
     print(f"{Fore.CYAN}{Style.BRIGHT}")
     print("╔═══════════════════════════════════════════════════════════╗")
     print("║                                                           ║")
-    print("║       RAGNAROK UNIFIED BYPASS - Busca Automática         ║")
+    print("║       RAGNAROK UNIFIED BYPASS - Busca Automática          ║")
     print("║                                                           ║")
     print("╚═══════════════════════════════════════════════════════════╝")
     print(f"{Style.RESET_ALL}")
     
     cfg = get_cfg()
-    sel = choose_item(cfg)
     ip = cfg["IP"]
+    automatico = cfg["AUTOMATICO"]
+    
+    # Verifica se está no modo automático
+    if automatico:
+        print(f"{Fore.GREEN}Modo automático ativado (automatico=true no bypass.txt){Style.RESET_ALL}")
+        ok_all = launch_all_instances(cfg, ip)
+        
+        if ok_all:
+            print(f"\n{Fore.GREEN}{Style.BRIGHT}✓ Todas as 3 instâncias abertas com sucesso!{Style.RESET_ALL}")
+            sys.exit(0)
+        else:
+            print(f"\n{Fore.RED}{Style.BRIGHT}✗ Uma ou mais instâncias falharam.{Style.RESET_ALL}")
+            sys.exit(1)
+    
+    # Modo manual - mostra menu
+    sel = choose_item(cfg)
 
     if sel == MENU_ALL:
-        print(f"\n{Fore.CYAN}Iniciando todas as portas...{Style.RESET_ALL}\n")
-        ok_all = True
-        for idx, port in enumerate(PORT_OPTIONS, start=1):
-            exe_path = cfg.get(f"{port}_EXE_PATH")
-            ok = patch_instance(exe_path, ip, port, stagger_msg=f"[{idx}/3] ")
-            ok_all = ok_all and ok
-            if idx < len(PORT_OPTIONS):
-                print(f"{Fore.CYAN}Aguardando {BETWEEN_LAUNCH_SLEEP}s antes do próximo...{Style.RESET_ALL}")
-                time.sleep(BETWEEN_LAUNCH_SLEEP)
+        ok_all = launch_all_instances(cfg, ip)
         
         if ok_all:
             print(f"\n{Fore.GREEN}{Style.BRIGHT}✓ Todas as portas abertas com sucesso!{Style.RESET_ALL}")
