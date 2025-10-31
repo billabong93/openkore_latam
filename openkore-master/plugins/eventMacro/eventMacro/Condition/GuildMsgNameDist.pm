@@ -4,6 +4,7 @@ use strict;
 use Globals qw( $playersList );
 
 use base 'eventMacro::Condition::Base::MsgNameDist';
+use eventMacro::Condition::Base::Msg ();
 
 sub _hooks {
 	my ( $self ) = @_;
@@ -27,10 +28,10 @@ sub validate_condition {
 	$self->{message} = undef;
 	$self->{source} = undef;
 	
-	if ($callback_type eq 'hook') {
-		$self->{message} = $args->{Msg};
-		$self->{source} = $args->{MsgUser};
-	}
+        if ($callback_type eq 'hook') {
+                $self->{message} = eventMacro::Condition::Base::Msg::normalize_text($args->{Msg});
+                $self->{source} = eventMacro::Condition::Base::Msg::normalize_text($args->{MsgUser});
+        }
 	
 	return $self->SUPER::validate_condition( $callback_type, $callback_name, $args );
 }

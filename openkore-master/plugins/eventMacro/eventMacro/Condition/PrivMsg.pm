@@ -18,10 +18,9 @@ sub validate_condition {
 	$self->{message} = undef;
 	$self->{source} = undef;
 	
-	if ($callback_type eq 'hook') {
-		$self->{message} = $args->{Msg};
-		$self->{source} = $args->{MsgUser};
-	}
+        if ($callback_type eq 'hook') {
+                $self->set_message_and_source($args->{Msg}, $args->{MsgUser});
+        }
 	return $self->SUPER::validate_condition( $callback_type, $callback_name, $args );
 }
 

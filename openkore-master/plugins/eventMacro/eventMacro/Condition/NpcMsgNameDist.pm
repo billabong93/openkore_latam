@@ -4,6 +4,7 @@ use strict;
 use Globals qw( $npcsList );
 
 use base 'eventMacro::Condition::Base::MsgNameDist';
+use eventMacro::Condition::Base::Msg ();
 
 sub _hooks {
 	my ( $self ) = @_;
@@ -27,10 +28,10 @@ sub validate_condition {
 	$self->{message} = undef;
 	$self->{source} = undef;
 	
-	if ($callback_type eq 'hook') {
-		$self->{message} = $args->{msg};
-		$self->{source} = $args->{name};
-	}
+        if ($callback_type eq 'hook') {
+                $self->{message} = eventMacro::Condition::Base::Msg::normalize_text($args->{msg});
+                $self->{source} = eventMacro::Condition::Base::Msg::normalize_text($args->{name});
+        }
 	
 	return $self->SUPER::validate_condition( $callback_type, $callback_name, $args );
 }

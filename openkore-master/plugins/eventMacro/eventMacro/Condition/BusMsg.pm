@@ -14,14 +14,10 @@ sub _hooks {
 
 sub validate_condition {
 	my ( $self, $callback_type, $callback_name, $args ) = @_;
-	if ($callback_type eq 'hook') {
-		$self->{message} = $args->{message};
-		if (exists $args->{sender}) {
-			$self->{source} = $args->{sender};
-		} else {
-			$self->{source} = undef;
-		}
-	}
+        if ($callback_type eq 'hook') {
+                my $sender = exists $args->{sender} ? $args->{sender} : undef;
+                $self->set_message_and_source($args->{message}, $sender);
+        }
 	return $self->SUPER::validate_condition( $callback_type, $callback_name, $args );
 }
 
