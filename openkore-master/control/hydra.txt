@@ -8,6 +8,6 @@ ragnarokserver_ports=6901,6902,6903
 queryserver_ports=24390,24391,24392
 
 ### NAO MEXA!
-server_type=Default
+server_type=ROLA_2025-05-29
 fake_ip=
 debug=0
