@@ -8,7 +8,7 @@ use warnings;
 use utf8;
 
 use Plugins;
-use Globals qw(%config $char);
+use Globals qw(%config $char @sellList);
 use Log qw(message debug warning error);
 use Time::HiRes qw(time);
 use Commands;
@@ -89,10 +89,15 @@ Commands::register(
 );
 
 # --------- Estado do envio manual ---------
-my $hs_running = 0;
-my $hs_last    = 0;
-my $hs_delay   = 1.0;
-my @hs_queue   = ();
+my $hs_running          = 0;
+my $hs_last             = 0;
+my $hs_delay            = 1.0;
+my @hs_queue            = ();
+my %hs_expected_entries = ();
+my $hs_expected_total   = 0;
+my $hs_sent_total       = 0;
+my $hs_state            = 'idle';
+my $hs_settle_attempts  = 0;
 
 # Hook para disparar os envios com delay
 my $hk_ai_pre = Plugins::addHook('AI_pre', \&on_ai_pre);
@@ -130,20 +135,30 @@ BEGIN {
         }
 
         @hs_queue = ();
+        %hs_expected_entries = ();
         for my $it (@{$char->inventory}) {
             next unless exists $want{$it->{ID}};
             my $amt = $want{$it->{ID}};
             push @hs_queue, [ $it->{binID}, $amt, $it->nameString ];
+            $hs_expected_entries{$it->{binID}} = $amt;
         }
 
         if (!@hs_queue) {
             debug "[humanSell] Fila vazia; executando completeNpcSell original.\n", "ai";
+            $hs_running = 0;
+            $hs_state   = 'idle';
+            $hs_last    = 0;
+            %hs_expected_entries = ();
             return AI::CoreLogic::completeNpcSell_ORIG(@_);
         }
 
         $hs_delay   = _conf_num('sellAuto_humanDelay', 1.0);
         $hs_last    = time - $hs_delay;
         $hs_running = 1;
+        $hs_state   = 'sending';
+        $hs_expected_total  = scalar @hs_queue;
+        $hs_sent_total      = 0;
+        $hs_settle_attempts = 0;
 
         message sprintf("[humanSell] Venda humanizada: %d item(ns), delay %.2fs.\n", scalar(@hs_queue), $hs_delay), "info";
 
@@ -158,23 +173,76 @@ sub on_ai_pre {
     my $now = time();
     return if ($now - $hs_last) < $hs_delay;
 
-    if (@hs_queue) {
-        my ($binID, $amount, $name) = @{ shift @hs_queue };
-        $name //= '';
-        Commands::run(sprintf("sell %d %d", $binID, $amount));
-        debug sprintf("[humanSell] Added to sell list: %s (%d) x %d\n", $name, $binID, $amount), "ai";
-        $hs_last = $now;
+    if ($hs_state eq 'sending') {
+        if (@hs_queue) {
+            my ($binID, $amount, $name) = @{ shift @hs_queue };
+            $name //= '';
+            Commands::run(sprintf("sell %d %d", $binID, $amount));
+            debug sprintf("[humanSell] Added to sell list: %s (%d) x %d\n", $name, $binID, $amount), "ai";
+            $hs_sent_total++;
+            $hs_last = $now;
+            return;
+        }
+
+        $hs_state = 'settle';
+        $hs_last  = $now;
+        debug "[humanSell] Fila esvaziada; aguardando sincronização da lista antes de finalizar.\n", "ai";
         return;
     }
 
-    # Terminou a fila -> finaliza
-    Commands::run("sell done");
-    debug "[humanSell] 'sell done' enviado.\n", "ai";
+    if ($hs_state eq 'settle') {
+        my %remaining = %hs_expected_entries;
+        for my $entry (@sellList) {
+            next unless ref $entry eq 'HASH';
+            my $bin = $entry->{binID};
+            next unless defined $bin;
+            next unless exists $remaining{$bin};
+            my $amt = $entry->{amount} // 0;
+            delete $remaining{$bin} if $amt >= $remaining{$bin};
+        }
 
-    # limpa estado
+        my $missing_items    = scalar(keys %remaining);
+        my $missing_commands = ($hs_expected_total && $hs_sent_total < $hs_expected_total)
+            ? ($hs_expected_total - $hs_sent_total)
+            : 0;
+
+        if ($missing_items || $missing_commands) {
+            $hs_settle_attempts++;
+            if ($hs_settle_attempts < 5) {
+                debug sprintf("[humanSell] Aguardando sincronização: %d item(ns) pendente(s), %d comando(s) faltando (tentativa %d).\n",
+                    $missing_items, $missing_commands, $hs_settle_attempts), "ai";
+                $hs_last = $now;
+                return;
+            }
+            warning sprintf("[humanSell] Lista de venda não sincronizou após %d tentativas; forçando finalização (faltando %d item(ns), %d comando(s)).\n",
+                $hs_settle_attempts, $missing_items, $missing_commands);
+        }
+
+        Commands::run("sell done");
+        debug "[humanSell] 'sell done' enviado.\n", "ai";
+
+        # limpa estado
+        $hs_running = 0;
+        $hs_last    = 0;
+        @hs_queue   = ();
+        %hs_expected_entries = ();
+        $hs_expected_total   = 0;
+        $hs_sent_total       = 0;
+        $hs_state            = 'idle';
+        $hs_settle_attempts  = 0;
+        return;
+    }
+
+    # Fallback de segurança
+    debug "[humanSell] Estado inesperado; finalizando rotina para evitar travas.\n", "ai";
     $hs_running = 0;
     $hs_last    = 0;
     @hs_queue   = ();
+    %hs_expected_entries = ();
+    $hs_expected_total   = 0;
+    $hs_sent_total       = 0;
+    $hs_state            = 'idle';
+    $hs_settle_attempts  = 0;
 }
 
 Plugins::register('humanSell', 'Autosell manual com delay por item', sub {
