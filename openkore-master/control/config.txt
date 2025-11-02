@@ -884,6 +884,7 @@ buyAuto {
 }
 
 sellAuto 0
+sellAuto_maxItemTypes 10
 sellAuto_npc payon 159 96
 sellAuto_standpoint
 sellAuto_distance 2
