@@ -6,16 +6,21 @@
 
 ### 🛠️ EDITÁVEIS (SOMENTE ESTES 5) - ALTERE APENAS AQUI ####################
 # ⚙️ Formato: chave espaço valor (sem '=')
-# ✅ Campos permitidos
+# ✅ Campos permitidos / notas:
+#   - XKore: 0 | 1 | 2 | 3
+#   - XKore_listenPort: 1024-65535
+#   - XKore_port: porta do DLL/hook (ex: 6901,6902,6903)
+#   - poseidonServer: IP ou hostname (ex: 172.65.175.75)
+#   - poseidonPort: porta TCP do Poseidon (ex: 24390,24391,24392)
+#   - XKore_proxyPublicIp:  IP ou hostname (ex: 172.65.175.75)
+attackAuto_steal 1
 
-XKore 3
+XKore 0
 XKore_port 6901
-XKore_listenPort 6901
+XKore_proxyPort 6901
 poseidonServer 172.65.175.75
 poseidonPort 24390
-XKore_publicIp 172.65.175.75
-XKore_hookIp 172.65.175.75
-ip_socket 172.65.175.75
+XKore_proxyPublicIp 172.65.175.75
 ############################################################################
 
 ### 🔐 PROTEGIDO (NÃO MEXER) - SEPARADO ################################################
@@ -33,14 +38,10 @@ XKore_silent 1
 XKore_bypassBotDetection 0
 XKore_exeName ragexe.exe
 
-# Xkore 0 - Config do socket no recv!
-port_socket 5400
-
-# XKore 1 / Proxy configuration
-XKore_hookport 5400
-
 # XKore 2 / Proxy configuration
-XKore_listenIp 0.0.0.0
+XKore_proxyIp
+
+
 XKore_ID
 #########################################################################################
 
