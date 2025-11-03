@@ -1905,18 +1905,28 @@ function updateCharacter(char) {
             const sy = (y) => (mapData.height - y) * scaleY;
             
             if (mapData.portals) {
-                ctx.fillStyle = '#aa00ff';
-                ctx.strokeStyle = '#ff00ff';
-                ctx.lineWidth = 2;
-                mapData.portals.forEach(p => {
-                    const x = sx(p.x || 0);
-                    const y = sy(p.y || 0);
-                    ctx.beginPath();
-                    ctx.arc(x, y, 8, 0, Math.PI * 2);
-                    ctx.fill();
-                    ctx.stroke();
-                });
-            }
+    mapData.portals.forEach(p => {
+        const x = sx(p.x || 0);
+        const y = sy(p.y || 0);
+        
+        // Portais mais velhos ficam mais transparentes
+        ctx.fillStyle = 'rgba(170, 0, 255, 0.8)';  // Roxo sólido
+        ctx.strokeStyle = '#ff00ff';
+        ctx.lineWidth = 2;
+        
+        ctx.beginPath();
+        ctx.arc(x, y, 8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        
+        // Adiciona um pequeno efeito pulsante
+        ctx.strokeStyle = 'rgba(255, 0, 255, 0.3)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(x, y, 12, 0, Math.PI * 2);
+        ctx.stroke();
+    });
+}
             
             if (mapData.monsters) {
                 mapData.monsters.forEach(m => {
@@ -2006,33 +2016,34 @@ function updateInventory(inv) {
 
         
         function updateSkills(skills) {
-            if (!skills) return;
+    if (!skills) return;
+    
+    const list = document.getElementById('skillsList');
+    const skillPoints = parseInt(document.getElementById('skillPoints').textContent) || 0;
+    list.innerHTML = '';
+    
+    if (skills.skills && skills.skills.length > 0) {
+        skills.skills.forEach(skill => {
+            const div = document.createElement('div');
+            div.className = 'skill-item';
             
-            const list = document.getElementById('skillsList');
-            const skillPoints = parseInt(document.getElementById('skillPoints').textContent) || 0;
-            list.innerHTML = '';
+            // CORREÇÃO: Passa o ID da skill em vez do handle
+            const upgradeBtn = skillPoints > 0 && skill.id ? 
+                `<button class="skill-btn" onclick="upgradeSkill(${skill.id})">+ Upar</button>` :
+                '';
             
-            if (skills.skills && skills.skills.length > 0) {
-                skills.skills.forEach(skill => {
-                    const div = document.createElement('div');
-                    div.className = 'skill-item';
-                    
-                    const upgradeBtn = skillPoints > 0 ? 
-                        `<button class="skill-btn" onclick="upgradeSkill('${skill.handle}')">+ Upar</button>` :
-                        '';
-                    
-                    div.innerHTML = `
-                        <div class="skill-info">
-                            <div class="skill-name">${skill.name}</div>
-                            <div class="skill-details">Lv. ${skill.level} | SP: ${skill.sp}</div>
-                        </div>
-                        ${upgradeBtn}
-                    `;
-                    
-                    list.appendChild(div);
-                });
-            }
-        }
+            div.innerHTML = `
+                <div class="skill-info">
+                    <div class="skill-name">${skill.name}</div>
+                    <div class="skill-details">Lv. ${skill.level}/${skill.max_level} | SP: ${skill.sp} | ID: ${skill.id}</div>
+                </div>
+                ${upgradeBtn}
+            `;
+            
+            list.appendChild(div);
+        });
+    }
+}
         
         function updateMonstersList(monsters) {
             const list = document.getElementById('monstersList');
@@ -2136,9 +2147,9 @@ function updateInventory(inv) {
             await apiPost('/api/stat/upgrade', { stat });
         }
         
-        async function upgradeSkill(handle) {
-            await apiPost('/api/skill/upgrade', { skill: handle });
-        }
+        async function upgradeSkill(skillId) {
+    await apiPost('/api/skill/upgrade', { skill_id: skillId });
+}
         
         async function apiPost(url, data) {
             try {
