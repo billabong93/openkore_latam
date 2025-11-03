@@ -39,7 +39,7 @@ XKore_bypassBotDetection 0
 XKore_exeName ragexe.exe
 
 # XKore 2 / Proxy configuration
-XKore_proxyIp
+XKore_proxyIp 0.0.0.0
 
 
 XKore_ID
