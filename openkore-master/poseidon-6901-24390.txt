@@ -1,0 +1,13 @@
+### DEFINA AQUI O IP SEGURO, EX: 172.65.175.75
+ragnarokserver_ip=172.65.175.75
+queryserver_ip=172.65.175.75
+
+
+### DEFINA AQUI AS PORTAS QUE O POSEIDON VAI RODAR, Exemplos abaixo.
+ragnarokserver_port=6901
+queryserver_port=24390
+
+### NAO MEXA!
+server_type=ROla_2025-06-17
+fake_ip=
+debug=0
