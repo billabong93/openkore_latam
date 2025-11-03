@@ -1,5 +1,5 @@
 #########################################################################
-# 🐙 Hydra / XKore - CONFIG
+# 🐙 Poseidon / XKore - CONFIG
 # ✏️ Edite APENAS as chaves no bloco "### 🛠️ EDITÁVEIS ###"
 # 🔒 O RESTO ESTÁ ISOLADO EM "### 🔐 PROTEGIDO (NÃO MEXER) ###"
 #########################################################################
