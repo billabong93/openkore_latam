@@ -41,6 +41,7 @@ use Network::MessageTokenizer;
 
 my $clientBuffer;
 my $currentClientKey = 0;
+our $reconnect_message_count = 0;
 
 # Members:
 #
@@ -59,19 +60,16 @@ my $currentClientKey = 0;
 # Initialize X-Kore-Proxy mode.
 sub new {
 	my $class = shift;
-	my $ip = $config{XKore_listenIp} || '0.0.0.0';
-	my $port = $config{XKore_listenPort} || 6901;
+	my $ip = $config{XKore_proxyIp} || '0.0.0.0';
+	my $port = $config{XKore_proxyPort} || 6901;
 	my $self = bless {}, $class;
-
-	# Kill any process using the listen port before starting
-	$self->killPortProcess($port);
 
 	# Reuse code from Network::DirectConnection to connect to the server
 	require Network::DirectConnection;
 	$self->{server} = new Network::DirectConnection($self);
 
 	$self->{tokenizer} = new Network::MessageTokenizer($self->getRecvPackets());
-	$self->{publicIP} = $config{XKore_publicIp} || undef;
+	$self->{publicIP} = $config{XKore_proxyPublicIp} || undef;
 	$self->{client_state} = 0;
 	$self->{nextIp} = undef;
 	$self->{nextPort} = undef;
@@ -99,39 +97,6 @@ sub new {
 	message T("X-Kore mode intialized.\n"), "startup";
 
 	return $self;
-}
-
-##
-# $Network_XKoreProxy->killPortProcess(port)
-#
-# Kill any process that is currently using the specified port
-sub killPortProcess {
-	my ($self, $port) = @_;
-	
-	return unless defined $port;
-	
-	my $os = $^O;
-	
-	if ($os eq 'MSWin32') {
-		# Windows
-		my $netstat_output = `netstat -ano | findstr :$port`;
-		if ($netstat_output =~ /LISTENING\s+(\d+)/) {
-			my $pid = $1;
-			warning TF("Killing process %s using port %s\n", $pid, $port), "xkoreProxy";
-			system("taskkill /F /PID $pid >nul 2>&1");
-		}
-	} else {
-		# Linux/Unix
-		my $lsof_output = `lsof -ti:$port 2>/dev/null`;
-		chomp($lsof_output);
-		if ($lsof_output && $lsof_output =~ /^\d+$/) {
-			warning TF("Killing process %s using port %s\n", $lsof_output, $port), "xkoreProxy";
-			system("kill -9 $lsof_output 2>/dev/null");
-		}
-	}
-	
-	# Small delay to ensure port is freed
-	usleep(100000); # 100ms
 }
 
 sub version {
@@ -303,20 +268,6 @@ sub clientSend {
 		}
 	}
 
-	elsif ($switch eq "0AE3") { # received_login_token
-		my $login_type = unpack('l', substr($msg, 4, 8));
-
-		# OTP request
-		if ( ($login_type eq 400 || $login_type eq 1000) && $config{otpSeed} ) {
-			my $otp;
-			Plugins::callHook('request_otp_login', { otp => \$otp, seed => $config{otpSeed} });
-
-			if (defined $otp && length $otp) {
-				$messageSender->sendOtpToServer($otp);
-			}
-		}
-	}
-
 	$msg = $self->modifyPacketIn($msg, $switch) unless ($dontMod);
 	if ($config{debugPacket_ro_received}) {
 		debug "Modified packet sent to client\n", "xkoreProxy";
@@ -340,16 +291,40 @@ sub clientFlush {
 sub clientRecv {
 	my ($self, $msg) = @_;
 
+	# Check if proxy is alive and data is waiting
 	return undef unless ($self->proxyAlive && dataWaiting(\$self->{proxy}));
 
-	$self->{proxy}->recv($msg, 1024 * 32);
-	if (length($msg) == 0) {
-		# Connection from client closed
+	# Try to receive data from client
+	eval {
+		$self->{proxy}->recv($msg, 1024 * 32);
+	};
+	if ($@) {
+		error "Error receiving data from client: $@\n", "xkoreProxy";
 		close($self->{proxy});
 		return undef;
 	}
 
+	# Check if connection was closed
+	if (length($msg) == 0) {
+		warning "Client closed the connection.\n", "xkoreProxy";
+		close($self->{proxy});
+		return undef;
+	}
+
+	# Validate minimum packet size (at least 2 bytes for switch)
+	if (length($msg) < 2) {
+		warning "Received packet too short from client.\n", "xkoreProxy";
+		return undef;
+	}
+
+	# Extract and validate switch
 	my $switch = uc(unpack("H2", substr($msg, 1, 1))) . uc(unpack("H2", substr($msg, 0, 1)));
+	# Optionally, check if $switch is in a list of known switches
+	unless ($switch =~ /^[0-9A-F]{4}$/) {
+		warning "Received invalid switch from client: $switch\n", "xkoreProxy";
+		return undef;
+	}
+
 	$msg = $self->modifyPacketOut($msg, $switch);
 
 	if($self->getState() eq Network::IN_GAME || $self->getState() eq Network::CONNECTED_TO_CHAR_SERVER) {
@@ -370,7 +345,7 @@ sub onClientData {
 	}
 	$self->decryptMessageID(\$msg);
 
-	$msg = $self->{tokenizer}->slicePacket($msg, \$additional_data); # slice packet if needed
+	$msg = $self->{tokenizer}->slicePacket($msg, \$additional_data, 1);
 
 	$self->{tokenizer}->add($msg, 1);
 
@@ -435,8 +410,8 @@ sub checkProxy {
 		# sufficiently high), then the client will freeze.
 
 		# (Re)start listening...
-		my $ip = $config{XKore_listenIp} || '127.0.0.1';
-		my $port = $config{XKore_listenPort} || 6901;
+		my $ip = $config{XKore_proxyIp} || '127.0.0.1';
+		my $port = $config{XKore_proxyPort} || 6901;
 		$self->{proxy_listen} = new IO::Socket::INET(
 			LocalAddr	=> $ip,
 			LocalPort	=> $port,
@@ -467,6 +442,7 @@ sub checkServer {
 
 	# Connect to the next server for proxying the packets
 	if (!$self->serverAlive()) {
+		
 		# if no next server was defined by received packets, setup a primary server.
 		my $master = $masterServer = $masterServers{$config{'master'}};
 
@@ -479,7 +455,13 @@ sub checkServer {
 				$self->{nextIp} = $master->{ip};
 				$self->{nextPort} = $master->{port};
 			}
-			message TF("Proxying to [%s]\n", $config{master}), "connection" unless ($self->{gotError});
+			if ($reconnect_message_count < 3) {
+				message TF("Proxying to [%s]\n", $config{master}), "connection" unless ($self->{gotError});
+				$reconnect_message_count++;
+			} elsif ($reconnect_message_count == 3) {
+				message T("Still trying to reconnect... (messages suppressed)\n"), "connection";
+				$reconnect_message_count++;
+			}
 		}
 
 		$self->serverConnect($self->{nextIp}, $self->{nextPort}) unless ($self->{gotError});
@@ -494,6 +476,9 @@ sub checkServer {
 		# clean Next Server uppon connection
 		$self->{nextIp} = undef;
 		$self->{nextPort} = undef;
+	}
+	if ($self->serverAlive()) {
+		$reconnect_message_count = 0;
 	}
 }
 
@@ -537,9 +522,9 @@ sub modifyPacketIn {
 		$msg = "";
 	}
 
-	    # Handle packet 0BC7 - send disconnect instead of closing game
+    # Handle packet 0BC7 - send disconnect instead of closing game
     if ($switch eq "0BC7") {
-        debug "Received packet 0BC7, enviando pacote de desconexao ao inves de fechar o client.\n", "xkoreProxy";
+        debug "Received packet 0BC7, sending disconnect packet instead of closing game\n", "xkoreProxy";
         # Send disconnect packet to server
         $messageSender->sendQuit() if $messageSender;
         # Return empty message to prevent client from processing the original packet
@@ -589,9 +574,6 @@ sub modifyPacketIn {
 
 		debug "Modifying Account Info packet...\n", "xkoreProxy";
 
-		# Parse account info packet
-		my ($len, $sessionID, $accountID, $sessionID2, $lastLoginIP, $lastLoginTime, $accountSex, $serverInfo) = unpack('v a4 a4 a4 a4 a26 C x17 a*', substr($msg, 2));
-
 		my $xKoreCharServer = $servers[$config{server}];
 
 		$self->{nextIp} = $self->{charServerIp} = $xKoreCharServer->{ip};
@@ -606,11 +588,9 @@ sub modifyPacketIn {
 
 		$msg = $packetParser->reconstruct({
 			switch => $switch,
-			len => 62 + length($xKoreCharServer),
 			sessionID => $sessionID,
 			accountID => $accountID,
 			sessionID2 => $sessionID2,
-			lastLoginIP => $lastLoginIP,
 			accountSex => $accountSex,
 			servers => \@serverList,
 		});
@@ -754,28 +734,56 @@ sub modifyPacketIn {
 	} elsif ($switch eq "0259") {
 		# queue the packet as requiring client's response in time
 		$self->{packetPending} = $msg;
-	} elsif ($switch eq "0AE3") { # If token was received, we need to connect to login server
-			# Parse token response
-			my ($len, $login_type, $flag, $login_token) = unpack('v l Z20 Z*', substr($msg, 2));
 
-			# Check if this is not OTP related:
-			# - OTP failure attempt (300 or 500)
-			# - OTP request (400 or 1000)
-			if ( $login_type ne 300 && $login_type ne 400 && $login_type ne 500 && $login_type ne 1000 ) {
-				# If token response contains a login token, we need to connect to the master server
-				if (length($login_token)) {
-						# Get master config
-						my $master = $masterServer = $masterServers{$config{'master'}};
-						# Set next server to connect
-						$self->{nextIp} = $master->{ip};
-						$self->{nextPort} = $master->{port};
-				} else {
-						error T("Authentication failed, token not received: $flag.\n"), "connection";
-				}
-				# Disconnect from token server
-				message T("Closing connection to Token Server\n"), 'connection' if (!$self->{packetReplayTrial});
-				$self->serverDisconnect(1);
-			}
+	} elsif ($switch eq "0AE3") { # If token was received, we need to connect to login server
+        # Parse token response
+        my ($len, $login_type, $flag, $login_token) = unpack('v l Z20 Z*', substr($msg, 2));
+        # If no token was received, but we are in xkore 3, just wait for client input
+        if (length($login_token)) {
+            # Get master config
+            my $master = $masterServer = $masterServers{$config{'master'}};
+            # Set next server to connect
+            $self->{nextIp} = $master->{ip};
+            $self->{nextPort} = $master->{port};
+            message T("Closing connection to Token Server\n"), 'connection' if (!$self->{packetReplayTrial});
+            $self->serverDisconnect(1);
+        } else {
+            # Automatic support for OTP
+            if ($login_type == 400 || $login_type == 1000) {
+                my $otp;
+                
+                # Check if otpSeed is configured
+                if ($config{otpSeed}) {
+                    Plugins::callHook('request_otp_login', { otp => \$otp, seed => $config{otpSeed} });
+                    unless (defined $otp && length $otp) {
+                        error "No Plugin returned a OTP code for account $config{username}\n", 'connection';
+                    }
+                } else {
+                    # Prompt user for OTP if otpSeed is not configured
+                    my $prompt = T("Please enter your OTP code:");
+                    $otp = $interface->query($prompt, title => T("OTP Required"));
+                    
+                    # Check if user cancelled the dialog or provided empty input
+                    if (!defined $otp || $otp eq '') {
+                        error T("OTP input was cancelled or empty. Disconnecting.\n"), 'connection';
+                        $self->serverDisconnect();
+                        return $msg;
+                    }
+                }
+                
+                # Send the OTP to the server if we have a valid one
+                if (defined $otp && length $otp) {
+                    $messageSender->sendOtpToServer($otp);
+                } else {
+                    error T("No OTP code provided. Disconnecting.\n"), 'connection';
+                    $self->serverDisconnect();
+                }
+            } else {
+                error T("Authentication failed, token not received: $flag.\n"), "connection";
+                message T("Closing connection to Token Server\n"), 'connection' if (!$self->{packetReplayTrial});
+                $self->serverDisconnect(1);
+            }
+        }
     }
 
 	return $msg;

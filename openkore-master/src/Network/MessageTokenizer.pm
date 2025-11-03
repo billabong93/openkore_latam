@@ -25,8 +25,6 @@ use Modules 'register';
 use bytes;
 no encoding 'utf8';
 use enum qw(KNOWN_MESSAGE UNKNOWN_MESSAGE ACCOUNT_ID);
-use Translation qw(T TF);
-use Log qw(message warning error debug);
 
 ##
 # Network::MessageTokenizer->new(Hash* rpackets)
@@ -177,17 +175,21 @@ sub readNext {
 
 # ragnarok servers
 sub slicePacket {
-	my ($self, $data, $additional_data) = @_;
+	my ($self, $data, $additional_data, $enhanced_mode) = @_;
 	# temporary hack for new recvpackets format
 	my $switch = getMessageID($data);
 	my $real_length = $self->{rpackets}{$switch}{length};
 	my $packet;
+	
+	# Enhanced mode for proxy connections to handle extra bytes
+	my $offset = $enhanced_mode ? 1 : 0;
+	my $min_length = $enhanced_mode ? 5 : 4;
 
 	if (($real_length > 0) # packet size is not variable
-			&& (length($data) >= $real_length)) {
+			&& (length($data) >= ($real_length + $offset))) {
 		if (length($data) > $real_length) {
 			$packet = substr($data, 0, $real_length);
-			$$additional_data = substr($data, $real_length); # sliced data
+			$$additional_data = substr($data, $real_length + $offset); # sliced data
 		} else {
 			$packet = $data;
 			$$additional_data = undef;
@@ -195,10 +197,10 @@ sub slicePacket {
 	} else { # packet is at correct size?
 		$packet = $data;
 		$$additional_data = undef;
-		if (length($data) > 4) {
+		if (length($data) > $min_length) {
 			my $packet_length = unpack("v", substr($data, 2, 2));
-			if ($packet_length > 4 && length($data) > $packet_length) {
-				my $next_data = substr($data, $packet_length);
+			if ($packet_length > $min_length && length($data) > ($packet_length + $offset)) {
+				my $next_data = substr($data, $packet_length + $offset);
 				if (length($next_data) > 1) {
 					$packet = substr($data, 0, $packet_length);
 					$$additional_data = $next_data;
@@ -206,14 +208,7 @@ sub slicePacket {
 			}
 		}
 	}
-
-	# Remove checksum byte from the packet we just read if connected to map server (ref: LatamChecksum.pl)
-	if ( defined($$additional_data) && length($$additional_data) > 0 && $::net->getState() >= 4 ) {		
-		my $checksum_byte = substr($$additional_data, 0, 1);
-		$$additional_data = substr($$additional_data, 1);
-		debug TF("Removed checksum byte %s from %s [%d bytes] [additional data: %d bytes]\n", unpack("H*", $checksum_byte), $switch, length($packet), length($$additional_data)), "connection";
-	}
-
+	
 	return $packet; # real packet
 }
 

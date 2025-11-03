@@ -60,7 +60,6 @@ sub new {
 	my $self = $class->SUPER::new();
 
 	$self->{packet_list} = {
-		'0BC7' => ['detector_de_macro', 'v', [qw(flag)]],
 		'0069' => ['account_server_info', 'v a4 a4 a4 a4 a26 C a*', [qw(len sessionID accountID sessionID2 lastLoginIP lastLoginTime accountSex serverInfo)]],
 		'006A' => ['login_error', 'C Z20', [qw(type date)]],
 		# '006B' => ['received_characters_info', 'v x20 a*', [qw(len charInfo)]], # not used in official server
@@ -770,6 +769,7 @@ sub new {
 		'0B8D' => ['repute_info', 'v C a*', [qw(len sucess reputeInfo)]], # -1
 		# 'C350' => ['senbei_vender_items_list'], #new senbei vender, need research
 		'0BA4' => ['homunculus_property', 'Z24 C v11 V4 V4 v2', [qw(name state level hunger intimacy atk matk hit critical def mdef flee aspd hp hp_max sp sp_max exp exp2 exp_max exp_max2 points_skill attack_range)]],
+		'0840' => ['notify_accessible_mapname', 'v a*', [qw(len mapList)]], # map_list
 	};
 
 	# Item RECORD Struct's
@@ -1043,7 +1043,8 @@ sub _items_list {
 			@{$local_item}{@$_} = @{$item}{@$_};
 		}
 		$local_item->{name} = itemName($local_item);
-
+		$local_item->{serverID} = unpack('v', $local_item->{ID});
+		
 		$args->{callback}($local_item) if $args->{callback};
 
 		$args->{adder}($local_item) if $add;

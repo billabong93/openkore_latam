@@ -114,3 +114,5 @@ item_list_start 0B08
 expandedItemID 1
 actor_info 0A30
 actor_name 0095
+items_stackable_type 7
+items_nonstackable_type 8
