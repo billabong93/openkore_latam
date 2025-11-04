@@ -1,0 +1,9 @@
+Arquivo personagem.txt
+Fica salvo qual o personagem no indice ele vai carregar.
+Ex: personagem=0
+
+Vai carregar automaticamente o primeiro personagem da lista, personagem=1, vai selecionar o segundo, e assim vai.
+
+Acho que ficou bem claro ne?
+
+Bjos
