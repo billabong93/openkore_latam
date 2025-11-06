@@ -15,6 +15,7 @@ use Actor;
 use utf8;
 use Log qw(message debug error);
 use JSON::Tiny qw(from_json to_json);
+use Encode qw(encode_utf8);
 use Translation qw(T TF);
 
 our %strings_cache;
@@ -222,7 +223,8 @@ sub npcTalkRespPost {
         next unless defined $responses->[$i];
         my $txt = $responses->[$i];
         $txt =~ s/\^[0-9A-Fa-f]{6}//g;  # Remove códigos
-        message sprintf("[%d] %s\n", $i, $txt);
+        my $line = sprintf("[%d] %s\n", $i, $txt);
+        message encode_utf8($line);
     }
     message "----------------------------------------\n";
 
@@ -250,12 +252,14 @@ sub npcTalkRespPost {
     }
 
 	if (!defined $Globals::latam_last_resp_notice_time || time - $Globals::latam_last_resp_notice_time > 0.5) {
-    
-		message TF("NPC %s (%d): Digite 'talk resp #' para escolher uma resposta.\n",
-        $npc_name, $npc_index), "ai_npcTalk";
-    
-    	$Globals::latam_last_resp_notice_time = time;
-    	$Globals::latam_last_resp_npc = $npc_name;
+        my $notice = TF(
+            "NPC %s (%d): Digite 'talk resp #' para escolher uma resposta.\n",
+            $npc_name, $npc_index
+        );
+        message encode_utf8($notice), "ai_npcTalk";
+
+        $Globals::latam_last_resp_notice_time = time;
+        $Globals::latam_last_resp_npc = $npc_name;
     }
 }
 
