@@ -168,7 +168,7 @@ sub serverConnect {
 sub serverSend {
 	my $self = shift;
 	my $msg = shift;
-	if ($self->serverAlive) {
+	if ($self->serverAlive && defined $self->serverPeerHost, $self->serverPeerPort) {
 		if (Plugins::hasHook('Network::serverSend/pre')) {
 			Plugins::callHook('Network::serverSend/pre', {msg => \$msg});
 		}
@@ -352,11 +352,13 @@ sub checkConnection {
 			return;
 		}
 		$reconnectCount++;
+		
 		if (defined $master->{OTP_ip} && defined $master->{OTP_port}) {
 			$self->serverConnect($master->{OTP_ip}, $master->{OTP_port});
 		} else {
 			$self->serverConnect($master->{ip}, $master->{port});
 		}
+
 		# call plugin's hook to determine if we can continue the work
 		if ($self->serverAlive) {
 			Plugins::callHook('Network::serverConnect/master');
@@ -570,6 +572,7 @@ sub checkConnection {
 				Plugins::callHook('Network::serverConnect/charselect');
 				return if ($conState == 1.5);
 			}
+
 			$messageSender->sendCharLogin($config{'char'});
 			$timeout{'charlogin'}{'time'} = time;
 
@@ -609,7 +612,8 @@ sub checkConnection {
 			}
 
 			$messageSender->sendPing() if (grep { $masterServer->{serverType} eq $_ } qw(ROla));
-			$messageSender->sendMapLogin($accountID, $charID, $sessionID, $accountSex2);
+			$messageSender->sendMapLogin($accountID, $charID, $sessionID, $accountSex);
+
 			$timeout_ex{master}{time} = time;
 			$timeout_ex{master}{timeout} = $timeout{reconnect}{timeout};
 			$timeout{maplogin}{time} = time;

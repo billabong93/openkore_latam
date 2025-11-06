@@ -248,7 +248,10 @@ sub sendToServer {
 
 	# Packet Prefix Encryption Support
 	$self->encryptMessageID(\$msg);
-
+	
+	# Salvar o tamanho original para o log
+	my $original_length = length($msg);
+	
 	$net->serverSend($msg);
 	$bytesSent += length($msg);
 
@@ -256,6 +259,7 @@ sub sendToServer {
 		my $label = $packetDescriptions{Send}{$messageID} ?
 			"[$packetDescriptions{Send}{$messageID}]" : '';
 		if ($config{debugPacket_sent} == 1) {
+			# Usar o tamanho final do pacote (após hooks)
 			debug(sprintf("Sent packet    : %-4s    [%2d bytes]  %s\n", $messageID, length($msg), $label), "sendPacket", 0);
 		} else {
 			Misc::visualDump($msg, ">> Sent packet: $messageID  $label");
@@ -533,8 +537,8 @@ sub sendAction { # flag: 0 attack (once), 7 attack (continuous), 2 sit, 3 stand
 	$args{monID} = $monID;
 	$args{flag} = $flag;
 	# eventually we'll trow this hooking out so...
-	Plugins::callHook('packet_pre/sendAttack', \%args) if $flag == Network::PacketParser::ACTION_ATTACK() || $flag == Network::PacketParser::ACTION_ATTACK_REPEAT();
-	Plugins::callHook('packet_pre/sendSit', \%args) if $flag == Network::PacketParser::ACTION_SIT() || $flag == Network::PacketParser::ACTION_STAND();
+	Plugins::callHook('packet_pre/sendAttack', \%args) if $flag == ACTION_ATTACK || $flag == ACTION_ATTACK_REPEAT;
+	Plugins::callHook('packet_pre/sendSit', \%args) if $flag == ACTION_SIT || $flag == ACTION_STAND;
 	if ($args{return}) {
 		$self->sendToServer($args{msg});
 		return;
@@ -1403,12 +1407,12 @@ sub sendTokenToServer {
 	my $len =  $length + 92;
 
 	my $password_rijndael = $self->encrypt_password($password);
-	my $ip = '192.168.0.14';
-	my $mac = '20CF3095572A';
+	my $ip = sprintf("192.168.%02d.%02d", (map { int(rand(255)) } 1..2));
+	my $mac = $config{macAddress} || sprintf("E0311E%02X%02X%02X", (map { int(rand(256)) } 1..3));
 	my $mac_hyphen_separated = join '-', $mac =~ /(..)/g;
 
 	$net->serverDisconnect();
-	$net->serverConnect($ip, $port);# OTP - One Time Password
+	$net->serverConnect($ip, $port); # OTP - One Time Password
 
 	my $msg = $self->reconstruct({
 		switch => 'token_login',
@@ -1437,7 +1441,7 @@ sub sendOtpToServer {
 
     $self->sendToServer($self->reconstruct({
         switch => 'send_otp_login',
-        otp    => $otp,
+        otp => $otp,
         padding => 0x00,
     }));
 
@@ -3560,6 +3564,30 @@ sub sendNPCCreateRequest {
 	my ($self, $name) = @_;
 	$self->sendToServer($self->reconstruct({switch => 'dynamicnpc_create_request', ID => $name}));
 	debug "Sent request to create NPC by name: $name\n", "sendPacket", 2;
+}
+
+# 0841 CH_SELECT_ACCESSIBLE_MAPNAME     
+sub sendSelectAccessibleMapname {
+    my ($self, $map_slot) = @_;
+
+    $self->sendToServer($self->reconstruct({
+        switch 		=> 'select_accessible_mapname',
+        char_slot	=> $config{char},
+        map_slot	=> $map_slot,
+    }));
+}
+
+# 0BAF CZ_USE_PACKAGEITEM
+sub sendUsePackageItem {
+    my ($self, $index, $itemID, $boxIndex) = @_;
+
+    $self->sendToServer($self->reconstruct({
+        switch   	=> 'use_packageitem',
+        index    	=> $index,
+        accountID	=> $accountID,
+        itemID   	=> $itemID,
+        boxIndex 	=> $boxIndex,
+    }));
 }
 
 1;

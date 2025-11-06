@@ -35,8 +35,8 @@ our ($hooks, $sessionStore, $accountServer, $charServer, $mapServer ,$mapServerC
 #
 # Start the X-Kore 2 subsystem.
 sub start {
-	my $publicIP = $config{XKore_publicIp} || '127.0.0.1';
-	my $port = $config{XKore_listenPort} || 6900;
+	my $publicIP = $config{XKore_publicIp} || '0.0.0.0';
+	my $port = $config{XKore_listenPort} || 6901;
 	$sessionStore = new Base::Ragnarok::SessionStore();
 	$mapServer = new Network::XKore2::MapServer(
 		host => $publicIP,

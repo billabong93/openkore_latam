@@ -1,3 +1,23 @@
+###########################################################
+# Poseidon server - Ragnarok Online server emulator
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License, or (at your option) any later version.
+#
+# Copyright (c) 2005-2006 OpenKore Development Team
+###########################################################
+# This class emulates a Ragnarok Online server.
+# The RO client connects to this server. This server
+# periodically sends a GameGuard query to the RO client,
+# and saves the RO client's response.
+###########################################################
+
+# TODO:
+# 1) make use of unpack strings to pack our packets depending on serverType
+# 2) make plugin like connection algorithms for each serverType or 1 main algo on which serverTypes have hooks
+
 package Poseidon::RagnarokServer;
 
 use strict;
@@ -277,7 +297,7 @@ sub ParsePacket {
 	} elsif (($switch eq '0064') || ($switch eq '01DD') || ($switch eq '01FA') || ($switch eq '0277') || ($switch eq '027C') || ($switch eq '02B0') || ($switch eq '0825') || ($switch eq '0987') || ($switch eq '0A76') || ($switch eq '0AAC') || ($switch eq '0B04')) { # master_login
 		# send account_server_info
 		my $sex = 1;
-		my $serverName = pack("a20", "Hydra Server"); # server name should be less than or equal to 20 characters
+		my $serverName = pack("a20", "Poseidon server"); # server name should be less than or equal to 20 characters
 		my $serverUsers = pack("V", @{$self->clients()} - 1);
 
 		my $data;
@@ -463,7 +483,7 @@ sub ParsePacket {
 
 		if ($self->{type}->{$config{server_type}}->{received_character_ID_and_Map} eq '0AC5') {
 			# '0AC5' => ['received_character_ID_and_Map', 'a4 Z16 a4 v a128', [qw(charID mapName mapIP mapPort mapUrl)]],
-			my $mapName = pack("a16", "brasilis.gat");
+			my $mapName = pack("a16", "payon.gat");
 			my $data = pack("v", 0x0AC5) . $charID . $mapName .
 				pack("C*", $ipElements[0], $ipElements[1], $ipElements[2], $ipElements[3]) . $port .
 				pack("x128"); # mapUrl
@@ -471,7 +491,7 @@ sub ParsePacket {
 
 		} else {
 			# '0071' => ['received_character_ID_and_Map', 'a4 Z16 a4 v1', [qw(charID mapName mapIP mapPort)]],
-			my $mapName = pack("a16", "brasilis.gat");
+			my $mapName = pack("a16", "payon.gat");
 			my $data = pack("v", 0x0071) . $charID . $mapName .
 				pack("C*", $ipElements[0], $ipElements[1], $ipElements[2], $ipElements[3]) . $port;
 			SendData($client, $data);
@@ -999,11 +1019,11 @@ sub SendCharacterList
 	my $block;
 
 	my $sex = 1;
-	my $map = "brasilis.gat";
+	my $map = "payon.gat";
 
 	# Filling Character 1 Block
 	$cID = $charID;	$hp = 10000; $maxHp = 10000; $sp = 10000; $maxSp = 10000; $hairstyle = 1; $level = 99; $headTop = 0; $hairColor = 6; $hairPallete = 0;
-	$name = "Celtos"; $str = 1; $agi = 1; $vit = 1; $int = 1; $dex = 1; $luk = 1;	$exp = 1; $zeny = 1; $jobExp = 1; $jobLevel = 50; $slot = 0; $rename = 0;
+	$name = "Poseidon"; $str = 1; $agi = 1; $vit = 1; $int = 1; $dex = 1; $luk = 1;	$exp = 1; $zeny = 1; $jobExp = 1; $jobLevel = 50; $slot = 0; $rename = 0;
 
 	# Preparing Character 1 Block
 	if ($self->{type}->{$config{server_type}}->{received_characters} eq '0B72') {
@@ -1016,6 +1036,10 @@ sub SendCharacterList
 
 	# Attaching Block
 	$data .= $block;
+
+	# Filling Character 2 Block
+	$cID = $charID;	$hp = 10000; $maxHp = 10000; $sp = 10000; $maxSp = 10000; $hairstyle = 1; $level = 99; $headTop = 0; $hairColor = 6;
+	$name = "Poseidon Dev"; $str = 1; $agi = 1; $vit = 1; $int = 1; $dex = 1; $luk = 1;	$exp = 1; $zeny = 1; $jobExp = 1; $jobLevel = 50; $slot = 1; $rename = 0;
 
 	# Preparing Character 2 Block
 	if ($self->{type}->{$config{server_type}}->{received_characters} eq '0B72') {
@@ -1302,3 +1326,7 @@ sub PerformMapLoadedTasks
 }
 
 1;
+
+# 0064 packet thanks to abt123
+# 0204 packet thanks to elhazard
+# queue the response (thanks abt123)

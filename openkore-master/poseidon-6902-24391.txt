@@ -4,10 +4,10 @@ queryserver_ip=172.65.175.75
 
 
 ### DEFINA AQUI AS PORTAS QUE O POSEIDON VAI RODAR, Exemplos abaixo.
-ragnarokserver_ports=6901,6902,6903
-queryserver_ports=24390,24391,24392
+ragnarokserver_port=6902
+queryserver_port=24391
 
 ### NAO MEXA!
-server_type=ROLA_2025-05-29
+server_type=ROla_2025-06-17
 fake_ip=
 debug=0

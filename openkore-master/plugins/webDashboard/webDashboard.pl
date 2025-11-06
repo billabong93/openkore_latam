@@ -76,6 +76,72 @@ my %cache = (
     last_character_data => {},
     last_map_data => {},
 );
+my %discovered_portals = ();  # Cache permanente de portais descobertos
+my $current_map_name = '';    # Nome do mapa atual para limpar cache ao mudar
+my %map_portals = ();  # Cache de portais por mapa carregados do arquivo
+my $portals_loaded = 0;  # Flag para carregar apenas uma vez
+
+sub load_portals_from_file {
+    return if $portals_loaded;
+    
+    # Tenta vários caminhos possíveis
+    my @possible_paths = (
+        '../tables/ROla/portals.txt',
+        '../../tables/ROla/portals.txt',
+        './tables/ROla/portals.txt',
+        'tables/ROla/portals.txt',
+    );
+    
+    my $portals_file;
+    foreach my $path (@possible_paths) {
+        if (-e $path) {
+            $portals_file = $path;
+            last;
+        }
+    }
+    
+    unless ($portals_file) {
+        warning "[webDashboard] Arquivo portals.txt não encontrado\n";
+        return;
+    }
+    
+    eval {
+        open(my $fh, '<:utf8', $portals_file) or die "Não pode abrir $portals_file: $!";
+        
+        while (my $line = <$fh>) {
+            chomp $line;
+            next if $line =~ /^#/ || $line =~ /^\s*$/;  # Pula comentários e linhas vazias
+            
+            # Formato: mapa_origem x_origem y_origem mapa_destino x_destino y_destino
+            if ($line =~ /^(\S+)\s+(\d+)\s+(\d+)\s+(\S+)\s+(\d+)\s+(\d+)/) {
+                my ($src_map, $src_x, $src_y, $dst_map, $dst_x, $dst_y) = ($1, $2, $3, $4, $5, $6);
+                
+                # Armazena portal indexado por mapa
+                push @{$map_portals{$src_map}}, {
+                    x => int($src_x),
+                    y => int($src_y),
+                    dest_map => $dst_map,
+                    dest_x => int($dst_x),
+                    dest_y => int($dst_y),
+                };
+            }
+        }
+        
+        close($fh);
+        $portals_loaded = 1;
+        
+        my $total = 0;
+        foreach my $map (keys %map_portals) {
+            $total += scalar(@{$map_portals{$map}});
+        }
+        
+        message "[webDashboard] Carregados $total portais de $portals_file\n";
+    };
+    
+    if ($@) {
+        warning "[webDashboard] Erro ao carregar portals.txt: $@\n";
+    }
+}
 
 sub onUnload {
     Plugins::delHooks($hooks);
@@ -89,6 +155,9 @@ sub onUnload {
 sub onStart {
     message "[webDashboard] Iniciando servidor web...\n";
     start_server();
+    
+    # Carrega portais do arquivo
+    load_portals_from_file();
     
     $log_hook = Log::addHook(\&onLogMessage);
     
@@ -176,6 +245,7 @@ sub onAttack {
 
 sub onMapChange {
     my ($self, $args) = @_;
+    
     # Limpa cache quando muda de mapa
     %cache = (
         last_update => 0,
@@ -183,6 +253,12 @@ sub onMapChange {
         last_character_data => {},
         last_map_data => {},
     );
+    
+    # Limpa portais descobertos ao mudar de mapa
+    if ($field && $field->baseName() && $field->baseName() ne $current_map_name) {
+        %discovered_portals = ();
+        $current_map_name = $field->baseName() || '';
+    }
 }
 
 sub onPlayerDead {
@@ -233,6 +309,12 @@ sub handle_request {
     
     if ($path eq '/' || $path eq '/index.html') {
         send_html($client);
+    }
+    elsif ($path eq '/api/reload-portals') {
+        $portals_loaded = 0;
+        %map_portals = ();
+        load_portals_from_file();
+        send_json($client, { success => 1, message => "Portais recarregados" });
     } elsif ($path eq '/api/all') {
         send_json($client, get_all_data());
     } elsif ($path eq '/api/character') {
@@ -276,8 +358,8 @@ sub handle_post_request {
             send_json($client, { success => 1 });
         }
     } elsif ($path eq '/api/skill/upgrade') {
-        if ($data && $data->{skill}) {
-            Commands::run("skills add " . $data->{skill});
+        if ($data && $data->{skill_id}) {
+            Commands::run("skills add " . $data->{skill_id});
             send_json($client, { success => 1 });
         }
     } elsif ($path eq '/api/stat/upgrade') {
@@ -533,8 +615,9 @@ sub get_character_data {
 sub get_map_data {
     return {} unless $field;
 
+    my $map_name = $field->baseName() || 'N/A';
     my %data = (
-        name   => $field->baseName() || 'N/A',
+        name   => $map_name,
         width  => _i($field->width()),
         height => _i($field->height()),
     );
@@ -547,6 +630,7 @@ sub get_map_data {
         $data{char_y} = 0;
     }
 
+    # Players
     my @players;
     if ($playersList && $playersList->can('getItems')) {
         foreach my $player (@{ $playersList->getItems() || [] }) {
@@ -564,6 +648,7 @@ sub get_map_data {
     }
     $data{players} = \@players;
 
+    # Monsters
     my @monsters;
     if ($monstersList && $monstersList->can('getItems')) {
         foreach my $monster (@{ $monstersList->getItems() || [] }) {
@@ -584,6 +669,7 @@ sub get_map_data {
     }
     $data{monsters} = \@monsters;
 
+    # NPCs
     my @npcs;
     if ($npcsList && $npcsList->can('getItems')) {
         foreach my $npc (@{ $npcsList->getItems() || [] }) {
@@ -597,19 +683,60 @@ sub get_map_data {
     }
     $data{npcs} = \@npcs;
 
+    # PORTAIS - Combina portais do arquivo com portais detectados em tempo real
     my @portals;
+    my %portal_positions;  # Para evitar duplicatas
+    
+    # Primeiro adiciona portais do arquivo para o mapa atual
+    if (exists $map_portals{$map_name}) {
+        foreach my $portal (@{$map_portals{$map_name}}) {
+            my $key = $portal->{x} . "_" . $portal->{y};
+            unless (exists $portal_positions{$key}) {
+                push @portals, {
+                    name => "Portal → " . ($portal->{dest_map} || 'Unknown'),
+                    x    => $portal->{x},
+                    y    => $portal->{y},
+                    from_file => 1,  # Marca que veio do arquivo
+                    dest_map => $portal->{dest_map},
+                    dest_x => $portal->{dest_x},
+                    dest_y => $portal->{dest_y},
+                };
+                $portal_positions{$key} = 1;
+            }
+        }
+    }
+    
+    # Depois adiciona portais detectados em tempo real (podem sobrescrever)
     if ($portalsList && $portalsList->can('getItems')) {
         foreach my $portal (@{ $portalsList->getItems() || [] }) {
             next unless $portal;
-            push @portals, {
-                name => $portal->name() || 'Portal',
-                x    => _i($portal->{pos}{x}),
-                y    => _i($portal->{pos}{y}),
-            };
+            my $x = _i($portal->{pos}{x});
+            my $y = _i($portal->{pos}{y});
+            my $key = "${x}_${y}";
+            
+            # Se já existe um portal nessa posição, atualiza o nome
+            if (exists $portal_positions{$key}) {
+                # Atualiza o nome se o portal detectado tem um nome melhor
+                for my $p (@portals) {
+                    if ($p->{x} == $x && $p->{y} == $y) {
+                        $p->{name} = $portal->name() || $p->{name};
+                        $p->{detected} = 1;  # Marca que foi detectado também
+                        last;
+                    }
+                }
+            } else {
+                push @portals, {
+                    name => $portal->name() || 'Portal',
+                    x    => $x,
+                    y    => $y,
+                    detected => 1,  # Portal detectado em tempo real
+                };
+                $portal_positions{$key} = 1;
+            }
         }
     }
+    
     $data{portals} = \@portals;
-
     $data{ai_state}    = eval { AI::state() }   // 'unknown';
     $data{ai_sequence} = eval { AI::action() }  // '';
 
@@ -708,7 +835,7 @@ sub get_skills_data {
                 level => $skill->{lv} || 0,
                 sp => $sp_cost,
                 handle => $handle,
-                id => $skill_id,
+                id => $skill_id,  # Certifica-se que o ID está sendo enviado
                 max_level => $skill->{max_lv} || 10,
             };
         }
@@ -1921,24 +2048,70 @@ function updateCharacter(char) {
             const sy = (y) => (mapData.height - y) * scaleY;
             
             if (mapData.portals) {
-                ctx.fillStyle = '#aa00ff';
-                ctx.strokeStyle = '#ff00ff';
-                ctx.lineWidth = 2;
-                mapData.portals.forEach(p => {
-                    const x = sx(p.x || 0);
-                    const y = sy(p.y || 0);
-                    ctx.beginPath();
-                    ctx.arc(x, y, 8, 0, Math.PI * 2);
-                    ctx.fill();
-                    ctx.stroke();
-                });
-            }
+            mapData.portals.forEach(p => {
+        const x = sx(p.x || 0);
+        const y = sy(p.y || 0);
+        
+        // Cores diferentes para portais do arquivo vs detectados
+        if (p.from_file && p.detected) {
+            // Portal confirmado (está no arquivo E foi detectado)
+            ctx.fillStyle = 'rgba(0, 255, 0, 0.8)';  // Verde
+            ctx.strokeStyle = '#00ff00';
+        } else if (p.from_file) {
+            // Portal do arquivo (ainda não detectado)
+            ctx.fillStyle = 'rgba(170, 0, 255, 0.6)';  // Roxo mais transparente
+            ctx.strokeStyle = '#aa00ff';
+        } else {
+            // Portal detectado mas não está no arquivo
+            ctx.fillStyle = 'rgba(255, 165, 0, 0.8)';  // Laranja
+            ctx.strokeStyle = '#ffa500';
+        }
+        
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(x, y, 8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        
+        // Adiciona efeito de destaque
+        ctx.strokeStyle = ctx.fillStyle.replace('0.', '0.3');
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(x, y, 12, 0, Math.PI * 2);
+        ctx.stroke();
+        
+        // Se tem informação de destino, mostra uma pequena seta
+        if (p.dest_map) {
+            ctx.fillStyle = '#fff';
+            ctx.font = '10px Arial';
+            ctx.fillText('→', x - 4, y + 3);
+        }
+    });
+}
+// Adicione uma legenda no mapa
+const mapLegend = document.createElement('div');
+mapLegend.style.cssText = `
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    background: rgba(0,0,0,0.8);
+    padding: 5px 10px;
+    border-radius: 5px;
+    font-size: 0.75em;
+    z-index: 10;
+`;
+mapLegend.innerHTML = `
+    <div style="color: #00ff00;">● Portal Confirmado</div>
+    <div style="color: #aa00ff;">● Portal Esperado</div>
+    <div style="color: #ffa500;">● Portal Novo</div>
+`;
+document.getElementById('mapContainer').appendChild(mapLegend);
             
             if (mapData.monsters) {
                 mapData.monsters.forEach(m => {
                     const x = sx(m.x || 0);
                     const y = sy(m.y || 0);
-                    ctx.fillStyle = '#ff4444';
+                    ctx.fillStyle = '#ff0000ff';
                     ctx.beginPath();
                     ctx.arc(x, y, 6, 0, Math.PI * 2);
                     ctx.fill();
@@ -1970,7 +2143,7 @@ function updateCharacter(char) {
             
             ctx.fillStyle = 'rgba(68,255,68,0.3)';
             ctx.beginPath();
-            ctx.arc(cx, cy, 14, 0, Math.PI * 2);
+            ctx.arc(cx, cy, 5, 0, Math.PI * 2);
             ctx.fill();
             ctx.fillStyle = '#44ff44';
             ctx.beginPath();
@@ -2022,33 +2195,34 @@ function updateInventory(inv) {
 
         
         function updateSkills(skills) {
-            if (!skills) return;
+    if (!skills) return;
+    
+    const list = document.getElementById('skillsList');
+    const skillPoints = parseInt(document.getElementById('skillPoints').textContent) || 0;
+    list.innerHTML = '';
+    
+    if (skills.skills && skills.skills.length > 0) {
+        skills.skills.forEach(skill => {
+            const div = document.createElement('div');
+            div.className = 'skill-item';
             
-            const list = document.getElementById('skillsList');
-            const skillPoints = parseInt(document.getElementById('skillPoints').textContent) || 0;
-            list.innerHTML = '';
+            // CORREÇÃO: Passa o ID da skill em vez do handle
+            const upgradeBtn = skillPoints > 0 && skill.id ? 
+                `<button class="skill-btn" onclick="upgradeSkill(${skill.id})">+ Upar</button>` :
+                '';
             
-            if (skills.skills && skills.skills.length > 0) {
-                skills.skills.forEach(skill => {
-                    const div = document.createElement('div');
-                    div.className = 'skill-item';
-                    
-                    const upgradeBtn = skillPoints > 0 ? 
-                        `<button class="skill-btn" onclick="upgradeSkill('${skill.handle}')">+ Upar</button>` :
-                        '';
-                    
-                    div.innerHTML = `
-                        <div class="skill-info">
-                            <div class="skill-name">${skill.name}</div>
-                            <div class="skill-details">Lv. ${skill.level} | SP: ${skill.sp}</div>
-                        </div>
-                        ${upgradeBtn}
-                    `;
-                    
-                    list.appendChild(div);
-                });
-            }
-        }
+            div.innerHTML = `
+                <div class="skill-info">
+                    <div class="skill-name">${skill.name}</div>
+                    <div class="skill-details">Lv. ${skill.level}/${skill.max_level} | SP: ${skill.sp} | ID: ${skill.id}</div>
+                </div>
+                ${upgradeBtn}
+            `;
+            
+            list.appendChild(div);
+        });
+    }
+}
         
         function updateMonstersList(monsters) {
             const list = document.getElementById('monstersList');
@@ -2152,9 +2326,9 @@ function updateInventory(inv) {
             await apiPost('/api/stat/upgrade', { stat });
         }
         
-        async function upgradeSkill(handle) {
-            await apiPost('/api/skill/upgrade', { skill: handle });
-        }
+        async function upgradeSkill(skillId) {
+    await apiPost('/api/skill/upgrade', { skill_id: skillId });
+}
         
         async function apiPost(url, data) {
             try {

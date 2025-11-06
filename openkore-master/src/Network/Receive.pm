@@ -73,7 +73,7 @@ our %EXPORT_TAGS = (
 						REFUSE_SSO_NOTHING_USER REFUSE_SSO_OTHER_2 REFUSE_SSO_WRONG_RATETYPE_1 REFUSE_SSO_EXTENSION_PCBANG_TIME
 						REFUSE_SSO_WRONG_RATETYPE_2 REFUSE_UNKNOWN REFUSE_INVALID_ID2 REFUSE_BLOCKED_ID REFUSE_BLOCKED_COUNTRY REFUSE_INVALID_PASSWD2
 						REFUSE_EMAIL_NOT_CONFIRMED2 REFUSE_BILLING REFUSE_BILLING2 REFUSE_WEB REFUSE_CHANGE_PASSWD_FORCE2 REFUSE_SERVER_ERROR
-						REFUSE_SERVER_ERROR2 REFUSE_SERVER_ERROR3 REFUSE_ACCOUNT_NOT_PREMIUM)],
+						REFUSE_SERVER_ERROR2 REFUSE_SERVER_ERROR3 REFUSE_ACCOUNT_NOT_PREMIUM REFUSE_BAN_ACCOUNT)],
 	stat_info => [qw(VAR_SPEED VAR_EXP VAR_JOBEXP VAR_VIRTUE VAR_HONOR VAR_HP VAR_MAXHP VAR_SP VAR_MAXSP VAR_POINT VAR_HAIRCOLOR VAR_CLEVEL VAR_SPPOINT
 						VAR_STR VAR_AGI VAR_VIT VAR_INT VAR_DEX VAR_LUK VAR_JOB VAR_MONEY VAR_SEX VAR_MAXEXP VAR_MAXJOBEXP VAR_WEIGHT VAR_MAXWEIGHT VAR_POISON
 						VAR_STONE VAR_CURSE VAR_FREEZING VAR_SILENCE VAR_CONFUSION VAR_STANDARD_STR VAR_STANDARD_AGI VAR_STANDARD_VIT VAR_STANDARD_INT
@@ -203,6 +203,7 @@ use constant {
 	REFUSE_SSO_WRONG_RATETYPE_1 => 0x13c1,
 	REFUSE_SSO_EXTENSION_PCBANG_TIME => 0x13c2,
 	REFUSE_SSO_WRONG_RATETYPE_2 => 0x13c3,
+	REFUSE_BAN_ACCOUNT => 0x13c6,
 
 	# 0x0AE0
 	REFUSE_UNKNOWN => 0x1450,
@@ -1262,15 +1263,12 @@ sub map_loaded {
 		ai_clientSuspend(0, $timeout{'ai_clientSuspend'}{'timeout'});
 	} else {
 		$messageSender->sendReqRemainTime() if (grep { $masterServer->{serverType} eq $_ } qw(Zero Sakray));
-
 		$messageSender->sendMapLoaded();
-
 		$messageSender->sendSync(1);
 
 		# Request for Guild Information
 		$messageSender->sendGuildRequestInfo(0) unless (grep { $masterServer->{serverType} eq $_ } qw(twRO ROla)); # some servers does not send this packet
-
-		$messageSender->sendRequestCashItemsList() if (grep { $masterServer->{serverType} eq $_ } qw(bRO idRO_Renewal twRO ROla)); # tested at bRO 2013.11.30, request for cashitemslist
+		$messageSender->sendRequestCashItemsList() if (grep { $masterServer->{serverType} eq $_ } qw(bRO idRO_Renewal twRO ROla)); # tested at bRO 2013.11.30, request for cashitemslist		
 		$messageSender->sendCashShopOpen() if ($config{whenInGame_requestCashPoints});
 
 		# request to unfreeze char - alisonrag
@@ -1632,31 +1630,6 @@ our %stat_info_handlers = (
 #
 # Notification about a homunculus status parameter change.
 # 07DB <var id>.W <value>.L
-
-
-sub detector_de_macro {
-    my ($self, $args) = @_;
-    
-    $self->{contador_detector} ||= 0;
-    $self->{contador_detector}++;
-    
-    message "[Anti-Bot] Detector recebido pela $self->{contador_detector}ª vez!\n", "warning";
-    
-    my $tempo_base = 2 + ($self->{contador_detector} * 2);
-    my $tempo_aleatorio = int(rand(5));
-    my $tempo_total = $tempo_base + $tempo_aleatorio;
-    
-    message "[Anti-Bot] Aguardando $tempo_total segundos...\n", "system";
-    
-    $timeout{relogar}{time} = time + $tempo_total;
-    $net->serverDisconnect();
-    $timeout{reconectar}{time} = time + $tempo_total + 10;
-    
-    $config{dcOnServerClose} = 1;
-    $config{reconnectAuto} = 1;
-    $config{dcOnServerShutDown} = 1;
-}
-
 sub stat_info {
 	my ($self, $args) = @_;
 
@@ -3089,136 +3062,8 @@ sub homunculus_info {
 # effect: unknown, may be missing
 #
 # Minimap indicator.
-
-our $last_cart_update = 0;
-our $last_inventory_update = 0;
-our $last_storage_update = 0;
-our $last_map_change_time  = 0;
-our $minimap_indicator_suppress_until = 0;
-our %minimap_indicator_suppress_actor_until;
-our %minimap_indicator_suppress_coord_until;
-
-use constant MINIMAP_INDICATOR_SUPPRESS_DURATION => 2;
-
-# Atualização do timestamp no mapload
-Plugins::addHook('map_loaded', sub {
-    $last_map_change_time = time;
-});
-
-sub _extend_minimap_indicator_suppression {
-    my ($duration) = @_;
-    $duration ||= MINIMAP_INDICATOR_SUPPRESS_DURATION;
-
-    my $candidate = time + $duration;
-    if ($candidate > $minimap_indicator_suppress_until) {
-        $minimap_indicator_suppress_until = $candidate;
-    }
-}
-
-sub _suppress_minimap_indicator_for_actor {
-    my ($actorID, $duration) = @_;
-    return unless defined $actorID;
-
-    $duration ||= MINIMAP_INDICATOR_SUPPRESS_DURATION;
-    my $candidate = time + $duration;
-    my $current   = $minimap_indicator_suppress_actor_until{$actorID} // 0;
-
-    if ($candidate > $current) {
-        $minimap_indicator_suppress_actor_until{$actorID} = $candidate;
-    }
-}
-
-sub _suppress_minimap_indicator_for_coord {
-    my ($x, $y, $duration) = @_;
-    return unless defined $x && defined $y;
-
-    $duration ||= MINIMAP_INDICATOR_SUPPRESS_DURATION;
-    my $candidate = time + $duration;
-    my $key       = join ',', $x, $y;
-    my $current   = $minimap_indicator_suppress_coord_until{$key} // 0;
-
-    if ($candidate > $current) {
-        $minimap_indicator_suppress_coord_until{$key} = $candidate;
-    }
-}
-
 sub minimap_indicator {
 	my ($self, $args) = @_;
-
-
-    ########## Fix spam indicadores ############
-	
-    return unless defined $Globals::char;
-	
-	my $now = time;
-
-    if (defined(my $actor_id = $args->{npcID})) {
-        if (my $until = $minimap_indicator_suppress_actor_until{$actor_id}) {
-            if ($now <= $until) {
-                return;
-            }
-            delete $minimap_indicator_suppress_actor_until{$actor_id};
-        }
-    }
-
-    if (defined $args->{x} && defined $args->{y}) {
-        my $key = join ',', $args->{x}, $args->{y};
-        if (my $until = $minimap_indicator_suppress_coord_until{$key}) {
-            if ($now <= $until) {
-                return;
-            }
-            delete $minimap_indicator_suppress_coord_until{$key};
-        }
-    }
-
-    if ($now <= $minimap_indicator_suppress_until) {
-        return;
-    }
-	
-    # Pra não falhar em quests (effect == 1)
-    if (defined $args->{effect} && $args->{effect} == 1) {
-        # Mesmo que haja atualização de inventário, mostrar o indicador
-        my $color_str = "[R:$args->{red}, G:$args->{green}, B:$args->{blue}, A:$args->{alpha}]";
-        my $indicator = T("*Quest!*");
-        message TF("%s shown %s at location %d, %d with the color %s\n",
-            $args->{actor}, $indicator, @{$args}{qw(x y)}, $color_str),
-            'effect';
-        return;
-    }
-
-    # Delay dos indicadores (s)
-    my $allow_due_to_map_change = ($now - $last_map_change_time < 5);
-
-    unless ($allow_due_to_map_change) {
-        # Ignora se o armazém estiver aberto ou sendo carregado
-        if ($Globals::char->storage && ($Globals::char->storage->isReady || $Globals::char->storage->wasOpenedThisSession)) {
-            if ($now - $last_storage_update < 1) {
-                return;
-            }
-            $last_storage_update = $now;
-        }
-
-        # Ignora se o carrinho estiver sendo manipulado
-        if ($Globals::char->cart && scalar($Globals::char->cart->getItems()) > 0) {
-            if ($now - $last_cart_update < 1) {
-                return;
-            }
-            $last_cart_update = $now;
-        }
-
-        # Ignora se estiver processando lista de itens
-        if (defined $Network::Receive::current_item_list && $Network::Receive::current_item_list != 0) {
-            return;
-        }
-
-        # Ignora se estiver manipulando inventário
-        if ($Globals::char->{inventory} && scalar($Globals::char->{inventory}->getItems()) > 0) {
-            if ($now - $last_inventory_update < 1) {
-                return;
-            }
-            $last_inventory_update = $now;
-        }
-    }
 
 	my $color_str = "[R:$args->{red}, G:$args->{green}, B:$args->{blue}, A:$args->{alpha}]";
 	my $indicator = T("minimap indicator");
@@ -3828,8 +3673,6 @@ sub arrow_equipped {
 sub inventory_item_added {
 	my ($self, $args) = @_;
 
-	  local $Network::Receive::in_item_context = 1;
-
 	return unless changeToInGameState();
 
 	my ($index, $amount, $fail) = ($args->{ID}, $args->{amount}, $args->{fail});
@@ -3925,9 +3768,6 @@ sub inventory_item_removed {
 		inventoryItemRemoved($item->{binID}, $args->{amount});
 		Plugins::callHook('packet_item_removed', {index => $item->{binID}});
 	}
-	
-	_suppress_minimap_indicator_for_actor($accountID);
-    _extend_minimap_indicator_suppression();
 }
 
 # 0299
@@ -4670,60 +4510,54 @@ sub cash_shop_buy_result {
 
 }
 
- sub sprite_change {
- 	my ($self, $args) = @_;
- 
- 	my ($ID, $type, $value1, $value2) = @{$args}{qw(ID type value1 value2)};
- 	my $player = ($ID ne $accountID)? $playersList->getByID($ID) : $char;
- 	return unless $player;
- 
- 	if ($type == 0) {
- 		$player->{jobID} = $value1;
- 		message TF("%s changed Job to: %s\n", $player, $jobs_lut{$value1}), "parseMsg_statuslook";
- 
- 	} elsif ($type == 2) {
- 		if ($value1 ne $player->{weapon}) {
- 			message TF("%s changed Weapon to %s (%d)\n", $player, itemName({nameID => $value1}), $value1), "parseMsg_statuslook", 2;
- 			$player->{weapon} = $value1;
- 		}
- 		if ($value2 ne $player->{shield}) {
- 			message TF("%s changed Shield to %s (%d)\n", $player, itemName({nameID => $value2}), $value2), "parseMsg_statuslook", 2;
- 			$player->{shield} = $value2;
- 		}
-    } elsif ($type == 3) {
-		if ($ID ne $accountID) {
-			message TF("%s changed Lower headgear to %s (%d)\n", $player, headgearName($value1), $value1), "parseMsg_statuslook";
+sub sprite_change {
+	my ($self, $args) = @_;
+
+	my ($ID, $type, $value1, $value2) = @{$args}{qw(ID type value1 value2)};
+	my $player = ($ID ne $accountID)? $playersList->getByID($ID) : $char;
+	return unless $player;
+
+	if ($type == 0) {
+		$player->{jobID} = $value1;
+		message TF("%s changed Job to: %s\n", $player, $jobs_lut{$value1}), "parseMsg_statuslook";
+
+	} elsif ($type == 2) {
+		if ($value1 ne $player->{weapon}) {
+			message TF("%s changed Weapon to %s (%d)\n", $player, itemName({nameID => $value1}), $value1), "parseMsg_statuslook", 2;
+			$player->{weapon} = $value1;
 		}
+		if ($value2 ne $player->{shield}) {
+			message TF("%s changed Shield to %s (%d)\n", $player, itemName({nameID => $value2}), $value2), "parseMsg_statuslook", 2;
+			$player->{shield} = $value2;
+		}
+	} elsif ($type == 3) {
+		message TF("%s changed Lower headgear to %s (%d)\n", $player, headgearName($value1), $value1), "parseMsg_statuslook";
 		$player->{headgear}{low} = $value1;
 	} elsif ($type == 4) {
-	if ($ID ne $accountID) {
 		message TF("%s changed Upper headgear to %s (%d)\n", $player, headgearName($value1), $value1), "parseMsg_statuslook";
-	}
-	$player->{headgear}{top} = $value1;
+		$player->{headgear}{top} = $value1;
 	} elsif ($type == 5) {
-	if ($ID ne $accountID) {
 		message TF("%s changed Middle headgear to %s (%d)\n", $player, headgearName($value1), $value1), "parseMsg_statuslook";
-	}
-	$player->{headgear}{mid} = $value1;
- 	} elsif ($type == 6) {
-  		message TF("%s changed Hair color to: %s (%d)\n", $player, $haircolors{$value1}, $value1), "parseMsg_statuslook";
- 		$player->{hair_color} = $value1;
- 	} elsif ($type == 9) {
- 		if ($player->{shoes} && $value1 ne $player->{shoes}) {
- 			message TF("%s changed Shoes to: %s\n", $player, itemName({nameID => $value1})), "parseMsg_statuslook", 2;
+		$player->{headgear}{mid} = $value1;
+	} elsif ($type == 6) {
+ 		message TF("%s changed Hair color to: %s (%d)\n", $player, $haircolors{$value1}, $value1), "parseMsg_statuslook";
+		$player->{hair_color} = $value1;
+	} elsif ($type == 9) {
+		if ($player->{shoes} && $value1 ne $player->{shoes}) {
+			message TF("%s changed Shoes to: %s\n", $player, itemName({nameID => $value1})), "parseMsg_statuslook", 2;
 		}
- 		$player->{shoes} = $value1;
- 	} elsif ($type == 12) {
-  		message TF("%s changed Robe to: SPRITE_ROBE_ID=%d\n", $player, $value1, $value1), "parseMsg_statuslook", 2;
- 	} elsif ($type== 7 || $type == 13) {
- 		# Type 7 looks like body palette or body color. Type 13 looks like body2
- 		debug sprintf("%s changed type= %d. value1=%d, value2=%d\n", $player, $type, $value1, $value2);
- 	} else {
- 		error TF("%s changed unknown sprite type (%d), write about it to OpenKore developer\n", $player, $type), "parseMsg_statuslook";
- 	}
- 	Plugins::callHook('sprite_job_change');
- }
- 
+		$player->{shoes} = $value1;
+	} elsif ($type == 12) {
+ 		message TF("%s changed Robe to: SPRITE_ROBE_ID=%d\n", $player, $value1, $value1), "parseMsg_statuslook", 2;
+	} elsif ($type== 7 || $type == 13) {
+		# Type 7 looks like body palette or body color. Type 13 looks like body2
+		debug sprintf("%s changed type= %d. value1=%d, value2=%d\n", $player, $type, $value1, $value2);
+	} else {
+		error TF("%s changed unknown sprite type (%d), write about it to OpenKore developer\n", $player, $type), "parseMsg_statuslook";
+	}
+	Plugins::callHook('sprite_job_change');
+}
+
 sub progress_bar {
 	my($self, $args) = @_;
 	message TF("Progress bar loading (time: %d).\n", $args->{time}), 'info';
@@ -5592,6 +5426,9 @@ sub login_error {
 		Misc::offlineMode();
 	} elsif ($args->{type} == REFUSE_TOKEN_EXPIRED) {
 		error TF("Your connection was refused due to expired Token.\n"), "connection";
+  	} elsif ($args->{type} == REFUSE_BAN_ACCOUNT) {
+		error TF("Your account has been banned.\n"), "connection";
+		Plugins::callHook('account_banned');
 	} else {
 		error TF("The server has denied your connection for unknown reason (%d).\n", $args->{type}), 'connection';
 	}
@@ -7153,12 +6990,6 @@ sub item_used {
 				message TF("You failed to use unknown item #%d - %d left\n", $itemID, $remaining), "useItem", 1;
 			}
 		}
-		
-		_suppress_minimap_indicator_for_actor($accountID);
-		if (defined $char->{pos_to}{x} && defined $char->{pos_to}{y}) {
-			_suppress_minimap_indicator_for_coord($char->{pos_to}{x}, $char->{pos_to}{y});
-		}
-		_extend_minimap_indicator_suppression();
 	} else {
 		my $actor = Actor::get($ID);
 		my $itemDisplay = itemNameSimple($itemID);
@@ -7215,9 +7046,6 @@ sub item_appeared {
 		item	=> $item,
 		type => $args->{type}
 	});
-	
-	_suppress_minimap_indicator_for_coord($args->{x}, $args->{y});
-    _extend_minimap_indicator_suppression();
 }
 
 sub item_exists {
@@ -7250,39 +7078,35 @@ sub item_exists {
 		show_effect => $args->{show_effect},
 		effect_type => $args->{effect_type}
 	});
-	
-	_suppress_minimap_indicator_for_coord($args->{x}, $args->{y});
-    _extend_minimap_indicator_suppression();
 }
 
 # Makes an item disappear from the ground.
 # 00A1 <id>.L (ZC_ITEM_DISAPPEAR)
 sub item_disappeared {
-	my ( $self, $args ) = @_;
+	my ($self, $args) = @_;
 	return unless changeToInGameState();
 
-	my $item = $itemsList->getByID( $args->{ID} );
-	if ( $item ) {
-		if ( $config{attackLooters} && AI::action ne "sitAuto" && pickupitems( $item->{name}, $item->{nameID} ) > 0 ) {
-			for my Actor::Monster $monster ( @$monstersList ) {    # attack looter code
-				if ( my $control = mon_control( $monster->name, $monster->{nameID} ) ) {
-					next
-						if ( ( $control->{attack_auto} ne "" && $control->{attack_auto} == -1 )
-						|| ( $control->{attack_lvl} ne ""  && $control->{attack_lvl} > $char->{lv} )
-						|| ( $control->{attack_jlvl} ne "" && $control->{attack_jlvl} > $char->{lv_job} )
-						|| ( $control->{attack_hp} ne ""   && $control->{attack_hp} > $char->{hp} )
-						|| ( $control->{attack_sp} ne ""   && $control->{attack_sp} > $char->{sp} ) );
+	my $item = $itemsList->getByID($args->{ID});
+	if ($item) {
+		if ($config{attackLooters} && AI::action ne "sitAuto" && pickupitems($item->{name}, $item->{nameID}) > 0) {
+			for my Actor::Monster $monster (@$monstersList) { # attack looter code
+				if (my $control = mon_control($monster->name,$monster->{nameID})) {
+					next if ( ($control->{attack_auto}  ne "" && $control->{attack_auto} == -1)
+						|| ($control->{attack_lvl}  ne "" && $control->{attack_lvl} > $char->{lv})
+						|| ($control->{attack_jlvl} ne "" && $control->{attack_jlvl} > $char->{lv_job})
+						|| ($control->{attack_hp}   ne "" && $control->{attack_hp} > $char->{hp})
+						|| ($control->{attack_sp}   ne "" && $control->{attack_sp} > $char->{sp})
+						);
 				}
-				if ( distance( $item->{pos}, $monster->{pos} ) <= ( $config{attackLooters_dist} || 0 ) ) {
+				if (distance($item->{pos}, $monster->{pos}) <= ($config{attackLooters_dist} || 0)) {
 					my %plugin_args;
 					$plugin_args{monster} = $monster;
-					$plugin_args{item}    = $item;
-					$plugin_args{return}  = 0;
-					Plugins::callHook( 'check_attackLooter' => \%plugin_args );
-					unless ( $plugin_args{return} ) {
-						message TF( "Looter: %s looted %s - Adding it to looters list to be attacked\n",
-							$monster->nameIdx, $item->{name} ),
-							"looter";
+					$plugin_args{item} = $item;
+					$plugin_args{return} = 0;
+					Plugins::callHook('check_attackLooter' => \%plugin_args);
+					unless ($plugin_args{return}) {
+						message TF("Looter: %s looted %s - Adding it to looters list to be attacked\n",
+						$monster->nameIdx, $item->{name}), "looter";
 						$monster->{attackLooters} = 1;
 						last;
 					}
@@ -7292,10 +7116,10 @@ sub item_disappeared {
 
 		debug "Item Disappeared: $item->{name} ($item->{binID})\n", "parseMsg_presence";
 		my $ID = $args->{ID};
-		$items_old{$ID}              = $item->deepCopy();
+		$items_old{$ID} = $item->deepCopy();
 		$items_old{$ID}{disappeared} = 1;
-		$items_old{$ID}{gone_time}   = time;
-		$itemsList->removeByID( $ID );
+		$items_old{$ID}{gone_time} = time;
+		$itemsList->removeByID($ID);
 	}
 }
 
@@ -7672,92 +7496,55 @@ sub npc_talk_number {
 
 # Displays an NPC dialog menu (ZC_MENU_LIST).
 # 00B7 <packet len>.W <npc id>.L <menu items>.?B
-#sub npc_talk_responses {
-#	my ($self, $args) = @_;
+sub npc_talk_responses {
+	my ($self, $args) = @_;
 
 	# 00b7: word len, long ID, string str
 	# A list of selections appeared on the NPC message dialog.
 	# Each item is divided with ':'
-#	my $msg = $args->{RAW_MSG};
+	my $msg = $args->{RAW_MSG};
 
-#	my $ID = substr($msg, 4, 4);
-#	my $nameID = unpack 'V', $ID;
-#	autoNpcTalk($ID, $nameID);
+	my $ID = substr($msg, 4, 4);
+	my $nameID = unpack 'V', $ID;
+	autoNpcTalk($ID, $nameID);
 
-#	$talk{ID} = $ID;
-#	$talk{nameID} = $nameID;
-#	my $talk = unpack("Z*", substr($msg, 8));
-#	$talk = substr($msg, 8) if (!defined $talk);
-#	$talk = bytesToString($talk);
+	$talk{ID} = $ID;
+	$talk{nameID} = $nameID;
+	my $talk = unpack("Z*", substr($msg, 8));
+	$talk = substr($msg, 8) if (!defined $talk);
+	$talk = bytesToString($talk);
 
-#	my @preTalkResponses = split /:/, $talk;
-#	$talk{responses} = [];
-#	foreach my $response (@preTalkResponses) {
+	my @preTalkResponses = split /:/, $talk;
+
+	Plugins::callHook('pre/npc_talk_responses', {
+						responses => \@preTalkResponses,
+						});
+
+	$talk{responses} = [];
+	foreach my $response (@preTalkResponses) {
 		# Remove RO color codes
-#		$response =~ s/\^[a-fA-F0-9]{6}//g;
-#		if ($response =~ /^\^nItemID\^(\d+)$/) {
-#			$response = itemNameSimple($1);
-#		}
+		$response =~ s/\^[a-fA-F0-9]{6}//g;
+		if ($response =~ /^\^nItemID\^(\d+)$/) {
+			$response = itemNameSimple($1);
+		}
 
-#		push @{$talk{responses}}, $response if ($response ne "");
-#	}
+		push @{$talk{responses}}, $response if ($response ne "");
+	}
 
-#	$talk{responses}[@{$talk{responses}}] = T("Cancel Chat");
+	$talk{responses}[@{$talk{responses}}] = T("Cancel Chat");
 
-#	$ai_v{'npc_talk'}{'ID'} = $talk{ID};
-#	$ai_v{'npc_talk'}{'talk'} = 'select';
-#	$ai_v{'npc_talk'}{'time'} = time;
+	$ai_v{'npc_talk'}{'ID'} = $talk{ID};
+	$ai_v{'npc_talk'}{'talk'} = 'select';
+	$ai_v{'npc_talk'}{'time'} = time;
 
-#	Commands::run('talk resp');
+	Commands::run('talk resp');
 
-#	my $name = getNPCName($ID);
-#	Plugins::callHook('npc_talk_responses', {
-#						ID => $ID,
-#						name => $name,
-#						responses => $talk{responses},
-#						});
-#}
-
-# npc_talk_responses sem menu
-sub npc_talk_responses {
-    my ($self, $args) = @_;
-
-    my $msg = $args->{RAW_MSG};
-    my $ID = substr($msg, 4, 4);
-    my $nameID = unpack 'V', $ID;
-    autoNpcTalk($ID, $nameID);
-
-    $talk{ID} = $ID;
-    $talk{nameID} = $nameID;
-
-    my $talk = unpack("Z*", substr($msg, 8));
-    $talk = substr($msg, 8) if (!defined $talk);
-    $talk = bytesToString($talk);
-
-    my @preTalkResponses = split /:/, $talk;
-    $talk{responses} = [];
-    foreach my $response (@preTalkResponses) {
-        $response =~ s/\^[a-fA-F0-9]{6}//g;
-        if ($response =~ /^\^nItemID\^(\d+)$/) {
-            $response = itemNameSimple($1);
-        }
-        push @{$talk{responses}}, $response if ($response ne "");
-    }
-    $talk{responses}[@{$talk{responses}}] = T("Cancel Chat");
-
-    # Atualiza AI interno
-    $ai_v{'npc_talk'}{'ID'}   = $talk{ID};
-    $ai_v{'npc_talk'}{'talk'} = 'select';
-    $ai_v{'npc_talk'}{'time'} = time;
-
-    # Commands::run('talk resp')
-    # Plugins::callHook
-    my $name = $args->{name} // getNPCName($ID) // "NPC"; 
+	my $name = getNPCName($ID);
 	Plugins::callHook('npc_talk_responses', {
-		ID        => $ID,
-		name      => $name,
-		responses => $talk{responses},
-	});
+						ID => $ID,
+						name => $name,
+						responses => $talk{responses},
+						});
 }
 
 # Displays an NPC dialog input box for numbers (ZC_OPEN_EDITDLGSTR).
@@ -8231,10 +8018,13 @@ sub remain_time_info {
 }
 
 sub received_login_token {
-    my ($self, $args) = @_;
+	my ($self, $args) = @_;
 
     # Skip in XKore mode 1 / 3
-    return if $self->{net}->version == 1;
+    if ($self->{net}->version == 1) {
+        #message "[OTP] XKore mode detected. Digite o token no cliente Ragnarok.\n", "connection";
+        return;
+    }
 
     my $master = $masterServers{$config{master}};
     my $login_type = $args->{login_type};
@@ -8253,17 +8043,19 @@ sub received_login_token {
         );
     
     } elsif ($login_type == 400 || $login_type == 1000) {
-        die 'ERROR: otpSeed is not set in config.txt' unless $config{otpSeed};
-
         my $otp;
-        Plugins::callHook('request_otp_login', { otp => \$otp, seed => $config{otpSeed} });
-    	unless (defined $otp && length $otp) { 
-			error "No Plugin returned a OTP code for account $config{username}\n", 'connection';
-			$otp = $interface->query(T(', please enter your OTP: ')); 
-		}
+        if ($config{otpSeed}) {
+            Plugins::callHook('request_otp_login', { otp => \$otp, seed => $config{otpSeed} });
+            unless (defined $otp && length $otp) {
+                error "No Plugin returned a OTP code for account $config{username}\n", 'connection';
+                $otp = $interface->query(T(', please enter your OTP: '));
+            }
+        } else {
+            $otp = $interface->query(T('Please enter your OTP code: '));
+        }
         $messageSender->sendOtpToServer($otp);
 
-	} elsif ($login_type == 300) {
+    } elsif ($login_type == 300) {
         error "OTP token malformed for account $config{username}\n", 'connection';
         my $otp = $interface->query(T('Please enter the OTP code: '));
         $messageSender->sendOtpToServer($otp);
@@ -8277,12 +8069,9 @@ sub received_login_token {
         error "Password Error for account $config{username}\n", 'connection';
         Misc::quit();
     
-    } elsif ($login_type == 900) {
-		error "You need to setup your OTP for account $config{username}\n", 'connection';
-		Misc::quit();
-	} else {
+    } else {
         error "Unknown login_type $login_type\n", 'connection';
-		Misc::quit();
+        Misc::quit();
     }
 }
 
@@ -10905,9 +10694,7 @@ sub equip_item {
 		}
 		message TF("You equip %s (%d) - %s (type %s)\n", $item->{name}, $item->{binID}, $equipTypes_lut{$item->{type_equip}}, $args->{type}), 'inventory';
 	}
-	_suppress_minimap_indicator_for_actor($accountID);
-    _extend_minimap_indicator_suppression();
-    $ai_v{temp}{waitForEquip}-- if $ai_v{temp}{waitForEquip};
+	$ai_v{temp}{waitForEquip}-- if $ai_v{temp}{waitForEquip};
 }
 
 # Acknowledgement for adding an equip to the equip switch window
@@ -10936,8 +10723,6 @@ sub equip_item_switch {
 
 		message TF("[Equip Switch] You equip %s (%d) - %s (type %s)\n", $item->{name}, $item->{binID}, $equipTypes_lut{$item->{type_equip}}, $args->{type}), 'inventory';
 	}
-	_suppress_minimap_indicator_for_actor($accountID);
-	_extend_minimap_indicator_suppression();
 	$ai_v{temp}{waitForEquip}-- if $ai_v{temp}{waitForEquip};
 }
 
@@ -11792,8 +11577,8 @@ sub skill_cast {
 	$control = mon_control($monster->name,$monster->{nameID}) if ($monster);
 	if (AI::state == AI::AUTO && $control->{skillcancel_auto}) {
 		if ($targetID eq $accountID || $dist > 0 || (AI::action eq "attack" && AI::args->{ID} ne $sourceID)) {
-			message TF( "Monster Skill - %s (%d) - Adding it to monsterSkillCancel list to be attacked\n",
-				$monster->name, $monster->{binID} );
+			message TF("Monster Skill - %s (%d) - Adding it to monsterSkillCancel list to be attacked\n",
+			$monster->name, $monster->{binID});
 			$monster->{monsterSkillCancel} = 1;
 		}
 
@@ -11900,9 +11685,6 @@ sub unequip_item {
 	if ($item) {
 		message TF("You unequip %s (%d) - %s\n",$item->{name}, $item->{binID},$equipTypes_lut{$item->{type_equip}}), 'inventory';
 	}
-	
-	_suppress_minimap_indicator_for_actor($accountID);
-    _extend_minimap_indicator_suppression();
 }
 
 # Acknowledgement for removing an equip to the equip switch window
@@ -11934,9 +11716,6 @@ sub unequip_item_switch {
 	if ($item) {
 		message TF("[Equip Switch] You unequip %s (%d) - %s\n",$item->{name}, $item->{binID},$equipTypes_lut{$item->{type_equip}}), 'inventory';
 	}
-	
-	_suppress_minimap_indicator_for_actor($accountID);
-    _extend_minimap_indicator_suppression();
 }
 
 # TODO: only used to report failure? $args->{success}
@@ -12699,6 +12478,38 @@ sub dynamicnpc_create_result {
 	}
 
 	message TF("Dynamic NPC create result - Status: %s\n", $status);
+}
+
+# 0840 - PACKET_HC_NOTIFY_ACCESSIBLE_MAPNAME
+sub parse_notify_accessible_mapname {
+    my ($self, $args) = @_;
+
+    my $mapList = {
+        len => 20,
+        types => 'V Z16',
+        keys => [qw(unknown map_name)],
+    };
+
+    @{$args->{map_list}} = map {
+        my %map;
+        @map{@{$mapList->{keys}}} = unpack($mapList->{types}, $_);
+        \%map;
+    } unpack "(a$mapList->{len})*", $args->{mapList};
+}
+
+sub notify_accessible_mapname {
+    my ($self, $args) = @_;
+	my $map_index = 0;
+
+    foreach my $i (0 .. $#{$args->{map_list}}) {
+        my $map = $args->{map_list}[$i];
+        error("[notify_accessible_mapname] unknown = $map->{unknown}, name = $map->{map_name}\n");
+        if (defined $config{saveMap} && $map->{map_name} =~ /$config{saveMap}/) {
+            $map_index = $i;
+        }
+    }
+
+	$messageSender->sendSelectAccessibleMapname($map_index);
 }
 
 1;
