@@ -16,11 +16,11 @@ use Commands;
 use File::Spec;
 
 my $PLUGIN_NAME = 'portalUIClear';
-sub _on_ai_sell_auto_done;
+sub _on_log_message;
 
 my %PORTALS_BY_MAP;
 my $PORTALS_LOADED = 0;
-my $HOOK_SELL_AUTO_DONE;
+my $HOOK_MESSAGE;
 my $HOOK_AI_POST;
 my $HOOK_MAP_CHANGED;
 my $PENDING_AFTER_SELL = 0;
@@ -28,8 +28,9 @@ my $PENDING_RETURN_ROUTE = 0;
 my $RETURN_TARGET;
 my $RETURN_DISTANCE;
 my $RETURN_BUY_ARGS;
+my $PENDING_AFTER_SELL_TIME;
 
-$HOOK_SELL_AUTO_DONE = Plugins::addHook('AI_sell_auto_done', \&_on_ai_sell_auto_done);
+$HOOK_MESSAGE      = Log::addHook(\&_on_log_message);
 $HOOK_AI_POST       = Plugins::addHook('AI_post', \&_on_ai_post);
 $HOOK_MAP_CHANGED   = Plugins::addHook('packet/map_changed', \&_on_map_changed);
 
@@ -151,17 +152,38 @@ sub after_sell {
     return 1;
 }
 
-### hooks AI ###
-sub _on_ai_sell_auto_done {
+### hooks ###
+sub _on_log_message {
+    my ($type, $domain, undef, undef, $text) = @_;
+    return unless defined $type && $type eq 'message';
+    return unless defined $domain && $domain eq 'success';
     return if $PENDING_AFTER_SELL || $PENDING_RETURN_ROUTE;
-    return unless AI::inQueue('buyAuto');
-    $PENDING_AFTER_SELL = 1;
+
+    my $clean = defined $text ? $text : '';
+    $clean =~ s/\r?\n$//;
+    return unless $clean eq 'Auto-sell sequence completed.'
+        || $clean eq "Seqüência de vendas automáticas concluída.";
+
+    $PENDING_AFTER_SELL      = 1;
+    $PENDING_AFTER_SELL_TIME = time;
 }
 
 sub _on_ai_post {
     return unless $PENDING_AFTER_SELL;
     return if AI::is('sellAuto') || AI::inQueue('sellAuto');
-    return unless AI::inQueue('buyAuto');
+
+    if (!AI::inQueue('buyAuto')) {
+        my $buy_index = AI::findAction('buyAuto');
+        unless (defined $buy_index || AI::is('buyAuto')) {
+            if (defined $PENDING_AFTER_SELL_TIME && time - $PENDING_AFTER_SELL_TIME > 5) {
+                $PENDING_AFTER_SELL      = 0;
+                $PENDING_AFTER_SELL_TIME = undef;
+            }
+        }
+        return;
+    }
+
+    $PENDING_AFTER_SELL_TIME = undef;
 
     my $buy_index = AI::findAction('buyAuto');
     return unless defined $buy_index;
@@ -268,7 +290,7 @@ Plugins::register(
 ### unload ###
 
 sub on_unload {
-    Plugins::delHook($HOOK_SELL_AUTO_DONE) if $HOOK_SELL_AUTO_DONE;
+    Log::delHook($HOOK_MESSAGE)            if defined $HOOK_MESSAGE;
     Plugins::delHook($HOOK_AI_POST)       if $HOOK_AI_POST;
     Plugins::delHook($HOOK_MAP_CHANGED)   if $HOOK_MAP_CHANGED;
     message "[$PLUGIN_NAME] Descarregado.\n";
