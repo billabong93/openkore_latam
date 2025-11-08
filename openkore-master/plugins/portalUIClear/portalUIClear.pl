@@ -15,10 +15,13 @@ use Commands;
 use File::Spec;
 
 my $PLUGIN_NAME = 'portalUIClear';
-my $ORIG_completeSell;
+sub _on_ai_sell_auto_done;
 
 my %PORTALS_BY_MAP;
 my $PORTALS_LOADED = 0;
+my $HOOK_SELL_AUTO_DONE;
+
+$HOOK_SELL_AUTO_DONE = Plugins::addHook('AI_sell_auto_done', \&_on_ai_sell_auto_done);
 
 ### utils ###
 sub _norm_map {
@@ -119,28 +122,11 @@ sub after_sell {
     Commands::run("move $x $y");
 }
 
-### hook fim do autosell ###
-BEGIN {
-    no strict 'refs';
-    no warnings 'redefine';
-
-    if (defined &AI::CoreLogic::completeNpcSell) {
-        $ORIG_completeSell = \&AI::CoreLogic::completeNpcSell;
-
-        *AI::CoreLogic::completeNpcSell = sub {
-            my @ret;
-            if (wantarray) { @ret = $ORIG_completeSell->(@_); }
-            else { my $r = $ORIG_completeSell->(@_); @ret = ($r); }
-
-            eval { portalUIClear::after_sell(); 1 } or do {
-                warning "[$PLUGIN_NAME] Erro em after_sell: $@\n";
-            };
-
-            return wantarray ? @ret : $ret[0];
-        };
-    } else {
-        warning "[$PLUGIN_NAME] Aviso: completeNpcSell não encontrado; não será possível detectar o fim do autosell.\n";
-    }
+### hooks AI ###
+sub _on_ai_sell_auto_done {
+    eval { portalUIClear::after_sell(); 1 } or do {
+        warning "[$PLUGIN_NAME] Erro em after_sell: $@\n";
+    };
 }
 
 ### registro ###
@@ -153,11 +139,7 @@ Plugins::register(
 ### unload ###
 
 sub on_unload {
-    no warnings 'redefine';
-    if ($ORIG_completeSell) {
-        *AI::CoreLogic::completeNpcSell = $ORIG_completeSell;
-        $ORIG_completeSell = undef;
-    }
+    Plugins::delHook($HOOK_SELL_AUTO_DONE) if $HOOK_SELL_AUTO_DONE;
     message "[$PLUGIN_NAME] Descarregado.\n";
 }
 
