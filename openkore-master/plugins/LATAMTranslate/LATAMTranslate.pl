@@ -7,6 +7,28 @@
 package LATAMTranslate;
 
 use strict;
+
+BEGIN {
+    require File::Basename;
+    require File::Spec;
+    require Cwd;
+
+    my $plugin_dir = Cwd::realpath(File::Basename::dirname(__FILE__));
+    my @roots = grep { defined $_ } (
+        Cwd::realpath(File::Spec->catdir($plugin_dir, '..', '..', '..')),
+        Cwd::realpath(File::Spec->catdir($plugin_dir, '..', '..')),
+        Cwd::realpath(File::Spec->catdir($plugin_dir, '..')),
+    );
+
+    for my $root (@roots) {
+        next unless defined $root;
+        for my $lib (File::Spec->catdir($root, 'src'), File::Spec->catdir($root, 'src', 'deps')) {
+            next unless defined $lib && -d $lib;
+            unshift @INC, $lib unless grep { $_ eq $lib } @INC;
+        }
+    }
+}
+
 use Plugins;
 use Globals;
 use Settings;
