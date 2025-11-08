@@ -26,6 +26,8 @@ my $HOOK_MAP_CHANGED;
 my $PENDING_AFTER_SELL = 0;
 my $PENDING_RETURN_ROUTE = 0;
 my $RETURN_TARGET;
+my $RETURN_DISTANCE;
+my $RETURN_BUY_ARGS;
 
 $HOOK_SELL_AUTO_DONE = Plugins::addHook('AI_sell_auto_done', \&_on_ai_sell_auto_done);
 $HOOK_AI_POST       = Plugins::addHook('AI_post', \&_on_ai_post);
@@ -116,6 +118,24 @@ sub _nearest_portal_xy_for_current_map {
     return ($best_x,$best_y,$best_to);
 }
 
+sub _buy_target_from_args {
+    my ($args) = @_;
+    return unless $args && $args->{npc};
+
+    my $npc = $args->{npc};
+    return unless $npc->{map} && $npc->{pos};
+
+    my $pos = $npc->{pos};
+    return unless defined $pos->{x} && defined $pos->{y};
+
+    return {
+        map  => $npc->{map},
+        x    => int($pos->{x}),
+        y    => int($pos->{y}),
+        dist => $args->{distance},
+    };
+}
+
 ### ação pós-autosell ###
 sub after_sell {
     return 0 unless $field;
@@ -133,6 +153,7 @@ sub after_sell {
 
 ### hooks AI ###
 sub _on_ai_sell_auto_done {
+    return if $PENDING_AFTER_SELL || $PENDING_RETURN_ROUTE;
     return unless AI::inQueue('buyAuto');
     $PENDING_AFTER_SELL = 1;
 }
@@ -142,27 +163,45 @@ sub _on_ai_post {
     return if AI::is('sellAuto') || AI::inQueue('sellAuto');
     return unless AI::inQueue('buyAuto');
 
+    my $buy_index = AI::findAction('buyAuto');
+    return unless defined $buy_index;
+
+    my $buy_args = AI::args($buy_index);
+    $RETURN_BUY_ARGS = $buy_args;
+
     $PENDING_AFTER_SELL = 0;
 
-    my ($cx,$cy) = _char_xy();
-    my $cur_map = ($field ? _norm_map($field->baseName) : undef);
-    if (defined $cur_map && defined $cx && defined $cy) {
-        $RETURN_TARGET = { map => $cur_map, x => $cx, y => $cy };
+    my $target = _buy_target_from_args($buy_args);
+    if ($target) {
+        $RETURN_TARGET   = { map => $target->{map}, x => $target->{x}, y => $target->{y} };
+        $RETURN_DISTANCE = $target->{dist};
     } else {
-        $RETURN_TARGET = undef;
+        my ($cx,$cy) = _char_xy();
+        my $cur_map = ($field ? _norm_map($field->baseName) : undef);
+        if (defined $cur_map && defined $cx && defined $cy) {
+            $RETURN_TARGET   = { map => $cur_map, x => $cx, y => $cy };
+            $RETURN_DISTANCE = undef;
+        } else {
+            $RETURN_TARGET   = undef;
+            $RETURN_DISTANCE = undef;
+        }
     }
 
     my $moved = eval { portalUIClear::after_sell(); };
     if (!defined $moved && $@) {
         warning "[$PLUGIN_NAME] Erro em after_sell: $@\n";
         $RETURN_TARGET = undef;
+        $RETURN_DISTANCE = undef;
+        $RETURN_BUY_ARGS = undef;
         $PENDING_RETURN_ROUTE = 0;
         return;
     }
     if ($moved) {
-        $PENDING_RETURN_ROUTE = 1 if $RETURN_TARGET;
+        $PENDING_RETURN_ROUTE = 1;
     } else {
         $RETURN_TARGET = undef;
+        $RETURN_DISTANCE = undef;
+        $RETURN_BUY_ARGS = undef;
         $PENDING_RETURN_ROUTE = 0;
     }
 }
@@ -170,29 +209,53 @@ sub _on_ai_post {
 sub _on_map_changed {
     return unless $PENDING_RETURN_ROUTE;
     $PENDING_RETURN_ROUTE = 0;
-    return unless $RETURN_TARGET;
 
     my $buy_index = AI::findAction('buyAuto');
     unless (defined $buy_index) {
         $RETURN_TARGET = undef;
+        $RETURN_DISTANCE = undef;
+        $RETURN_BUY_ARGS = undef;
         return;
     }
 
     my $args = AI::args($buy_index);
+    my $target = _buy_target_from_args($args);
+    unless ($target) {
+        $target = _buy_target_from_args($RETURN_BUY_ARGS) if $RETURN_BUY_ARGS;
+    }
+    unless ($target) {
+        if ($RETURN_TARGET) {
+            $target = { %{$RETURN_TARGET}, dist => $RETURN_DISTANCE };
+        } else {
+            warning "[$PLUGIN_NAME] Não consegui determinar o NPC de compra para retorno.\n";
+            $RETURN_TARGET = undef;
+            $RETURN_DISTANCE = undef;
+            $RETURN_BUY_ARGS = undef;
+            return;
+        }
+    }
+
     delete $args->{sentNpcTalk};
     delete $args->{sentNpcTalk_time};
     delete $args->{recv_buyList_time};
     AI::mapChanged($buy_index);
 
-    my $map = $RETURN_TARGET->{map};
-    my $x   = $RETURN_TARGET->{x};
-    my $y   = $RETURN_TARGET->{y};
+    my $map = $target->{map};
+    my $x   = $target->{x};
+    my $y   = $target->{y};
+    my $dist = $target->{dist};
     $RETURN_TARGET = undef;
+    $RETURN_DISTANCE = undef;
+    $RETURN_BUY_ARGS = undef;
 
     return unless defined $map && defined $x && defined $y;
 
     message "[$PLUGIN_NAME] Retornando ao NPC de compra em $map ($x,$y).\n";
-    AI::ai_route($map, $x, $y, attackOnRoute => 1);
+    if (defined $dist && $dist ne '') {
+        AI::ai_route($map, $x, $y, attackOnRoute => 1, distFromGoal => $dist);
+    } else {
+        AI::ai_route($map, $x, $y, attackOnRoute => 1);
+    }
 }
 
 ### registro ###
