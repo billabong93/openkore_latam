@@ -7,6 +7,23 @@
 package LATAMTranslate;
 
 use strict;
+use File::Basename qw(dirname);
+use File::Spec;
+
+BEGIN {
+        my $dir = dirname(__FILE__);
+        my $src = File::Spec->catdir($dir, '..', '..', 'src');
+        my $deps = File::Spec->catdir($src, 'deps');
+
+        $src  = File::Spec->rel2abs($src);
+        $deps = File::Spec->rel2abs($deps);
+
+        # Ensure the OpenKore core modules (Plugins.pm, etc.) are reachable when
+        # running the plugin through `perl -c` outside the runtime.
+        unshift @INC, $src unless grep { $_ eq $src } @INC;
+        unshift @INC, $deps unless grep { $_ eq $deps } @INC;
+}
+
 use Plugins;
 use Globals;
 use Settings;
@@ -16,6 +33,7 @@ use Log qw(message debug error);
 use JSON::Tiny qw(from_json to_json);
 
 our %strings_cache;
+our %monster_names;
 
 our $RE_TOKEN_BLOB = qr{
     \x1C
@@ -48,16 +66,18 @@ sub load {
 			['packet_pre/npc_talk', \&npcTalkPre, undef],
 			['pre/npc_talk_responses', \&npcTalkRespPre, undef]
 		);
-		loadJSON();
-	}
+                loadJSON();
+                loadMonsterNames();
+        }
 
 }
 
 # Plugin cleanup
 sub unload {
 	Plugins::delHooks($hooks) if ($hooks);
-	Plugins::delHooks($base_hooks) if ($base_hooks);
-	%strings_cache = ();
+        Plugins::delHooks($base_hooks) if ($base_hooks);
+        %strings_cache = ();
+        %monster_names = ();
 }
 
 # Load actor_name.json
@@ -88,7 +108,70 @@ sub loadJSON {
 
 	%strings_cache = %{$data};
 	my $count = scalar( keys %strings_cache );
-	message "[LATAMTranslate] Loaded $count actor names from strings.json\n", "LATAMTranslate";
+        message "[LATAMTranslate] Loaded $count actor names from strings.json\n", "LATAMTranslate";
+}
+
+sub _monster_name_candidates {
+        my %seen;
+        my @candidates = (
+                eval { Settings::getTableFilename('ROla/monsters_name.txt') },
+                eval { Settings::getTableFilename('monsters_name.txt') },
+                File::Spec->catfile($plugin_path, '..', '..', 'tables', 'ROla', 'monsters_name.txt'),
+                File::Spec->catfile($plugin_path, '..', '..', 'tables', 'monsters_name.txt'),
+                File::Spec->catfile('tables', 'ROla', 'monsters_name.txt'),
+                File::Spec->catfile('tables', 'monsters_name.txt'),
+        );
+
+        my @paths;
+        for my $path (@candidates) {
+                next unless defined $path && length $path;
+                if (!File::Spec->file_name_is_absolute($path)) {
+                        $path = File::Spec->rel2abs($path);
+                }
+                next if $seen{$path}++;
+                push @paths, $path;
+        }
+        return @paths;
+}
+
+sub loadMonsterNames {
+        %monster_names = ();
+
+        my $file;
+        for my $candidate (_monster_name_candidates()) {
+                if (-r $candidate) {
+                        $file = $candidate;
+                        last;
+                }
+        }
+
+        unless ($file) {
+                message "[LATAMTranslate] monsters_name.txt não encontrado; nomes de monstros não serão traduzidos.\n", "LATAMTranslate";
+                return;
+        }
+
+        my $fh;
+        unless (open $fh, '<:encoding(UTF-8)', $file) {
+                error( "[LATAMTranslate] Falha ao abrir $file: $!\n" );
+                return;
+        }
+
+        my $count = 0;
+        while (my $line = <$fh>) {
+                $line =~ s/\r?\n$//;
+                next if $line =~ /^\s*$/;
+                next if $line =~ /^\s*#/;
+
+                if ($line =~ /^([^#]+)#([^#]*)#$/) {
+                        my ($token, $name) = ($1, $2);
+                        next unless length $token;
+                        $monster_names{$token} = $name;
+                        $count++;
+                }
+        }
+        close $fh;
+
+        message "[LATAMTranslate] Loaded $count monster names from $file\n", "LATAMTranslate";
 }
 
 sub debug {
@@ -97,24 +180,26 @@ sub debug {
 }
 
 sub translate_token {
-	my ($token) = @_;
+        my ($token, $original) = @_;
 
-	if (exists $strings_cache{$token}) {
-		my $string = $strings_cache{$token};
-        	utf8::decode($string);
-		return $string;
-	} else {
-		# print warning of missing token and the hex
-		my $hex = unpack("H*", $token);
-		message("[LATAMTranslate] Missing token: $token (hex: $hex)\n");
-		return "[MISSING:$token]";
-	}
+        if (exists $strings_cache{$token}) {
+                my $string = $strings_cache{$token};
+                utf8::decode($string);
+                return $string;
+        } elsif (exists $monster_names{$token}) {
+                return $monster_names{$token};
+        } else {
+                # print warning of missing token and the hex
+                my $hex = unpack("H*", $token);
+                message("[LATAMTranslate] Missing token: $token (hex: $hex)\n");
+                return defined $original ? $original : $token;
+        }
 }
 
 # Handles composite tokens of the type: ∟ID\x1Darg0\x1Darg1...∟
 # Also supports U+2194 (↔) as a fallback separator in case it's rendered that way.
 sub translate_composite_token {
-    my ($blob) = @_;
+    my ($blob, $original) = @_;
 
     # Split into ID and parameters using 0x1D (GS) or U+2194 (↔) as separators
     my @parts = split(/\x1D|\x{2194}/, $blob);
@@ -122,7 +207,7 @@ sub translate_composite_token {
 
     # Try to find a template by ID; if not found, fallback to simple token translation (logs as MISSING)
     unless (exists $strings_cache{$id}) {
-        return translate_token($blob);
+        return translate_token($blob, $original);
     }
 
     my $template = $strings_cache{$id};
@@ -131,7 +216,7 @@ sub translate_composite_token {
     for my $i (0..$#parts) {
         my $arg = $parts[$i] // '';
         if ($arg =~ /^\x1C([[:print:]]+?)\x1C$/) {
-            $arg = translate_token($1);
+            $arg = translate_token($1, $arg);
         }
         $template =~ s/\{\Q$i\E\}/$arg/g;
     }
@@ -140,10 +225,10 @@ sub translate_composite_token {
 }
 
 sub _translate_blob {
-    my ($blob) = @_;
+    my ($blob, $original) = @_;
     return (index($blob, "\x1D") >= 0 || $blob =~ /\x{2194}/)
-        ? translate_composite_token($blob)
-        : translate_token($blob);
+        ? translate_composite_token($blob, $original)
+        : translate_token($blob, $original);
 }
 
 sub _translate_tokens_inplace {
@@ -151,7 +236,7 @@ sub _translate_tokens_inplace {
     return unless defined $$sref;
     return unless index($$sref, "\x1C") >= 0;   # fast-path
 
-    $$sref =~ s/$RE_TOKEN_BLOB/_translate_blob($1)/gex;
+    $$sref =~ s/$RE_TOKEN_BLOB/_translate_blob($1, $&)/gex;
 }
 
 sub _translate_args_field {
