@@ -32,7 +32,7 @@ my $PENDING_AFTER_SELL_TIME;
 
 $HOOK_MESSAGE      = Log::addHook(\&_on_log_message);
 $HOOK_AI_POST       = Plugins::addHook('AI_post', \&_on_ai_post);
-$HOOK_MAP_CHANGED   = Plugins::addHook('packet/map_changed', \&_on_map_changed);
+$HOOK_MAP_CHANGED   = Plugins::addHook('Network::Receive::map_changed', \&_on_map_changed);
 
 ### utils ###
 sub _norm_map {
