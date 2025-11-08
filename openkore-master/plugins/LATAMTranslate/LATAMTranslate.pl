@@ -16,6 +16,7 @@ use utf8;
 use Log qw(message debug error);
 use JSON::Tiny qw(from_json to_json);
 use Encode qw(encode_utf8);
+use File::Spec;
 use Translation qw(T TF);
 
 our %strings_cache;
@@ -105,8 +106,8 @@ sub loadJSON {
 sub loadMonsters {
     %monsters_cache = ();
 
-    my $file = Settings::getTableFilename('ROla/monsters_name.txt');
-    unless (defined $file && -r $file) {
+    my $file = _resolve_monsters_filename();
+    unless (defined $file) {
         message "[LATAMTranslate] Could not read monsters_name.txt\n", "LATAMTranslate";
         return;
     }
@@ -132,6 +133,33 @@ sub loadMonsters {
     close $fh;
 
     message "[LATAMTranslate] Loaded $count monster names from monsters_name.txt\n", "LATAMTranslate" if $count;
+}
+
+sub _resolve_monsters_filename {
+    my @candidates;
+
+    my @tables_folders;
+    eval { @tables_folders = Settings::getTablesFolders(); 1 } or @tables_folders = ();
+
+    for my $dir (@tables_folders) {
+        next unless defined $dir && $dir ne '';
+        push @candidates, File::Spec->catfile($dir, 'ROla', 'monsters_name.txt');
+        push @candidates, File::Spec->catfile($dir, 'monsters_name.txt');
+    }
+
+    push @candidates,
+        File::Spec->catfile($plugin_path, '..', '..', 'tables', 'ROla', 'monsters_name.txt'),
+        File::Spec->catfile($plugin_path, '..', 'tables', 'ROla', 'monsters_name.txt'),
+        File::Spec->catfile($plugin_path, 'tables', 'ROla', 'monsters_name.txt'),
+        File::Spec->catfile('tables', 'ROla', 'monsters_name.txt');
+
+    for my $candidate (@candidates) {
+        next unless defined $candidate;
+        my $path = File::Spec->canonpath($candidate);
+        return $path if -r $path;
+    }
+
+    return undef;
 }
 
 # ===============================
