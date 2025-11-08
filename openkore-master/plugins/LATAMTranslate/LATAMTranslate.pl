@@ -35,6 +35,11 @@ use JSON::Tiny qw(from_json to_json);
 our %strings_cache;
 our %monster_names;
 
+sub _wrap_token {
+        my ($token) = @_;
+        return defined $token ? "\x1C$token\x1C" : '';
+}
+
 our $RE_TOKEN_BLOB = qr{
     \x1C
     (
@@ -180,7 +185,7 @@ sub debug {
 }
 
 sub translate_token {
-        my ($token, $original) = @_;
+        my ($token) = @_;
 
         if (exists $strings_cache{$token}) {
                 my $string = $strings_cache{$token};
@@ -192,14 +197,14 @@ sub translate_token {
                 # print warning of missing token and the hex
                 my $hex = unpack("H*", $token);
                 message("[LATAMTranslate] Missing token: $token (hex: $hex)\n");
-                return defined $original ? $original : $token;
+                return _wrap_token($token);
         }
 }
 
 # Handles composite tokens of the type: ∟ID\x1Darg0\x1Darg1...∟
 # Also supports U+2194 (↔) as a fallback separator in case it's rendered that way.
 sub translate_composite_token {
-    my ($blob, $original) = @_;
+    my ($blob) = @_;
 
     # Split into ID and parameters using 0x1D (GS) or U+2194 (↔) as separators
     my @parts = split(/\x1D|\x{2194}/, $blob);
@@ -207,7 +212,7 @@ sub translate_composite_token {
 
     # Try to find a template by ID; if not found, fallback to simple token translation (logs as MISSING)
     unless (exists $strings_cache{$id}) {
-        return translate_token($blob, $original);
+        return translate_token($blob);
     }
 
     my $template = $strings_cache{$id};
@@ -216,7 +221,7 @@ sub translate_composite_token {
     for my $i (0..$#parts) {
         my $arg = $parts[$i] // '';
         if ($arg =~ /^\x1C([[:print:]]+?)\x1C$/) {
-            $arg = translate_token($1, $arg);
+            $arg = translate_token($1);
         }
         $template =~ s/\{\Q$i\E\}/$arg/g;
     }
@@ -225,10 +230,10 @@ sub translate_composite_token {
 }
 
 sub _translate_blob {
-    my ($blob, $original) = @_;
+    my ($blob) = @_;
     return (index($blob, "\x1D") >= 0 || $blob =~ /\x{2194}/)
-        ? translate_composite_token($blob, $original)
-        : translate_token($blob, $original);
+        ? translate_composite_token($blob)
+        : translate_token($blob);
 }
 
 sub _translate_tokens_inplace {
@@ -236,7 +241,7 @@ sub _translate_tokens_inplace {
     return unless defined $$sref;
     return unless index($$sref, "\x1C") >= 0;   # fast-path
 
-    $$sref =~ s/$RE_TOKEN_BLOB/_translate_blob($1, $&)/gex;
+    $$sref =~ s/$RE_TOKEN_BLOB/_translate_blob($1)/gex;
 }
 
 sub _translate_args_field {
