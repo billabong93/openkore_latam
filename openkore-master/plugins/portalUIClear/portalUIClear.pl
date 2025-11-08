@@ -10,6 +10,7 @@ use utf8;
 
 use Plugins;
 use Globals qw($char $field);
+use AI;
 use Log qw(message warning);
 use Commands;
 use File::Spec;
@@ -20,8 +21,11 @@ sub _on_ai_sell_auto_done;
 my %PORTALS_BY_MAP;
 my $PORTALS_LOADED = 0;
 my $HOOK_SELL_AUTO_DONE;
+my $HOOK_AI_POST;
+my $PENDING_AFTER_SELL = 0;
 
 $HOOK_SELL_AUTO_DONE = Plugins::addHook('AI_sell_auto_done', \&_on_ai_sell_auto_done);
+$HOOK_AI_POST       = Plugins::addHook('AI_post', \&_on_ai_post);
 
 ### utils ###
 sub _norm_map {
@@ -124,6 +128,15 @@ sub after_sell {
 
 ### hooks AI ###
 sub _on_ai_sell_auto_done {
+    $PENDING_AFTER_SELL = 1;
+}
+
+sub _on_ai_post {
+    return unless $PENDING_AFTER_SELL;
+    return if AI::is('sellAuto') || AI::inQueue('sellAuto');
+
+    $PENDING_AFTER_SELL = 0;
+
     eval { portalUIClear::after_sell(); 1 } or do {
         warning "[$PLUGIN_NAME] Erro em after_sell: $@\n";
     };
@@ -140,6 +153,7 @@ Plugins::register(
 
 sub on_unload {
     Plugins::delHook($HOOK_SELL_AUTO_DONE) if $HOOK_SELL_AUTO_DONE;
+    Plugins::delHook($HOOK_AI_POST)       if $HOOK_AI_POST;
     message "[$PLUGIN_NAME] Descarregado.\n";
 }
 
