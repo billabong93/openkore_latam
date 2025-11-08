@@ -7496,96 +7496,55 @@ sub npc_talk_number {
 
 # Displays an NPC dialog menu (ZC_MENU_LIST).
 # 00B7 <packet len>.W <npc id>.L <menu items>.?B
-#sub npc_talk_responses {
-#	my ($self, $args) = @_;
+sub npc_talk_responses {
+	my ($self, $args) = @_;
 
 	# 00b7: word len, long ID, string str
 	# A list of selections appeared on the NPC message dialog.
 	# Each item is divided with ':'
-#	my $msg = $args->{RAW_MSG};
+	my $msg = $args->{RAW_MSG};
 
-#	my $ID = substr($msg, 4, 4);
-#	my $nameID = unpack 'V', $ID;
-#	autoNpcTalk($ID, $nameID);
+	my $ID = substr($msg, 4, 4);
+	my $nameID = unpack 'V', $ID;
+	autoNpcTalk($ID, $nameID);
 
-#	$talk{ID} = $ID;
-#	$talk{nameID} = $nameID;
-#	my $talk = unpack("Z*", substr($msg, 8));
-#	$talk = substr($msg, 8) if (!defined $talk);
-#	$talk = bytesToString($talk);
+	$talk{ID} = $ID;
+	$talk{nameID} = $nameID;
+	my $talk = unpack("Z*", substr($msg, 8));
+	$talk = substr($msg, 8) if (!defined $talk);
+	$talk = bytesToString($talk);
 
-#	my @preTalkResponses = split /:/, $talk;
+	my @preTalkResponses = split /:/, $talk;
 
-#	Plugins::callHook('pre/npc_talk_responses', {
-#						responses => \@preTalkResponses,
-#						});
+	Plugins::callHook('pre/npc_talk_responses', {
+						responses => \@preTalkResponses,
+						});
 
-#	$talk{responses} = [];
-#	foreach my $response (@preTalkResponses) {
+	$talk{responses} = [];
+	foreach my $response (@preTalkResponses) {
 		# Remove RO color codes
-#		$response =~ s/\^[a-fA-F0-9]{6}//g;
-#		if ($response =~ /^\^nItemID\^(\d+)$/) {
-#			$response = itemNameSimple($1);
-#		}
+		$response =~ s/\^[a-fA-F0-9]{6}//g;
+		if ($response =~ /^\^nItemID\^(\d+)$/) {
+			$response = itemNameSimple($1);
+		}
 
-#		push @{$talk{responses}}, $response if ($response ne "");
-#	}
+		push @{$talk{responses}}, $response if ($response ne "");
+	}
 
-#	$talk{responses}[@{$talk{responses}}] = T("Cancel Chat");
+	$talk{responses}[@{$talk{responses}}] = T("Cancel Chat");
 
-#	$ai_v{'npc_talk'}{'ID'} = $talk{ID};
-#	$ai_v{'npc_talk'}{'talk'} = 'select';
-#	$ai_v{'npc_talk'}{'time'} = time;
+	$ai_v{'npc_talk'}{'ID'} = $talk{ID};
+	$ai_v{'npc_talk'}{'talk'} = 'select';
+	$ai_v{'npc_talk'}{'time'} = time;
 
-#	Commands::run('talk resp');
+	Commands::run('talk resp');
 
-#	my $name = getNPCName($ID);
-#	Plugins::callHook('npc_talk_responses', {
-#						ID => $ID,
-#						name => $name,
-#						responses => $talk{responses},
-#						});
-#}
-
-sub npc_talk_responses {
-    my ($self, $args) = @_;
-
-    my $msg = $args->{RAW_MSG};
-    my $ID = substr($msg, 4, 4);
-    my $nameID = unpack 'V', $ID;
-    autoNpcTalk($ID, $nameID);
-
-    $talk{ID} = $ID;
-    $talk{nameID} = $nameID;
-
-    my $talk = unpack("Z*", substr($msg, 8));
-    $talk = substr($msg, 8) if (!defined $talk);
-    $talk = bytesToString($talk);
-
-    my @preTalkResponses = split /:/, $talk;
-    $talk{responses} = [];
-    foreach my $response (@preTalkResponses) {
-        $response =~ s/\^[a-fA-F0-9]{6}//g;
-        if ($response =~ /^\^nItemID\^(\d+)$/) {
-            $response = itemNameSimple($1);
-        }
-        push @{$talk{responses}}, $response if ($response ne "");
-    }
-    $talk{responses}[@{$talk{responses}}] = T("Cancel Chat");
-
-    # Atualiza AI interno
-    $ai_v{'npc_talk'}{'ID'}   = $talk{ID};
-    $ai_v{'npc_talk'}{'talk'} = 'select';
-    $ai_v{'npc_talk'}{'time'} = time;
-
-    # Commands::run('talk resp')
-    # Plugins::callHook
-    my $name = $args->{name} // getNPCName($ID) // "NPC"; 
+	my $name = getNPCName($ID);
 	Plugins::callHook('npc_talk_responses', {
-		ID        => $ID,
-		name      => $name,
-		responses => $talk{responses},
-	});
+						ID => $ID,
+						name => $name,
+						responses => $talk{responses},
+						});
 }
 
 # Displays an NPC dialog input box for numbers (ZC_OPEN_EDITDLGSTR).
