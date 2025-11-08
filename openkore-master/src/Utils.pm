@@ -30,7 +30,7 @@ use base qw(Exporter);
 use Config;
 use FastUtils;
 
-use Globals qw($masterServer);
+use Globals qw($masterServer %monsterTokens_lut);
 use Utils::DataStructures (':all', '!/^binFind$/');
 
 
@@ -48,11 +48,12 @@ our @EXPORT = (
 	# OS-specific
 	qw(checkLaunchedApp launchApp launchScript),
 	# Other stuff
-	qw(dataWaiting dumpHash formatNumber getCoordString getCoordString2
-	getFormattedDate getFormattedDateShort getHex giveHex getRange getTickCount
-	inRange judgeSkillArea makeCoordsDir makeCoordsXY makeCoordsFromTo makeDistMap makeIP encodeIP parseArgs parse_portal_conversation_args
-	quarkToString stringToQuark shiftPack swrite timeConvert timeOut
-	urldecode urlencode unShiftPack vocalString wrapText pin_encode)
+        qw(dataWaiting dumpHash formatNumber getCoordString getCoordString2
+        getFormattedDate getFormattedDateShort getHex giveHex getRange getTickCount
+        inRange judgeSkillArea makeCoordsDir makeCoordsXY makeCoordsFromTo makeDistMap makeIP encodeIP parseArgs parse_portal_conversation_args
+        quarkToString stringToQuark shiftPack swrite timeConvert timeOut
+        urldecode urlencode unShiftPack vocalString wrapText pin_encode,
+        translateROlaMonsterName)
 );
 
 our %strings;
@@ -161,6 +162,26 @@ sub get_client_easy_solution {
 	}
 
 	return $solution;
+}
+
+sub translateROlaMonsterName {
+        my ($text) = @_;
+
+        return $text if (!defined $text);
+        return $text if (!$masterServer || !defined $masterServer->{serverType} || $masterServer->{serverType} ne 'ROla');
+        return $text if (!%monsterTokens_lut);
+
+        my $needs_translation = (index($text, "\x1C") >= 0) || (index($text, "\x{221F}") >= 0);
+        return $text unless $needs_translation;
+
+        my $result = $text;
+        $result =~ s{(\x1C|\x{221F})([^\x1C\x{221F}]+?)(\x1C|\x{221F})}{
+                my ($open, $token, $close) = ($1, $2, $3);
+                my $replacement = $monsterTokens_lut{$token};
+                defined $replacement ? $replacement : $open . $token . $close;
+        }gex;
+
+        return $result;
 }
 
 ##

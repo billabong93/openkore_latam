@@ -276,12 +276,15 @@ sub loadDataFiles {
 	Settings::addTableFile('maps.txt',
 		internalName => 'maps.txt',
 		loader => [\&parseROLUT, \%maps_lut]);
-	Settings::addTableFile('monsters.txt',
-		internalName => 'monsters.txt',
-		loader => [\&parseDataFile2, \%monsters_lut], createIfMissing => 1);
-	Settings::addTableFile('npcs.txt',
-		internalName => 'npcs.txt',
-		loader => [\&parseNPCs, \%npcs_lut], createIfMissing => 1);
+        Settings::addTableFile('monsters.txt',
+                internalName => 'monsters.txt',
+                loader => [\&parseDataFile2, \%monsters_lut], createIfMissing => 1);
+        Settings::addTableFile('ROla/monsters_name.txt',
+                internalName => 'ROla/monsters_name.txt',
+                loader => [\&parseROTokenLUT, \%monsterTokens_lut], mustExist => 0);
+        Settings::addTableFile('npcs.txt',
+                internalName => 'npcs.txt',
+                loader => [\&parseNPCs, \%npcs_lut], createIfMissing => 1);
 	Settings::addTableFile('packetdescriptions.txt',
 		internalName => 'packetdescriptions.txt',
 		loader => [\&parseSectionedFile, \%packetDescriptions], mustExist => 0);

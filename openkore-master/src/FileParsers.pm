@@ -60,7 +60,8 @@ our @EXPORT = qw(
 	parseRecvpackets
 	parseROLUT
 	parseRODescLUT
-	parseROSlotsLUT
+        parseROSlotsLUT
+        parseROTokenLUT
 	parseROQuestsLUT
 	parseSectionedFile
 	parseShopControl
@@ -130,6 +131,31 @@ sub parseAchievementFile {
 	}
 
 	return 1;
+}
+
+sub parseROTokenLUT {
+        my ($file, $r_hash) = @_;
+
+        undef %{$r_hash};
+
+        my $reader = new Utils::TextReader($file);
+        while (!$reader->eof()) {
+                my $line = $reader->readLine();
+                $line =~ s/[\r\n\x{FEFF}]//g;
+                next if ($line =~ /^\s*#/);
+                $line =~ s/^\s+|\s+$//g;
+                next if ($line eq '');
+
+                if ($line =~ /^([^#]+)#([^#]*)#/) {
+                        my ($token, $name) = ($1, $2);
+                        $token =~ s/^\s+|\s+$//g;
+                        $name =~ s/^\s+|\s+$//g;
+                        next if ($token eq '');
+                        $r_hash->{$token} = $name;
+                }
+        }
+
+        return 1;
 }
 
 sub parseArrayFile {
