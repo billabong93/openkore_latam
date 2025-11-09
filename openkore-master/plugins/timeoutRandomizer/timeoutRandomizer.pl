@@ -23,16 +23,18 @@ Plugins::register('timeoutRandomizer', 'Randomize configured timeouts within ran
 
 $hooks = Plugins::addHooks(
         ['pos_load_timeouts.txt', \&on_timeouts_loaded, undef],
+        ['start3',                \&on_start,           undef],
 );
 
 sub on_start {
-        $control_handle = Settings::addControlFile('timeout_randomizer.txt',
-                loader => [\&load_range_file], mustExist => 0, autoSearch => 1);
-        Settings::loadByHandle($control_handle);
+        if (!defined $control_handle) {
+                $control_handle = Settings::addControlFile('timeout_randomizer.txt',
+                        loader => [\&load_range_file], mustExist => 0, autoSearch => 1);
+        }
+
+        Settings::loadByHandle($control_handle) if defined $control_handle;
         apply_ranges();
 }
-
-on_start();
 
 no warnings 'redefine';
 *Utils::timeOut = sub {

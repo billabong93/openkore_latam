@@ -4,7 +4,7 @@ This plugin lets you configure random ranges for specific entries in `control/ti
 
 ## Usage
 1. Copy `plugins/timeoutRandomizer/timeoutRandomizer.pl` to your `plugins.txt` list so OpenKore loads it.
-2. Edit `control/timeout_randomizer.txt` and add the timeouts you want to randomize. Each line should contain the timeout name followed by either a single value or a minimum and maximum value.
+2. Edit `control/timeout_randomizer.txt` and add the timeouts you want to randomize. Each line should contain the timeout name followed by either a single value or a minimum and maximum value. When the `profiles` plugin is in use, the configuration is loaded from the selected profile folder (for example, `profiles/bot1/timeout_randomizer.txt`).
 3. Reload the configuration (`reload timeouts`, `reload timeout_randomizer`, or restart OpenKore).
 
 Example configuration:
