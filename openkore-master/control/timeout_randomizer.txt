@@ -1,0 +1,12 @@
+# Configure random ranges for timeout entries.
+# Each line has the format:
+#   timeout_name minimum maximum
+# You can also use "minimum..maximum" or "minimum,maximum" as shorthand.
+# Lines starting with # are ignored.
+#
+# Example:
+# ai_teleport 1 8
+# ai_attack 0.6..1.4
+# ai 3
+#
+# Remove or comment all lines if you don't want the plugin to change any timeout.
