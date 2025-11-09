@@ -37,7 +37,7 @@ sub on_start {
 }
 
 no warnings 'redefine';
-*Utils::timeOut = sub {
+*Utils::timeOut = sub ($;$) {
         my ($r_time, $timeout_value) = @_;
 
         if (!defined $timeout_value && ref($r_time) eq 'HASH') {
