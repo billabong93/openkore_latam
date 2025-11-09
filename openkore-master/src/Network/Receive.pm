@@ -7031,8 +7031,11 @@ sub item_appeared {
 	$item->{pos_to}{y} = $args->{y};
 	$itemsList->add($item) if ($mustAdd);
 
-	# Take item as fast as possible
-	if (AI::state == AI::AUTO && pickupitems($item->{name}, $item->{nameID}) == 2
+	# Take item as fast as possible only when there is no configured delay
+	my $take_delay = $timeout{ai_items_take_start}{timeout};
+	$take_delay = 0 unless defined $take_delay;
+	if ($take_delay <= 0
+	 && AI::state == AI::AUTO && pickupitems($item->{name}, $item->{nameID}) == 2
 	 && ($config{'itemsTakeAuto'} || $config{'itemsGatherAuto'})
 	 && (!$config{itemsGatherAuto_notInTown} || !$field->isCity)
 	 && (percent_weight($char) < $config{'itemsMaxWeight'})
