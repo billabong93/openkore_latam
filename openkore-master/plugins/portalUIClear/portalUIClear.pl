@@ -10,15 +10,29 @@ use utf8;
 
 use Plugins;
 use Globals qw($char $field);
+use AI;
 use Log qw(message warning);
 use Commands;
 use File::Spec;
 
 my $PLUGIN_NAME = 'portalUIClear';
-my $ORIG_completeSell;
+sub _on_log_message;
 
 my %PORTALS_BY_MAP;
 my $PORTALS_LOADED = 0;
+my $HOOK_MESSAGE;
+my $HOOK_AI_POST;
+my $HOOK_MAP_CHANGED;
+my $PENDING_AFTER_SELL = 0;
+my $PENDING_RETURN_ROUTE = 0;
+my $RETURN_TARGET;
+my $RETURN_DISTANCE;
+my $RETURN_BUY_ARGS;
+my $PENDING_AFTER_SELL_TIME;
+
+$HOOK_MESSAGE      = Log::addHook(\&_on_log_message);
+$HOOK_AI_POST       = Plugins::addHook('AI_post', \&_on_ai_post);
+$HOOK_MAP_CHANGED   = Plugins::addHook('Network::Receive::map_changed', \&_on_map_changed);
 
 ### utils ###
 sub _norm_map {
@@ -105,41 +119,164 @@ sub _nearest_portal_xy_for_current_map {
     return ($best_x,$best_y,$best_to);
 }
 
+sub _buy_target_from_args {
+    my ($args) = @_;
+    return unless $args && $args->{npc};
+
+    my $npc = $args->{npc};
+    return unless $npc->{map} && $npc->{pos};
+
+    my $pos = $npc->{pos};
+    return unless defined $pos->{x} && defined $pos->{y};
+
+    return {
+        map  => $npc->{map},
+        x    => int($pos->{x}),
+        y    => int($pos->{y}),
+        dist => $args->{distance},
+    };
+}
+
 ### ação pós-autosell ###
 sub after_sell {
-    return unless $field;
+    return 0 unless $field;
 
     my ($x,$y,$to_map) = _nearest_portal_xy_for_current_map();
     unless (defined $x) {
         warning "[$PLUGIN_NAME] Nenhum portal candidato neste mapa ou posição indisponível.\n";
-        return;
+        return 0;
     }
 
     message "[$PLUGIN_NAME] Autosell finalizado. Indo ao portal mais próximo em ($x,$y) -> $to_map.\n";
     Commands::run("move $x $y");
+    return 1;
 }
 
-### hook fim do autosell ###
-BEGIN {
-    no strict 'refs';
-    no warnings 'redefine';
+### hooks ###
+sub _on_log_message {
+    my ($type, $domain, undef, undef, $text) = @_;
+    return unless defined $type && $type eq 'message';
+    return unless defined $domain && $domain eq 'success';
+    return if $PENDING_AFTER_SELL || $PENDING_RETURN_ROUTE;
 
-    if (defined &AI::CoreLogic::completeNpcSell) {
-        $ORIG_completeSell = \&AI::CoreLogic::completeNpcSell;
+    my $clean = defined $text ? $text : '';
+    $clean =~ s/\r?\n$//;
+    return unless $clean eq 'Auto-sell sequence completed.'
+        || $clean eq "Seqüência de vendas automáticas concluída.";
 
-        *AI::CoreLogic::completeNpcSell = sub {
-            my @ret;
-            if (wantarray) { @ret = $ORIG_completeSell->(@_); }
-            else { my $r = $ORIG_completeSell->(@_); @ret = ($r); }
+    $PENDING_AFTER_SELL      = 1;
+    $PENDING_AFTER_SELL_TIME = time;
+}
 
-            eval { portalUIClear::after_sell(); 1 } or do {
-                warning "[$PLUGIN_NAME] Erro em after_sell: $@\n";
-            };
+sub _on_ai_post {
+    return unless $PENDING_AFTER_SELL;
+    return if AI::is('sellAuto') || AI::inQueue('sellAuto');
 
-            return wantarray ? @ret : $ret[0];
-        };
+    if (!AI::inQueue('buyAuto')) {
+        my $buy_index = AI::findAction('buyAuto');
+        unless (defined $buy_index || AI::is('buyAuto')) {
+            if (defined $PENDING_AFTER_SELL_TIME && time - $PENDING_AFTER_SELL_TIME > 5) {
+                $PENDING_AFTER_SELL      = 0;
+                $PENDING_AFTER_SELL_TIME = undef;
+            }
+        }
+        return;
+    }
+
+    $PENDING_AFTER_SELL_TIME = undef;
+
+    my $buy_index = AI::findAction('buyAuto');
+    return unless defined $buy_index;
+
+    my $buy_args = AI::args($buy_index);
+    $RETURN_BUY_ARGS = $buy_args;
+
+    $PENDING_AFTER_SELL = 0;
+
+    my $target = _buy_target_from_args($buy_args);
+    if ($target) {
+        $RETURN_TARGET   = { map => $target->{map}, x => $target->{x}, y => $target->{y} };
+        $RETURN_DISTANCE = $target->{dist};
     } else {
-        warning "[$PLUGIN_NAME] Aviso: completeNpcSell não encontrado; não será possível detectar o fim do autosell.\n";
+        my ($cx,$cy) = _char_xy();
+        my $cur_map = ($field ? _norm_map($field->baseName) : undef);
+        if (defined $cur_map && defined $cx && defined $cy) {
+            $RETURN_TARGET   = { map => $cur_map, x => $cx, y => $cy };
+            $RETURN_DISTANCE = undef;
+        } else {
+            $RETURN_TARGET   = undef;
+            $RETURN_DISTANCE = undef;
+        }
+    }
+
+    my $moved = eval { portalUIClear::after_sell(); };
+    if (!defined $moved && $@) {
+        warning "[$PLUGIN_NAME] Erro em after_sell: $@\n";
+        $RETURN_TARGET = undef;
+        $RETURN_DISTANCE = undef;
+        $RETURN_BUY_ARGS = undef;
+        $PENDING_RETURN_ROUTE = 0;
+        return;
+    }
+    if ($moved) {
+        $PENDING_RETURN_ROUTE = 1;
+    } else {
+        $RETURN_TARGET = undef;
+        $RETURN_DISTANCE = undef;
+        $RETURN_BUY_ARGS = undef;
+        $PENDING_RETURN_ROUTE = 0;
+    }
+}
+
+sub _on_map_changed {
+    return unless $PENDING_RETURN_ROUTE;
+    $PENDING_RETURN_ROUTE = 0;
+
+    my $buy_index = AI::findAction('buyAuto');
+    unless (defined $buy_index) {
+        $RETURN_TARGET = undef;
+        $RETURN_DISTANCE = undef;
+        $RETURN_BUY_ARGS = undef;
+        return;
+    }
+
+    my $args = AI::args($buy_index);
+    my $target = _buy_target_from_args($args);
+    unless ($target) {
+        $target = _buy_target_from_args($RETURN_BUY_ARGS) if $RETURN_BUY_ARGS;
+    }
+    unless ($target) {
+        if ($RETURN_TARGET) {
+            $target = { %{$RETURN_TARGET}, dist => $RETURN_DISTANCE };
+        } else {
+            warning "[$PLUGIN_NAME] Não consegui determinar o NPC de compra para retorno.\n";
+            $RETURN_TARGET = undef;
+            $RETURN_DISTANCE = undef;
+            $RETURN_BUY_ARGS = undef;
+            return;
+        }
+    }
+
+    delete $args->{sentNpcTalk};
+    delete $args->{sentNpcTalk_time};
+    delete $args->{recv_buyList_time};
+    AI::mapChanged($buy_index);
+
+    my $map = $target->{map};
+    my $x   = $target->{x};
+    my $y   = $target->{y};
+    my $dist = $target->{dist};
+    $RETURN_TARGET = undef;
+    $RETURN_DISTANCE = undef;
+    $RETURN_BUY_ARGS = undef;
+
+    return unless defined $map && defined $x && defined $y;
+
+    message "[$PLUGIN_NAME] Retornando ao NPC de compra em $map ($x,$y).\n";
+    if (defined $dist && $dist ne '') {
+        AI::ai_route($map, $x, $y, attackOnRoute => 1, distFromGoal => $dist);
+    } else {
+        AI::ai_route($map, $x, $y, attackOnRoute => 1);
     }
 }
 
@@ -153,11 +290,9 @@ Plugins::register(
 ### unload ###
 
 sub on_unload {
-    no warnings 'redefine';
-    if ($ORIG_completeSell) {
-        *AI::CoreLogic::completeNpcSell = $ORIG_completeSell;
-        $ORIG_completeSell = undef;
-    }
+    Log::delHook($HOOK_MESSAGE)            if defined $HOOK_MESSAGE;
+    Plugins::delHook($HOOK_AI_POST)       if $HOOK_AI_POST;
+    Plugins::delHook($HOOK_MAP_CHANGED)   if $HOOK_MAP_CHANGED;
     message "[$PLUGIN_NAME] Descarregado.\n";
 }
 

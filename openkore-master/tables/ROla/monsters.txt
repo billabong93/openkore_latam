@@ -1,0 +1,1588 @@
+1001 Escorpião
+1002 Poring
+1004 Zangão
+1005 Farmiliar
+1007 Fabre
+1008 Pupa
+1009 Condor
+1010 Salgueiro
+1011 Chonchon
+1012 Sapo de Rodda
+1013 Lobo
+1014 Esporo
+1015 Zumbi
+1016 Esqueleto Arqueiro
+1018 Creamy
+1019 PecoPeco
+1020 Mandrágora
+1023 Guerreiro Orc
+1024 Rabo-de-Verme
+1025 Jiboia
+1026 Munak
+1028 Esqueleto Soldado
+1029 Ísis
+1030 Anaconda
+1031 Poporing
+1032 Verit
+1033 Salgueiro Ancião
+1034 Sapo de Thara
+1035 Mosca Caçadora
+1036 Carniçal
+1037 Sorrateiro
+1038 Osíris
+1039 Bafomé
+1040 Golem
+1041 Múmia
+1042 Chonchon de Aço
+1044 Obeaune
+1045 Cavalo-Marinho
+1046 Doppelganger
+1047 Ovo de PecoPeco
+1048 Ovo de Besouro-Ladrão
+1049 Picky
+1050 Picky com casca
+1051 Besouro-Ladrão
+1052 Rocker
+1053 Besouro-Ladrão Fêmea
+1054 Besouro-Ladrão Macho
+1055 Muka
+1056 Fumacento
+1057 Yoyo
+1058 Metaller
+1059 Abelha-Rainha
+1060 Pé-Grande
+1061 Pesadelo
+1063 Lunático
+1064 Megalodon
+1065 Strouf
+1066 Vadon
+1067 Cornutus
+1068 Hidra
+1069 Peixe-Espada
+1070 Kukre
+1071 Esqueleto Pirata
+1072 Kaho
+1073 Caranguejo
+1074 Molusco
+1076 Esqueleto
+1077 Esporo Venenoso
+1078 Planta Vermelha
+1079 Planta Azul
+1080 Planta Verde
+1081 Planta Amarela
+1082 Planta Branca
+1083 Planta Brilhante
+1084 Cogumelo Negro
+1085 Cogumelo Vermelho
+1086 Besouro-Ladrão Dourado
+1087 Orc Herói
+1088 Vocal
+1089 Sapo-Cururu
+1090 Mastering
+1091 Libélula
+1092 Lobo Errante
+1093 Eclipse
+1094 Ambernite
+1095 Andre
+1096 Angeling
+1097 Ovo de Andre
+1098 Anubis
+1099 Argiope
+1100 Argos
+1101 Bafomé Jr.
+1102 Bathory
+1103 Caramelo
+1104 Koko
+1105 Andre
+1106 Lobo do Deserto
+1107 Filhote de Lobo do Deserto
+1108 Deviace
+1109 Deviruchi
+1110 Dokebi
+1111 Drainliar
+1112 Drake
+1113 Drops
+1114 Poeira
+1115 Eddga
+1116 Eggyra
+1117 Druida Maligno
+1118 Flora
+1119 Frilldora
+1120 Ghostring
+1121 Giearth
+1122 Goblin
+1123 Goblin
+1124 Goblin
+1125 Goblin
+1126 Goblin
+1127 Hode
+1128 Besouro-Chifre
+1129 Horong
+1130 Jakk
+1131 Coringa
+1132 Khalitzburg
+1133 Kobold
+1134 Kobold
+1135 Kobold
+1138 Magnólia
+1139 Louva-a-Deus
+1140 Marduk
+1141 Marina
+1142 Esfera Marinha
+1143 Marionete
+1144 Marte
+1145 Martin
+1146 Matyr
+1147 Maya
+1148 Medusa
+1149 Minorous
+1150 Flor do Luar
+1151 Névoa
+1152 Orc Esqueleto
+1153 Orc Zumbi
+1154 Pasana
+1155 Petite
+1156 Petite Voador
+1157 Faraó
+1158 Fen
+1159 Freeoni
+1160 Andre
+1161 Plankton
+1162 Rafflesia
+1163 Raydric
+1164 Réquiem
+1165 Arenoso
+1166 Selvagem
+1167 Bebê Selvagem
+1168 Rei Escorpião
+1169 Esqueleto Operário
+1170 Sohee
+1171 Soldado Andre
+1172 Soldado Andre
+1173 Soldado Andre
+1174 Percevejo
+1175 Tarou
+1176 Vitata
+1177 Zenorc
+1178 Zerom
+1179 Sussurro
+1180 Nove Caudas
+1182 Cogumelo
+1183 Chonchon
+1184 Fabre
+1185 VIcB
+1186 Cochicho
+1188 Bongun
+1189 Orc Arqueiro
+1190 Senhor dos Orcs
+1191 Mímico
+1192 Alma Penada
+1193 Alarme
+1194 Arclouse
+1195 Rideword
+1196 Esqueleto Prisioneiro
+1197 Zumbi Prisioneiro
+1198 Sacerdote Maldito
+1199 Punk
+1200 Jirtas
+1201 Rybio
+1202 Fendark
+1203 Mysteltainn
+1204 Tirfing
+1205 Executor
+1206 Anolian
+1207 Sting
+1208 Andarilho
+1209 Cãibra
+1210 Besouro-Chifre
+1211 Escaravelho
+1212 Mão de Ferro
+1213 Grand Orc
+1214 Choco
+1215 Talo de Verme
+1216 Penomena
+1219 Cavaleiro do Abismo
+1220 Lobo do Deserto
+1221 Selvagem
+1222 Guerreiro Orc
+1223 Guerreiro Orc
+1224 Esporo Venenoso
+1225 Yoyo
+1226 Kobold
+1227 Goblin
+1228 Fen
+1229 Fabre
+1230 Pupa
+1232 Ovo de PecoPeco
+1233 PecoPeco
+1234 Yoyo
+1235 Guerreiro Orc
+1236 Ovo de Andre
+1237 Andre
+1238 Andre
+1239 Andre
+1240 Picky
+1241 Picky com casca
+1242 Marin
+1243 Sasquatch
+1245 Goblin Natalino
+1246 Cookie Natalino
+1248 Soldadinho de Chumbo
+1249 Presente
+1250 Chepet
+1251 Cavaleiro da Tempestade
+1252 Hatii
+1253 Gárgula
+1254 Raggler
+1255 Nereida
+1256 Peste
+1257 Injustiçado
+1258 Goblin Arqueiro
+1259 Grifo
+1260 Moldura Maldita
+1261 Rosa Selvagem
+1262 Dragão Mutante
+1263 Xamã do Vento
+1264 Tritão
+1265 Cookie
+1266 Estrela-do-Mar
+1267 Carat
+1268 Cavaleiro Sanguinário
+1269 Relógio
+1270 Gerente
+1271 Crocodilo
+1272 Senhor das Trevas
+1273 Senhora Orc
+1274 Megalith
+1275 Alice
+1276 Raydric Arqueiro
+1277 Guardião da Floresta
+1278 Golem Estalactítico
+1279 Trilobita
+1280 Goblin a Vapor
+1281 Verme Sábio
+1282 Kobold Arqueiro
+1283 Quimera
+1287 Soldado Guardião
+1289 Maya Macho
+1290 Esqueleto General
+1291 Aparição
+1292 Diabinho
+1293 Creamy Ameaçador
+1294 Mantis Assassino
+1295 Barão Coruja
+1296 Líder Kobold
+1297 Múmia Anciã
+1298 Zumbi Mestre
+1299 Líder Goblin
+1300 Lagarta
+1301 Am Mut
+1302 Ilusão das Trevas
+1303 Zangão Gigante
+1304 Aranha Gigante
+1305 Verme Ancião
+1306 Leib Olmai
+1307 Gato de Nove Caudas
+1308 Panzer Goblin
+1309 Gajomart
+1310 Majoruros
+1311 Gullinbursti
+1312 General Tartaruga
+1313 Yakuza
+1314 Batedor
+1315 Agressor
+1316 Solidificador
+1317 Foca
+1318 Aquecedor
+1319 Congelador
+1320 Duque Coruja
+1321 Lavadeira
+1322 Coelho
+1323 Lontra
+1365 Apocalipse
+1366 Golem de Lava
+1367 Labareda
+1368 Planta Carnívora
+1369 Grand Peco
+1370 Succubus
+1371 Anjo Fajuto
+1372 Bode
+1373 Senhor dos Mortos
+1374 Inccubus
+1375 Papel
+1376 Harpia
+1377 Ancião
+1378 Pungus
+1379 Pesadelo Sombrio
+1380 Furador
+1381 Grizzly
+1382 Diabolik
+1383 Estrondo
+1384 Exterminador
+1385 Deletério
+1386 Rochoso
+1387 Ferrão
+1388 ArchAngeling
+1389 Drácula
+1390 HIgB
+1391 Pingu
+1392 Giro-Goblin
+1400 Karakasa
+1401 Shinobi
+1402 Sapo Venenoso
+1403 Zumbi Atirador
+1404 Boneco de Miyabi
+1405 Tengu
+1406 Kapha
+1408 Borboleta Sanguinária
+1409 Pirralho
+1410 Pessegueira Encantada
+1412 Ermitão Maligno
+1413 Ermitão Selvagem
+1415 Leopardo Filhote
+1416 Ninfa Perversa
+1417 Zipper
+1418 Serpente Suprema
+1492 Samurai Encarnado
+1493 Dríade
+1494 Encouraçado
+1495 Atirador de Pedras
+1497 Golem de Madeira
+1498 Artilheiro Wootan
+1499 Guerreiro Wootan
+1500 Parasita
+1502 Poring Noel
+1503 Árvore Maldita
+1504 Dullahan
+1505 Loli Ruri
+1506 Mascarado
+1507 Serial Killer
+1508 Quve
+1509 Lude
+1510 Poltergeist
+1511 Amon-Ra
+1512 Yao Jun
+1513 Mao Guai
+1514 Zhu Po Long
+1515 Filhote de Hatii
+1516 Mi Gao
+1517 Jing Guai
+1582 Deviling
+1583 Tao Gunka
+1584 Tamruan
+1586 Gato de Folha
+1587 Kraben
+1613 Metaling
+1614 Mineral
+1615 Obsidiana
+1616 Mineiros
+1617 Fornalha Velha
+1618 Ungoliant
+1619 Porcellio
+1620 Nuvem Tóxica
+1621 Nuvem Venenosa
+1622 Ursinho
+1623 Rsx 0806
+1626 Espectro de Hellion
+1627 Anopheles
+1628 Holden
+1629 Vento da Colina
+1630 Lady Branca
+1631 Donzela Verde
+1632 Gremlin
+1633 Beholder
+1634 Seyren
+1635 Eremes
+1636 Howard
+1637 Margaretha
+1638 Cecil
+1639 Kathryne
+1640 KYkB
+1641 Kokb
+1642 K4kB
+1643 LIkB
+1644 LYkB
+1645 LokB
+1646 Lorde Seyren
+1647 Algoz Eremes
+1648 Mestre Ferreiro Howard
+1649 Sumo Margaretha
+1650 Atiradora Cecil
+1651 Arquimaga Kathryne
+1652 Egnigem Cenia
+1653 Wickebine Tres
+1654 Armeyer Dinze
+1655 Errende Ebecee
+1656 Kavach Icarus
+1657 Laurell Weinder
+1658 Espadachim Egnigem
+1668 Archdam
+1669 Dimik
+1670 Dimik
+1671 Dimik (Azul)
+1672 Dimik (Laranja)
+1673 Dimik (Vermelho)
+1675 Venatu (Vermelho)
+1676 Venatu (Roxo)
+1677 Venatu (Verde)
+1678 Venatu (Laranja)
+1679 Venatu (Azul)
+1680 Vento da Colina
+1681 Gemini-S58
+1682 Remover
+1685 Vesper
+1686 Filhote de Orc
+1687 Grove
+1688 Lady Tanee
+1692 Breeze
+1693 Plasma
+1694 Plasma
+1695 Plasma
+1696 Plasma
+1697 Plasma
+1698 Palavra Morta
+1699 Mimico Antigo
+1700 Dama da Guarda
+1701 Senhora do Abrigo
+1702 Baronesa da Retribuição
+1703 Senhora do Conforto
+1704 Odium de Thanatos
+1705 Despero de Thanatos
+1706 Maero de Thanatos
+1707 Pesar de Thanatos
+1708 Memória de Thanatos
+1713 Acidus Dourado
+1714 Ferus Escarlate
+1715 Novus Escarlate
+1716 Acidus Azul
+1717 Ferus Verde
+1718 Novus Dourado
+1719 Detardeurus
+1720 Hydrolancer
+1721 Ovo de Dragão
+1734 Kiel-D-01
+1735 Alicel
+1736 Aliot
+1737 Aliza
+1738 jIkB
+1745 k4kB
+1751 Valquíria Randgris
+1752 Skogul
+1753 Frus
+1754 Skeggiold
+1761 o4kB
+1762 pIkB
+1765 mYkB
+1768 Pesar Noturno
+1769 Agav
+1770 Echio
+1771 Vanberk
+1772 Isilla
+1773 Hodremlin
+1774 Rastreador
+1775 Yeti
+1776 Siroma
+1777 Titã de Gelo
+1778 Gazeti
+1779 Ktullanux
+1780 Muscipular
+1781 Drosera
+1782 Roween
+1783 Galion
+1784 Stapo
+1785 Atroce
+1789 vokB
+1796 Aunoe
+1797 Fanat
+1829 Espadachim Guardião
+1830 Arqueiro Guardião
+1831 Salamandra
+1832 Ifrit
+1833 Kasa
+1836 Magmaring
+1837 Imp
+1838 Golpeador
+1839 Byorgue
+1851 Yakuza
+1854 Muka
+1855 Esporo Venenoso
+1856 Magnólia
+1857 Marin
+1858 Plankton
+1859 Mandrágora
+1860 Koko
+1861 Choco
+1862 Martin
+1864 Massacre
+1865 Zumbi Dilacerado
+1866 Cão Infernal
+1867 Banshee
+1869 Crânio Flamejante
+1870 Necromante
+1871 Bispo Decadente
+1873 Belzebu
+1874 Belzebu
+1880 Leshij
+1881 Les
+1882 Baba-Yaga
+1883 Kikimora
+1884 Mavka
+1885 Gorynych
+1894 Pouring
+1917 PYoB
+1918 PooB
+1919 P4oB
+1920 QIoB
+1921 QYoB
+1929 Bafomé
+1932 AIoB
+1933 AYoB
+1957 Entweihen Crothen
+1958 Esqueleto Espinhoso
+1968 Strouf
+1969 Cavalo-Marinho
+1970 Obeaune
+1971 Vadon
+1972 Marina
+1974 Banshee Master
+1975 Mestre Beholder
+1976 Cobalto
+1977 Heavy Metaling
+1978 Apocalipse Infernal
+1979 Zakudam
+1986 Tatacho
+1987 Centopéia
+1988 Nepenthes
+1989 Leão da Montanha
+1990 Mamute Rochoso
+1991 Leão de Vinhas
+1992 Cornus
+1993 Naga
+1994 Vespa Vagalume
+1995 Pinguicula
+1999 Larva de Centopéia
+2011 Carniçal
+2012 Zumbi
+2013 Draco
+2014 Ovo de Draco
+2015 Pinguicula Sombria
+2016 Elemental da Água
+2017 Rata
+2018 Duneyrr
+2019 Árvore Anciã
+2020 Rhyncho
+2021 Phylla
+2022 Sombra do Guardião
+2023 Sombra Obscura
+2024 Golem de Bradium
+2047 p4oB
+2049 qYoB
+2051 Bafomé
+2052 Senhor das Trevas
+2053 Dimik
+2061 Stapo
+2062 Poporing
+2063 Drops
+2064 Magmaring
+2065 Metaling
+2066 Anopheles
+2067 Anopheles
+2068 Boitatá
+2069 Iara
+2070 Espírito da Água
+2071 Mula Sem Cabeça
+2072 Espírito da Terra
+2073 Espírito do Vento
+2074 Curupira
+2076 Sombra da Decepção
+2077 Sombra da Ilusão
+2078 Sombra do Prazer
+2081 fYoB
+2083 Scaraba
+2084 Scaraba
+2085 Scaraba
+2086 Scaraba
+2087 Rainha Scaraba
+2088 uYoB
+2089 uooB
+2090 u4oB
+2091 vIoB
+2092 Dolomedes
+2094 Orc Herói
+2095 Pé-Grande
+2096 Osíris
+2097 Drácula
+2098 Pesadelo
+2099 Abelha-Rainha
+2100 Bafomé
+2101 Andarilho
+2102 Ilusão das Trevas
+2103 Ktullanux
+2104 Serpente Suprema
+2105 Agressor
+2106 Vesper
+2107 Bispo Decadente
+2108 Echio
+2109 Valquíria Randgris
+2110 Ifrit
+2111 Mestre Ferreiro Howard
+2113 Algoz Eremes
+2132 Aranha Pom
+2133 Louva-a-deus Angra
+2134 Chapim
+2136 Pequeno Fatum
+2137 Plagiador
+2151 Rafflesia Alnoldi
+2152 Comodo
+2153 Cendrawasih
+2154 Banaspaty
+2155 Butoijo
+2156 Leak
+2161 Scaraba Dourado
+2162 Scaraba Dourado
+2163 Scaraba Dourado
+2164 Scaraba Dourado
+2165 Rainha Scaraba Dourada
+2166 3IoB
+2167 3YoB
+2168 3ooB
+2169 34oB
+2187 Celacanto Sombrio
+2188 Celacanto Cruel
+2189 Celacanto Mutante
+2190 Celacanto Violento
+2192 Pequeno Polvo
+2194 Polvo Gigante
+2197 Eruma Vermelho
+2198 Dramoh Rei
+2199 Siorava
+2201 Sropho
+2202 Kraken
+2203 Dofle
+2204 Sedora
+2208 Montaria Selvagem
+2209 Quick Dark Shadow
+2212 Cavaleiro da Tempestade
+2221 Randel
+2222 Flamel
+2223 Celia
+2224 Chen
+2225 Gertie
+2226 Alphoccio
+2227 Trentini
+2228 JYsB
+2229 JosB
+2230 J4sB
+2231 KIsB
+2232 KYsB
+2233 KosB
+2234 K4sB
+2235 Paladino Randel
+2236 Criador Flamel
+2237 Professora Celia
+2238 Mestre Chen
+2239 Desordeira Gertie
+2240 Menestrel Alphoccio
+2241 Cigana Trentini
+2246 Guerreiro Wootan
+2247 Mi Gao
+2249 Pyuriel Furiosa
+2250 Guerreira Laura
+2251 Gioia
+2252 Elvira
+2253 General Daehyun
+2254 Samurai Soheon
+2255 Guardião Morto Kades
+2256 Rudo
+2281 WYsB
+2282 WosB
+2283 W4sB
+2284 XIsB
+2285 XYsB
+2286 XosB
+2287 X4sB
+2288 YIsB
+2306 Besouro-Ladrão Dourado
+2309 Bungisngis
+2310 Engkanto
+2311 Manananggal
+2312 Mangkukulam
+2313 Tikbalang
+2314 aIsB
+2315 Wakwak
+2316 Jejeling
+2317 Bangungot
+2318 Bangungot
+2319 Buwaya
+2320 Bakonawa
+2321 Bakonawa
+2322 Bakonawa
+2327 Bangungot
+2335 Bakonawa
+2353 Minorous do Pesadelo
+2354 Múmia do Pesadelo
+2355 Verit do Pesadelo
+2356 Mímico do Pesadelo
+2358 Arclouse do Pesadelo
+2360 Múmia Anciã do Pesadelo
+2362 Amon Ra do Pesadelo
+2363 Menblatt
+2364 Petal
+2365 Cenere
+2366 Antigo Livro Danificado
+2367 Lichtern Laguz
+2368 Lichtern Anzus
+2369 Lichtern Kenaz
+2370 Lichtern Inguz
+2371 Gerente de Bifröst
+2398 Bebê Poring
+2401 Mi4B
+2402 44wB
+2403 4owB
+2404 4YwB
+2405 5YwB
+2406 5owB
+2407 5IwB
+2408 Nv.10
+2413 Nv.10 (fogo)
+2414 Livro Fugitivo
+2415 n4sB
+2416 oIsB
+2417 oYsB
+2418 oosB
+2419 o4sB
+2420 pIsB
+2421 pYsB
+2422 posB
+2423 p4sB
+2424 qIsB
+2425 qYsB
+2426 qosB
+2427 q4sB
+2441 uYsB
+2442 uosB
+2473 Cavaleiro Desmorto
+2474 Cavaleira Desmorta
+2475 Origem da Maldição
+2476 Amdarais
+2477 bYwB
+2478 n4wB
+2479 oIwB
+2480 bIwB
+2481 bowB
+2483 Bafomé
+2485 Quimera
+2528 Verme com Rosto
+2529 Rainha Verme
+2530 Verme Sombrio com Rosto
+2532 Rainha Verme
+2533 Rainha Verme
+2534 Rainha Verme
+2535 Rainha Verme
+2540 Ovo de Verme com Rosto
+2541 Larva de Verme
+2542 Lorde Irine
+2543 Guarda de Payon
+2544 Guarda de Payon
+2549 Alphard
+2550 Sirius
+2551 Gatuna de Geffen
+2552 Valentão de Geffen
+2553 Bandido de Geffen
+2554 Mirzam
+2555 Muliphen
+2556 Wezen
+2557 Wei
+2558 Sargas
+2559 Shaula
+2560 Ahdara
+2561 Procyon
+2562 Atria
+2563 Fey Kanavion
+2603 Massacre Ágil
+2604 Zumbi Prisioneiro Brutal
+2605 Zumbi Mestre Alfa
+2606 Zumbi Feroz
+2607 Zakudam Fugaz
+2608 Yoyo Ágil
+2609 Yoyo Brutal
+2610 Rabo-de-Verme Alfa
+2611 Guerreiro Wootan Feroz
+2612 Leshij Fugaz
+2613 Lobo Ágil
+2614 Xamã do Vento Brutal
+2615 Salgueiro Alfa
+2616 Rosa Selvagem Feroz
+2617 Ninfa Perversa Fugaz
+2618 Sussurro Brutal
+2619 Co0B
+2620 Andarilho Feroz
+2621 Di0B
+2622 74wB
+2623 Dy0B
+2624 Nuvem Venenosa Alfa
+2625 Venatu Feroz (Roxo)
+2626 Baba-Yaga Fugaz
+2627 Vanberk Ágil
+2628 Vadon Brutal
+2629 Ungoliant Alfa
+2630 Espírito do Vento Feroz
+2631 Fi0B
+2632 Besouro-Ladrão Brutal
+2633 Besouro-Ladrão Alfa
+2634 Besouro-Ladrão Feroz
+2635 Sapo de Thara Fugaz
+2636 Ursinho Ágil
+2637 Tatacho Brutal
+2638 Tarou Alfa
+2639 Tamruan Feroz
+2640 Sting Fugaz
+2641 Talo de Verme Ágil
+2642 Chonchon de Aço Brutal
+2643 Stapo Alfa
+2644 Golem Estalactítico Feroz
+2645 Percevejo Fugaz
+2646 Esporo Ágil
+2647 Solidificador Brutal
+2648 Esqueleto Soldado Alfa
+2649 Esqueleto Soldado Feroz
+2650 Senhora do Conforto Fugaz
+2651 Sohee Ágil
+2652 Yeti Brutal
+2653 Jiboia Alfa
+2654 Fumacento Feroz
+2655 Rochoso Fugaz
+2656 Rochoso Ágil
+2657 Skogul Brutal
+2658 Esqueleto General Alfa
+2659 Esqueleto General Feroz
+2660 Esqueleto Operário Fugaz
+2661 Siroma Ágil
+2662 Sorrateiro Brutal
+2663 Sorrateiro Alfa
+2664 Shinobi Feroz
+2665 Senhora do Abrigo Fugaz
+2666 Molusco Ágil
+2667 Cecil Brutal
+2668 Lontra Alfa
+2669 Sedora Feroz
+2670 Escorpião Fugaz
+2671 Bebê Selvagem Ágil
+2672 Selvagem Brutal
+2673 Selvagem Alfa
+2674 Arenoso Feroz
+2675 Salamandra Fugaz
+2676 +YwB
+2677 Roween Brutal
+2678 Sapo de Rodda Alfa
+2679 Sapo de Rodda Feroz
+2680 Rocker Fugaz
+2681 Rideword Ágil
+2682 Rideword Brutal
+2683 Pirralho Alfa
+2684 Baronesa da Retribuição Feroz
+2685 Baronesa da Retribuição Fugaz
+2686 Baronesa da Retribuição Ágil
+2687 Réquiem Brutal
+2688 Remover Alfa
+2689 Eruma Vermelho Fugaz
+2690 Raydric Ágil
+2691 Raydric Brutal
+2692 Laurell Weinder Alfa
+2693 Scaraba Feroz
+2694 Raggler Fugaz
+2695 Rafflesia Ágil
+2696 Poring Alfa
+2697 Poring Feroz
+2698 Poring Fugaz
+2699 Poring Ágil
+2700 Porcellio Brutal
+2701 Poporing Alfa
+2702 Poporing Feroz
+2703 Poporing Fugaz
+2704 Sapo Venenoso Ágil
+2705 Esporo Venenoso Brutal
+2706 Plasma Alfa
+2707 Plankton Feroz
+2708 Mineiros Fugaz
+2709 Espírito da Água Ágil
+2710 Pinguicula Sombria Brutal
+2711 Pinguicula Alfa
+2712 Picky com casca Feroz
+2713 Fen Fugaz
+2714 Petite Ágil
+2715 Petite Brutal
+2716 Penomena Alfa
+2717 Penomena Feroz
+2718 PecoPeco Fugaz
+2719 Pasana Ágil
+2720 Parasita Brutal
+2721 Duque Coruja Alfa
+2722 Guerreiro Orc Feroz
+2723 Orc Zumbi Fugaz
+2724 Orc Esqueleto Ágil
+2725 Senhora Orc Brutal
+2726 Dama da Guarda Alfa
+2727 Nuvem Tóxica Feroz
+2728 Novus Escarlate Fugaz
+2729 Novus Escarlate Ágil
+2730 Novus Escarlate Brutal
+2731 Novus Escarlate Alfa
+2732 Pesadelo Sombrio Feroz
+2735 Nepenthes Brutal
+2736 Necromante Alfa
+2737 Presente Feroz
+2738 Muscipular Fugaz
+2739 Múmia Ágil
+2740 Múmia Brutal
+2741 Muka Alfa
+2742 eI0B
+2743 eY0B
+2744 eo0B
+2745 Holden Brutal
+2746 Boneco de Miyabi Alfa
+2747 Minorous Feroz
+2748 Minorous Fugaz
+2749 Minorous Ágil
+2750 Mineral Brutal
+2751 Plagiador Alfa
+2752 Mímico Feroz
+2753 Mímico Fugaz
+2754 Metaller Ágil
+2755 Metaling Brutal
+2756 Metaling Alfa
+2757 Tritão Feroz
+2758 h40B
+2759 Medusa Ágil
+2760 Martin Brutal
+2761 Marionete Alfa
+2762 Marin Feroz
+2763 Marduk Fugaz
+2764 Louva-a-Deus Ágil
+2765 Mandrágora Brutal
+2766 j40B
+2767 Majoruros Feroz
+2768 Magnólia Fugaz
+2769 Magmaring Ágil
+2770 Lunático Brutal
+2771 Lunático Alfa
+2772 Lude Feroz
+2773 Vespa Vagalume Fugaz
+2774 Loli Ruri Ágil
+2775 Pessegueira Encantada Brutal
+2776 Bebê Poring Alfa
+2777 Pequeno Fatum Feroz
+2778 Jing Guai Fugaz
+2779 Les Ágil
+2780 Leib Olmai Brutal
+2781 Gato de Folha Alfa
+2782 n40B
+2783 Oi0B
+2784 Kobold Arqueiro Ágil
+2785 Kobold Brutal
+2786 Golpeador Alfa
+2787 Encouraçado Feroz
+2788 Kasa Fugaz
+2789 Karakasa Ágil
+2790 Ísis Brutal
+2791 Isilla Alfa
+2792 Injustiçado Feroz
+2793 Mi Gao Fugaz
+2794 Titã de Gelo Ágil
+2795 Iara Brutal
+2796 Yao Jun Alfa
+2797 Mosca Caçadora Feroz
+2798 Zangão Fugaz
+2799 Scaraba Ágil
+2800 Besouro-Chifre Brutal
+2801 Hodremlin Alfa
+2802 Hode Feroz
+2803 Vento da Colina Fugaz
+2804 Vento da Colina Ágil
+2805 Grand Orc Brutal
+2806 Harpia Alfa
+2807 Harpia Feroz
+2808 Grove Fugaz
+2809 Guardião da Floresta Ágil
+2810 Grand Peco Brutal
+2811 Grand Peco Alfa
+2812 Golem Feroz
+2813 Goblin Fugaz
+2814 Goblin Ágil
+2815 Bode Brutal
+2816 Bode Alfa
+2817 wo0B
+2819 xI0B
+2821 Zangão Gigante Alfa
+2822 Carniçal Feroz
+2823 Carniçal Fugaz
+2824 Planta Carnívora Ágil
+2825 Planta Carnívora Brutal
+2826 Gárgula Alfa
+2827 Gárgula Feroz
+2828 Galion Fugaz
+2829 Foca Ágil
+2830 Congelador Brutal
+2831 Congelador Alfa
+2832 Ferus Verde Feroz
+2833 Farmiliar Fugaz
+2834 Anjo Fajuto Ágil
+2835 Fabre Brutal
+2836 Fabre Alfa
+2837 Estrondo Feroz
+2838 Druida Maligno Fugaz
+2839 Salgueiro Ancião Ágil
+2840 Salgueiro Ancião Brutal
+2841 Echio Alfa
+2842 Poeira Feroz
+2843 Dríade Ágil
+2844 Drosera Brutal
+2845 Drops Alfa
+2846 Furador Feroz
+2847 Drainliar Fugaz
+2848 Lavadeira Ágil
+2849 Draco Brutal
+2850 Dolomedes Alfa
+2851 Dokebi Feroz
+2852 Mascarado Fugaz
+2853 Dimik Ágil
+2854 Deviruchi Brutal
+2855 Filhote de Lobo do Deserto Alfa
+2856 Filhote de Lobo Feroz
+2857 Andre Fugaz
+2858 Palavra Morta Ágil
+2859 Palavra Morta Brutal
+2860 Palavra Morta Alfa
+2861 Sacerdote Maldito Feroz
+2862 Zhu Po Long Fugaz
+2863 Creamy Ágil
+2864 Cornutus Brutal
+2865 Cookie Alfa
+2866 Constant Feroz
+2867 Comodo Fugaz
+2868 Koko Ágil
+2869 Koko Brutal
+2870 Relógio Alfa
+2871 Relógio Feroz
+2872 Chonchon Fugaz
+2873 Centopéia Ágil
+2874 +o0B
+2875 40B
+2876 Lagarta Feroz
+2877 Carat Fugaz
+2878 Caramelo Ágil
+2879 40B
+2880 Breeze Alfa
+2881 Breeze Feroz
+2882 Golem de Bradium Fugaz
+2883 Borboleta Sanguinária Ágil
+2884 Pé-Grande Alfa
+2885 Bathory Feroz
+2886 Banshee Master Fugaz
+2887 Banshee Ágil
+2888 Banaspaty Brutal
+2889 Agressor Alfa
+2890 Argos Feroz
+2891 Argiope Fugaz
+2892 Argiope Ágil
+2893 Arclouse Brutal
+2894 Arclouse Alfa
+2895 Apocalipse Feroz
+2896 Scaraba Fugaz
+2897 Ey4B
+2898 Eo4B
+2899 Anolian Feroz
+2900 Angra Fugaz
+2901 Louva-a-deus Angra Ágil
+2902 Andre Brutal
+2903 Mimico Antigo Alfa
+2904 Anaconda Feroz
+2905 Ambernite Fugaz
+2906 Rafflesia Alnoldi Ágil
+2907 Crocodilo Brutal
+2908 Aliza Alfa
+2909 Alicel Feroz
+2910 Alarme Fugaz
+2911 Agav Ágil
+2912 Acidus Azul Brutal
+2913 Acidus Azul Alfa
+2916 Marca-Tempo
+2917 Despertador
+2918 Diretor
+2919 Neo Punk
+2920 Ancião Ancestral
+2921 Visconde Coruja
+2923 Marquês Coruja
+2939 Sombras das Trevas
+2940 Sombras das Trevas
+2941 Sombras das Trevas
+2942 Fanático das Trevas
+2987 Árvore Maldita Decorada
+2988 Antonio
+2989 Cookie Aterrorizante
+2991 Presente das Trevas
+2992 Lude Grotesco
+2993 Poltergeist Sangrento
+2994 Marionete Demoníaca
+2995 Ursinho Abominável
+2996 Celine Kimi
+3000 Necromante de Morroc
+3010 Caídos
+3011 Caídos
+3012 Caídos
+3013 Caídos
+3014 Caídos
+3015 Caídos
+3016 Caídos
+3017 Caídos
+3018 Caídos
+3019 Celine Kimi
+3020 Condor de Fogo
+3021 Arenoso de Fogo
+3022 Frilldora de Fogo
+3023 Golem de Fogo
+3026 5osB
+3027 Besouro Rola Brasa
+3028 6IsB
+3029 Ceifador Ankou
+3061 6YsB
+3069 Pere Dançante
+3070 Pere Cantante
+3071 Pere Cantante
+3072 Pere Dançante
+3073 Grand Pere
+3074 Vigia do Tempo
+3091 Brinaranha
+3092 Skoll
+3097 Deus Morroc
+3105 Ahat
+3106 Shenime
+3108 Jitterbug
+3109 Jitterbug
+3124 Charleston 03
+3125 Roboring
+3126 Rock Step
+3127 Transistor
+3128 Kick & Kick
+3148 Cavaleiro Desmorto
+3149 Cavaleira Desmorta
+3150 Amdarais Sombrio
+3151 Origem da Escuridão
+3153 hIwB
+3154 hYwB
+3155 howB
+3156 h4wB
+3158 iYwB
+3159 iowB
+3175 Invasores
+3176 Invasores
+3177 Invasores
+3178 Invasores
+3179 Invasores
+3180 Invasores
+3181 Ferlock
+3182 Invasores
+3183 Invasores
+3184 Invasores
+3185 Invasores
+3186 Invasores
+3187 Invasores
+3188 Ferlock
+3191 Gigantes
+3192 Gigantes
+3193 Gigantes
+3194 Gigantes
+3195 Gigantes
+3196 Gigantes
+3207 1
+3208 Alma de Eremes
+3209 Alma de Margaretha
+3210 Alma de Kathryne
+3211 Alma de Cecil
+3212 Alma de Howard
+3213 Alma de Seyren
+3217 Cobaia Cecil
+3219 Cobaia Seyren
+3220 Sicário Eremes
+3221 Arcebispa Margaretha
+3222 Sentinela Cecil
+3223 Mecânico Howard
+3224 Arcana Kathryne
+3225 Cavaleiro Rúnico Seyren
+3226 Alma de Randel
+3227 Alma de Flamel
+3228 Alma de Celia
+3229 Alma de Chen
+3230 Alma de Gertie
+3231 Alma de Alphoccio
+3232 Alma de Trentini
+3233 Cobaia Randel
+3240 Guardião Real Randel
+3241 Bioquímico Flamel
+3242 Feiticeira Celia
+3243 Shura Chen
+3244 Renegada Gertie
+3245 Trovador Alphoccio
+3246 Musa Trentini
+3247 Fumaça Verde
+3248 Robô Reparador Turbo
+3249 Robô Explorador Turbo
+3250 Robô de Sucata
+3251 Gc109
+3252 Dr815
+3254 T W O
+3255 lYwB
+3256 lIwB
+3259 Cavalo Azul Furioso
+3260 Pequeno Cavalo Azul
+3384 Poring
+3385 Lunático
+3386 Fabre
+3387 Picky
+3388 Condor
+3389 Salgueiro
+3390 Esporo
+3391 Poporing
+3392 Fumacento
+3393 Dokebi
+3394 Pé-Grande
+3395 Rabo-de-Verme
+3396 Lobo
+3397 Jiboia
+3398 Anaconda
+3399 Marin
+3400 Muka
+3401 PecoPeco
+3402 Andre
+3403 Andre
+3404 Andre
+3405 Golem
+3406 Escorpião
+3407 Chonchon
+3408 Metaller
+3409 Arenoso
+3410 Raggler
+3411 Lavadeira
+3412 Grove
+3413 Lontra
+3414 Pingu
+3415 Foca
+3416 Crocodilo
+3417 Megalodon
+3418 Trilobita
+3419 Megalith
+3420 Dríade
+3442 towB
+3443 t4wB
+3444 uIwB
+3451 tIwB
+3452 tYwB
+3490 0IwB
+3495 04wB
+3496 1YwB
+3497 1owB
+3498 14wB
+3499 2IwB
+3500 2YwB
+3501 2owB
+3502 Basilisco Guarda
+3503 24wB
+3504 3IwB
+3505 Gemaring
+3506 3owB
+3507 3YwB
+3634 Presente Gigante
+3636 Bebê Isis
+3637 Esqueleto
+3638 Esqueleto
+3639 Esqueleto
+3640 Esqueleto
+3641 Esqueleto
+3642 Esqueleto
+3643 Farmiliar
+3644 Farmiliar
+3645 Farmiliar
+3646 Farmiliar
+3647 Farmiliar
+3648 Farmiliar
+3649 Zumbi
+3650 Zumbi
+3651 Zumbi
+3652 Zumbi
+3653 Zumbi
+3654 Zumbi
+3658 Monarca Lich
+3659 Monarca Lich
+3660 Pesadelo
+3661 Pesadelo
+3662 Jakk
+3663 Jakk
+3664 Carniçal
+3665 Carniçal
+3666 Drainliar
+3667 Drainliar
+3721 Poring
+3722 Poporing
+3723 Drops
+3724 Lunático
+3725 Salgueiro
+3726 Picky
+3727 Picky com casca
+3728 Zumbi
+3729 eowB
+3736 Búfalo Fuzileiro
+3737 Búfalo Atirador
+3738 Búfalo Estripador
+3739 Coyote
+3740 Gaster
+3741 Aranha Mecânica
+3742 Purplestone
+3743 Seaanemone
+3747 Gado Fuzileiro
+3748 Gado Atirador
+3749 Gado Estripador
+3750 y44B
+3752 zY4B
+3753 zo4B
+3754 z44B
+3755 0I4B
+3759 vo4B
+3760 vY4B
+3761 uY4B
+3762 v44B
+3763 uI4B
+3764 u44B
+3765 uo4B
+3766 Drake
+3767 Drácula
+3768 Flor do Luar
+3769 Bafomé
+3770 Abelha-Rainha
+3771 Senhor das Trevas
+3772 Cavaleiro da Tempestade
+3787 Tapuru
+3788 Gabiru
+3792 Bo8B
+3793 B48B
+3794 Ci8B
+3795 Cy8B
+3802 Solidificador Ominoso
+3809 Deadly Thief Bug
+3810 Rei Poring
+3811 Dourading Gigante
+3812 Amering Gigante
+3813 Drops Encorpado
+3814 Poporing Encorpado
+3815 Poring Encorpado
+3816 Marin Encorpado
+3817 Meloring
+3818 Meloring Gigante
+3820 Imp Morno
+3821 Estrondo Morno
+3888 Rainha Scaraba Dourada
+3889 Gioia
+3890 Vigia do Tempo
+3891 Guardião Morto Kades
+3892 Pyuriel Furiosa
+3893 General Daehyun
+3894 Lorde Seyren
+3895 Algoz Eremes
+3900 Orc Arqueiro
+3901 Orc Falso
+20118 Goblinking
+20175 Extrajoker
+20176 Erzsebet
+20177 Jeniffer
+20178 Generalorc
+20179 Sieglouse
+20367 Raydric Poluto
+20368 Raydric Atirador
+20369 Gárgula Congelada
+20370 Sting Poluto
+20371 Foragido
+20372 Brasa
+20373 Pesadelo Sinistro
+20374 Deleter Voador
+20375 Deleter
+20376 Explosão
+20377 Kaho Torrente
+20378 Golem de Magma
+20379 Xamã do Gelo
+20380 Xamã do Fogo
+20419 Muspellskoll
+20420 Andarilho Poluto
+20421 Aranha Rainha
+20422 Lorde das Trevas
+20570 Meloring Sombrio
+20592 Nuvem Nociva
+20593 Nuvem Perigosa
+20594 Neo Mineral
+20595 Neo Mineral (Vermelho)
+20596 Mineral de Selenita
+20597 Mineral de Ametista
+20598 Geodoliant
+20600 Geodo
+20601 Joialiant
+20602 Porcellio Albino
+20603 Garimpeiros
+20604 Angelgolt Azul
+20605 Angelgolt Rosa
+20606 Frus Angelical
+20607 Skogul Angelical
+20608 Plasma Angelical
+20609 Plasma Espectral
+20612 Ferus Roxo
+20613 Mímico Precioso
+20614 Qzab
+20615 Acidus Prateado
+20616 Ferus Esqueleto
+20617 Acidus Esqueleto
+20618 Detale Esqueleto
+20630 Z5Ab
+20633 apAB
+20634 a5AB
+20637 bpAB
+20639 bZAB
+20640 dpAB
+20641 d5AB
+20643 eJAB
+20644 dZAB
+20645 hpAB
+20646 eZAB
+20648 e5AB
+20649 fZAB
+20650 f5AB
+20651 epAB
+20652 fpAB
+20653 fJAB
+20679 cpAB
+20680 c5AB
+20682 dJAB
+20683 b5AB
+20684 hJAB
+20685 h5AB
+20686 cJAB
+20687 iJAB
+20688 Zzab
+20689 cZAB
+20690 g5AB
+20691 gJAB
+20692 hZAB
+20693 gZAB
+20694 gpAB
+20695 Alhoring
+20773 Empathizer
+20774 Happygiver
+20775 Thaanger
+20776 Thahorror
+20777 Tharesent
+20778 Tharegret
+20779 Voidmimic
+20780 Bookofdeath
+20781 Eldest
+20782 Crowduke
+20783 Crowbaron
+20801 3I8B
+20802 2Y8B
+20803 1I8B
+20804 148B
+20805 2I8B
+20806 248B
+20807 3o8B
+20808 3Y8B
+20809 2o8B
+20810 1Y8B
+20844 Praygiver
+20845 Smilegiver
+20920 Chimeralava
+20921 Chimerafulgor
+20922 Chimeranapeo
+20923 Chimeragalensis
+20924 Chimeraamitera
+20925 Chimeralitus
+20926 Chimerafillia
+20927 Chimeravanilaqus
+20928 Chimeratheone
+20929 Giantcaput
+20930 Dolorian
+20931 Plagarion
+20932 Deadre
+20933 Venedi
+20934 R001Bestia
+20935 Ganceann
+20936 Disguiser
+20937 Brutalmurderer
+20938 Ghostcube
+20939 Ludegal
+20940 Bluemoonloliruri
+20941 Grote
+20942 Pierrotzoist
+20943 Deathwitch
+21064 oY4B
+21065 oo4B
+21066 o44B
+21067 pI4B
+21068 pY4B
+21069 po4B
+21070 p44B
+21071 qI4B
+21072 qY4B
+21073 qo4B
+21074 q44B
+21075 rI4B
+21076 rY4B
+21077 ro4B
+21078 r44B
+21079 sI4B
+21080 sY4B
+21081 so4B
+21082 s44B
+21083 tI4B
+21084 tY4B
+21085 to4B
+21086 t44B
+21323 Bode
+21324 Filhote de Lobo do Deserto
+21386 Lzab
+21387 Mzab
+21388 KpAB
+21389 LpAB
+21390 L5Ab
+21391 K5Ab
+21392 Mjab
+21393 Ljab
+21394 MpAB
+21548 Ecocornus
+21549 Ecopinguicula
+21550 Ecohunterfly
+21551 Ecorocker
+21552 Ecosavage
+21553 Ecoflora
+21554 Ecohillwind
+21555 Ecomistress
+21556 Ecoexplosion
+21557 Ecodeleter
+21558 Ecojakk
+21559 Ecolavagolem
+21560 Ecomajoruros
+21561 Ecohydro
+21562 Ecoacidus
+21563 Ecodetale
+21564 Ecoicetitan
+21565 Ecosiroma
+21566 Ecosnowier
+21567 Ecocentipede
+21568 Ecoaquaelemental
+21569 Ecoangelgolt
+21570 Ecorhyncho
+21571 Ecoktullanux
+21572 Ecoancientmummy
+21573 Ecolude
+21574 Ecoraggedzombie
+21575 Ecowraith
+21576 Ecoflameskull
+21577 Ecobanshee
+21578 Ecoknightofabyss
+21579 Ecolordofdeath
+23436 Rei Poring
+23437 Rei Poring
