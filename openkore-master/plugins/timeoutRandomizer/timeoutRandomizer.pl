@@ -167,7 +167,6 @@ sub apply_ranges {
 
                         my $meta = $entry->{timeout_randomizer} ||= {};
                         @$meta{qw(min max name)} = ($min, $max, $name);
-                        delete @$meta{qw(initialized last_time)};
                         delete $missing_reported{$name};
                 } else {
                         next if $missing_reported{$name};
@@ -195,26 +194,13 @@ sub _maybe_randomize {
         return unless defined $min && defined $max;
         ($min, $max) = ($max, $min) if $max < $min;
 
-        my $time      = $entry->{time};
-        my $last_time = $meta->{last_time};
-        my $needs_new = !$meta->{initialized};
-
-        if (!$needs_new) {
-                if (defined $time) {
-                        $needs_new = !defined($last_time) || $last_time != $time;
-                } else {
-                        $needs_new = defined $last_time;
-                }
+        my $value = $min;
+        if ($max > $min) {
+                my $span = $max - $min;
+                $value = $min + rand($span);
         }
 
-        return unless $needs_new;
-
-        my $value = $min;
-        $value = $min + rand($max - $min) if $max > $min;
-
         $entry->{timeout} = $value;
-        $meta->{last_time} = $time;
-        $meta->{initialized} = 1;
 }
 
 sub reload {
