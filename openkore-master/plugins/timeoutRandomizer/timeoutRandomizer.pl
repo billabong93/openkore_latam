@@ -3,13 +3,12 @@ package OpenKore::Plugins::timeoutRandomizer;
 use strict;
 use warnings;
 
-use FastUtils ();
 use Globals qw(%timeout);
 use Log qw(message warning);
 use Plugins;
 use Scalar::Util qw(looks_like_number);
 use Settings;
-use Utils (); 
+use Utils ();
 
 our $VERSION = '1.0';
 
@@ -21,8 +20,7 @@ my $orig_timeOut;
 my $override_installed = 0;
 
 BEGIN {
-        $orig_timeOut = FastUtils->can('timeOut');
-        $orig_timeOut ||= Utils->can('timeOut');
+        $orig_timeOut = Utils->can('timeOut');
 }
 
 Plugins::register('timeoutRandomizer', 'Randomize configured timeouts within ranges', \&unload, \&reload);
