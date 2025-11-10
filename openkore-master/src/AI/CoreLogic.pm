@@ -2207,6 +2207,12 @@ sub processAutoSell {
 #####AUTO BUY#####
 sub processAutoBuy {
 	return if ($shopstarted || $buyershopstarted);
+	
+	# ✅ BLOQUEIA AUTOBUY SE ESTIVER INDO AO PORTAL (XKore 3), MAS PERMITE PROCESSAR QUANDO A AÇÃO ATUAL É portalWalkBuy
+	if ($config{'XKore'} eq "3" && AI::inQueue("portalWalkBuy") && AI::action ne "portalWalkBuy") {
+		return;
+	}
+	
 	my $needitem;
 	if (
 		 (AI::isIdle || AI::action eq "route" || AI::action eq "follow")
@@ -2263,25 +2269,231 @@ sub processAutoBuy {
 			error AI::args->{'error'}.".\n";
 		}
 
-		# buyAuto finished
 		my $forcedBySell = AI::args->{'forcedBySell'};
 		my $forcedByStorage = AI::args->{'forcedByStorage'};
+		
+		# Verifica se ainda há itens para comprar
+		my $hasMoreItems = 0;
+		for(my $i = 0; exists $config{"buyAuto_$i"}; $i++) {
+			next if (!$config{"buyAuto_$i"} || $config{"buyAuto_${i}_disabled"});
+			next if ($config{"buyAuto_${i}_maxBase"} =~ /^\d{1,}$/ && $char->{lv} > $config{"buyAuto_${i}_maxBase"});
+			next if ($config{"buyAuto_${i}_minBase"} =~ /^\d{1,}$/ && $char->{lv} < $config{"buyAuto_${i}_minBase"});
+			
+			my $amount;
+			if ($config{"buyAuto_$i"} =~ /^\d{3,}$/) {
+				$amount = $char->inventory->sumByNameID($config{"buyAuto_$i"}, $config{"buyAuto_${i}_onlyIdentified"});
+			} else {
+				$amount = $char->inventory->sumByName($config{"buyAuto_$i"}, $config{"buyAuto_${i}_onlyIdentified"});
+			}
+			
+			if ($config{"buyAuto_$i"."_maxAmount"} ne "" && $amount < $config{"buyAuto_$i"."_maxAmount"}) {
+				next if (($config{"buyAuto_$i"."_price"} && ($char->{zeny} < $config{"buyAuto_$i"."_price"})) || ($config{"buyAuto_$i"."_zeny"} && !inRange($char->{zeny}, $config{"buyAuto_$i"."_zeny"})));
+				$hasMoreItems = 1;
+				last;
+			}
+		}
+		
+		# ✅ SEMPRE vai ao PORTAL FÍSICO após CADA compra (se XKore = 3)
+		if ($config{'XKore'} eq "3" && $hasMoreItems) {
+			my ($portal_x, $portal_y, $portal_to) = _findNearestPhysicalPortal();
+			
+			if (defined $portal_x) {
+				message TF("Compra concluída! Indo ao portal físico em (%d, %d) -> %s\n", 
+					$portal_x, $portal_y, $portal_to), "buy";
+				
+				AI::dequeue;
+				
+				AI::queue("portalWalkBuy", {
+					portalPos => { x => $portal_x, y => $portal_y },
+					portalDestMap => $portal_to,
+					originalMap => $field->baseName,
+					hasMoreItems => $hasMoreItems,
+					forcedBySell => $forcedBySell,
+					forcedByStorage => $forcedByStorage
+				});
+				
+				ai_route(
+					$field->baseName,
+					$portal_x,
+					$portal_y,
+					attackOnRoute => 0,
+					distFromGoal => 0,
+					noSitAuto => 1
+				);
+				return;
+				
+			} else {
+				warning T("Nenhum portal físico encontrado! Aguardando 2s...\n"), "buy";
+				AI::dequeue;
+				AI::queue("buyAuto", {
+					forcedBySell => $forcedBySell,
+					forcedByStorage => $forcedByStorage,
+					waitTime => time + 2
+				});
+				Plugins::callHook('AI_buy_auto_queued');
+			}
+			
+		} elsif ($hasMoreItems) {
+			# Modo normal (não XKore 3): aguarda 2s antes do próximo item
+			AI::dequeue;
+			AI::queue("buyAuto", {
+				forcedBySell => $forcedBySell,
+				forcedByStorage => $forcedByStorage,
+				waitTime => time + 2
+			});
+			message T("Mais itens para comprar, continuando em 2 segundos...\n"), "buy";
+			Plugins::callHook('AI_buy_auto_queued');
+			
+		} else {
+			# Terminou de comprar tudo
+			message T("Sequência de compra automática concluída.\n"), "success";
+			AI::dequeue;
+			Plugins::callHook('AI_buy_auto_done');
 
-		AI::dequeue;
-		Plugins::callHook('AI_buy_auto_done');
-
-		if ($forcedBySell && $config{storageAuto}) {
-			AI::queue("storageAuto", {forcedBySell => 1});
-			Plugins::callHook('AI_storage_auto_queued');
-
-		} elsif (!$forcedByStorage && $config{storageAuto}) {
-			AI::queue("storageAuto", {forcedByBuy => 1});
-			Plugins::callHook('AI_storage_auto_queued');
+			if ($forcedBySell && $config{storageAuto}) {
+				AI::queue("storageAuto", {forcedBySell => 1});
+				Plugins::callHook('AI_storage_auto_queued');
+			} elsif (!$forcedByStorage && $config{storageAuto}) {
+				AI::queue("storageAuto", {forcedByBuy => 1});
+				Plugins::callHook('AI_storage_auto_queued');
+			}
 		}
 
+	# ✅ PROCESSA portalWalkBuy SEM DEPENDER DO timeOut E FINALIZA IMEDIATAMENTE NO MAPCHANGE
+	} elsif (AI::action eq "portalWalkBuy") {
+		my $args = AI::args;
+		
+		if (!exists $args->{portalPos}) {
+			AI::dequeue;
+			return;
+		}
+		
+		my $currentMap = $field->baseName;
+
+		# ✅ ENTROU NO PORTAL (MUDOU DE MAPA): LIMPA ROTAS E CONCLUI O QUEUE AGORA
+		if (exists $args->{originalMap} && $args->{originalMap} ne $currentMap) {
+			AI::clear(qw/route mapRoute move/);
+			delete $args->{routingToPortal};
+			delete $ai_v{portalTrace_mapChanged}; # opcional: evita reaplicar
+			
+			message T("Mudança de mapa detectada. Rotas limpas e liberando próxima compra.\n"), "buy";
+
+			AI::dequeue;
+			
+			if ($args->{hasMoreItems}) {
+				AI::queue("buyAuto", {
+					forcedBySell => $args->{forcedBySell},
+					forcedByStorage => $args->{forcedByStorage}
+				});
+				Plugins::callHook('AI_buy_auto_queued');
+			} else {
+				message T("Sequência de compra automática concluída.\n"), "success";
+				Plugins::callHook('AI_buy_auto_done');
+
+				if ($args->{forcedBySell} && $config{storageAuto}) {
+					AI::queue("storageAuto", {forcedBySell => 1});
+					Plugins::callHook('AI_storage_auto_queued');
+				} elsif (!$args->{forcedByStorage} && $config{storageAuto}) {
+					AI::queue("storageAuto", {forcedByBuy => 1});
+					Plugins::callHook('AI_storage_auto_queued');
+				}
+			}
+			return;
+		}
+
+		# ⚠️ AINDA NO MESMO MAPA - PROCESSO NORMAL DE APROXIMAÇÃO/ESPERA
+		# Usa o timeout apenas para iterar o fluxo restante
+		if (!timeOut($timeout{'ai_portalWalkBuy'})) {
+			return;
+		}
+
+		# Verifica se está EXATAMENTE na posição do portal
+		my $onPortal = ($char->{pos_to}{x} == $args->{portalPos}{x} && $char->{pos_to}{y} == $args->{portalPos}{y});
+		
+		if ($onPortal) {
+			# 🔧 EXTRA: limpa rotas ao chegar no tile do portal para evitar travar em [portalWalkBuy,route]
+			if (AI::findAction("route") ne "" || AI::findAction("mapRoute") ne "" || AI::is("move")) {
+				AI::clear(qw/route mapRoute move/);
+				delete $args->{routingToPortal};
+				message T("Rota concluída. Aguardando entrada no portal...\n"), "buy";
+			}
+
+			if (!exists $args->{portalReachedTime}) {
+				message T("No portal físico! Aguardando mudança de mapa...\n"), "buy";
+				$args->{portalReachedTime} = time;
+			} elsif (time - $args->{portalReachedTime} >= 5) {
+				# ⚠️ PASSOU 5S E NÃO MUDOU DE MAPA - PROCURA OUTRO PORTAL
+				message T("Não mudou de mapa após 5s. Procurando outro portal físico...\n"), "buy";
+				
+				my ($new_x, $new_y, $new_to) = _findNearestPhysicalPortal($args->{portalPos});
+				
+				if (defined $new_x) {
+					message TF("Novo portal físico encontrado em (%d, %d) -> %s\n", 
+						$new_x, $new_y, $new_to), "buy";
+					
+					$args->{portalPos} = { x => $new_x, y => $new_y };
+					$args->{portalDestMap} = $new_to;
+					delete $args->{portalReachedTime};
+					delete $args->{routingToPortal};
+					
+					ai_route(
+						$field->baseName,
+						$new_x,
+						$new_y,
+						attackOnRoute => 0,
+						distFromGoal => 0,
+						noSitAuto => 1
+					);
+				} else {
+					warning T("Nenhum outro portal físico encontrado. Liberando próxima compra...\n"), "buy";
+					
+					AI::dequeue;
+					
+					if ($args->{hasMoreItems}) {
+						AI::queue("buyAuto", {
+							forcedBySell => $args->{forcedBySell},
+							forcedByStorage => $args->{forcedByStorage}
+						});
+						Plugins::callHook('AI_buy_auto_queued');
+					} else {
+						message T("Sequência de compra automática concluída.\n"), "success";
+						Plugins::callHook('AI_buy_auto_done');
+
+						if ($args->{forcedBySell} && $config{storageAuto}) {
+							AI::queue("storageAuto", {forcedBySell => 1});
+							Plugins::callHook('AI_storage_auto_queued');
+						} elsif (!$args->{forcedByStorage} && $config{storageAuto}) {
+							AI::queue("storageAuto", {forcedByBuy => 1});
+							Plugins::callHook('AI_storage_auto_queued');
+						}
+					}
+				}
+			}
+		} elsif (blockDistance($char->{pos_to}, $args->{portalPos}) <= 3 && !$args->{routingToPortal}) {
+			message TF("Próximo ao portal físico (%d, %d). Entrando...\n", $args->{portalPos}{x}, $args->{portalPos}{y}), "buy";
+			
+			$args->{routingToPortal} = 1;
+			
+			ai_route(
+				$field->baseName,
+				$args->{portalPos}{x},
+				$args->{portalPos}{y},
+				attackOnRoute => 0,
+				distFromGoal => 0,
+				noSitAuto => 1
+			);
+		}
+		
+		$timeout{'ai_portalWalkBuy'}{'time'} = time;
+		
 	} elsif (AI::action eq "buyAuto" && timeOut($timeout{ai_buyAuto_wait})) {
 		Plugins::callHook('AI_buy_auto');
 		my $args = AI::args;
+
+		# Respeita o delay antes de continuar comprando
+		if (exists $args->{waitTime} && time < $args->{waitTime}) {
+			return;
+		}
 
 		if (exists $args->{sentBuyPacket_time} && exists $args->{index_failed}{$args->{lastIndex}}) {
 			if (timeOut($args->{sentBuyPacket_time}, $timeout{ai_buyAuto_wait_after_restart}{timeout})) {
@@ -2292,10 +2504,10 @@ sub processAutoBuy {
 			return;
 
 		} elsif (exists $args->{sentBuyPacket_time} && !exists $args->{index_failed}{$args->{lastIndex}}) {
+			# ✅ AGUARDA CONFIRMAÇÃO DA COMPRA
 			if (exists $args->{recv_buy_packet}) {
-				delete $args->{sentBuyPacket_time};
-				delete $args->{recv_buy_packet};
-				$args->{recv_buy_packet_time} = time;
+				# ⚠️ MARCA COMO DONE - buyAuto NÃO EXECUTA ENQUANTO portalWalkBuy ESTIVER ATIVO
+				$args->{'done'} = 1;
 
 			} elsif (timeOut($args->{sentBuyPacket_time}, $timeout{ai_buyAuto_wait_after_packet_giveup}{timeout})) {
 				$args->{'error'} = 'Did not received the buy result from server after buy packet was sent';
@@ -2320,7 +2532,6 @@ sub processAutoBuy {
 				next if (!$config{"buyAuto_$i"} || $config{"buyAuto_${i}_disabled"});
 				next if ($config{"buyAuto_${i}_maxBase"} =~ /^\d{1,}$/ && $char->{lv} > $config{"buyAuto_${i}_maxBase"});
 				next if ($config{"buyAuto_${i}_minBase"} =~ /^\d{1,}$/ && $char->{lv} < $config{"buyAuto_${i}_minBase"});
-				# did we already fail to do this buyAuto slot? (only fails in this way if the item is nonexistant)
 				next if (exists $args->{index_failed}{$i});
 
 				my $amount;
@@ -2334,13 +2545,10 @@ sub processAutoBuy {
 				if ($config{"buyAuto_$i"."_maxAmount"} ne "" && $amount < $config{"buyAuto_$i"."_maxAmount"}) {
 					next if (($config{"buyAuto_$i"."_price"} && ($char->{zeny} < $config{"buyAuto_$i"."_price"})) || ($config{"buyAuto_$i"."_zeny"} && !inRange($char->{zeny}, $config{"buyAuto_$i"."_zeny"})));
 
-					# get NPC info, use standpoint if provided
 					$args->{npc} = {};
 					my $destination = $config{"buyAuto_$i"."_standpoint"} || $config{"buyAuto_$i"."_npc"};
 					getNPCInfo($destination, $args->{npc});
 
-					# did we succeed to load NPC info from this slot?
-					# (doesnt check validity of _npc if we used _standpoint...)
 					if ($args->{npc}{ok}) {
 						$args->{index} = $i;
 					}
@@ -2348,7 +2556,6 @@ sub processAutoBuy {
 				}
 			}
 
-			# Failed to load any slots for buyAuto (we're done or they're all invalid)
 			if (!exists $args->{index}) {
 				$args->{'done'} = 1;
 				return;
@@ -2356,7 +2563,6 @@ sub processAutoBuy {
 
 			undef $ai_v{'temp'}{'do_route'};
 			if (!$args->{distance}) {
-				# Calculate variable or fixed (old) distance
 				if ($config{"buyAuto_$args->{index}"."_standpoint"}) {
 					$args->{distance} = 1;
 				} elsif ($config{"buyAuto_".$args->{index}."_minDistance"} && $config{"buyAuto_".$args->{index}."_maxDistance"}) {
@@ -2409,7 +2615,6 @@ sub processAutoBuy {
 						if ($needitem ne "") {
 							$msgneeditem = "Auto-buy: $needitem\n";
 						}
-						# If we still haven't warped after a certain amount of time, fallback to walking
 						$args->{warpStart} = time unless $args->{warpStart};
 						message T($msgneeditem."Teleporting to auto-buy\n"), "teleport";
 						ai_useTeleport(2);
@@ -2435,7 +2640,6 @@ sub processAutoBuy {
 
 		} elsif (!exists $args->{'sentNpcTalk'}) {
 
-			# load the real npc location just in case we used standpoint
 			my $realpos = {};
 			getNPCInfo($config{"buyAuto_".$args->{lastIndex}."_npc"}, $realpos);
 
@@ -2480,9 +2684,12 @@ sub processAutoBuy {
 		if (!exists $args->{'nameID'}) {
 			$args->{index_failed}{$args->{lastIndex}} = 1;
 			error "buyAuto index ".$args->{lastIndex}." (".$config{"buyAuto_".$args->{lastIndex}}.") failed, item doesn't exist in npc sell list.\n", "npc";
+			delete $args->{sentBuyPacket_time};
+			delete $args->{lastIndex};
+			delete $args->{distance};
 
 		} else {
-			my $maxbuy = ($config{"buyAuto_".$args->{lastIndex}."_price"}) ? int($char->{zeny}/$config{"buyAuto_$args->{index}"."_price"}) : 30000; # we assume we can buy 30000, when price of the item is set to 0 or undef
+			my $maxbuy = ($config{"buyAuto_".$args->{lastIndex}."_price"}) ? int($char->{zeny}/$config{"buyAuto_$args->{index}"."_price"}) : 30000;
 			my $needbuy = $config{"buyAuto_".$args->{lastIndex}."_maxAmount"};
 
 			my $inv_amount = $char->inventory->sumByNameID($args->{'nameID'}, $config{"buyAuto_".$args->{lastIndex}."_onlyIdentified"});
@@ -2491,7 +2698,6 @@ sub processAutoBuy {
 
 			my $buy_amount = ($maxbuy > $needbuy) ? $needbuy : $maxbuy;
 
-			# support to market
 			if ($item->{amount} && $item->{amount} < $buy_amount) {
 				$buy_amount = $item->{amount};
 			}
@@ -2517,6 +2723,11 @@ sub processAutoBuy {
 				);
 				push(@buyList, \%buy);
 			}
+			
+			if ($config{'XKore'} eq "3") {
+				my $itemName = $config{"buyAuto_".$args->{lastIndex}};
+				message TF("Comprando item: %s [XKore3: Aguardando entrada no portal...]\n", $itemName), "buy";
+			}
 		}
 
 		completeNpcBuy(\@buyList);
@@ -2530,6 +2741,129 @@ sub processAutoBuy {
 	}
 }
 
+# ✅ FUNÇÃO AUXILIAR: Encontra portal físico mais próximo (adaptada do plugin)
+sub _findNearestPhysicalPortal {
+	my ($exclude_pos) = @_;
+	
+	return (undef, undef, undef) unless $field;
+	my $currentMap = lc($field->baseName);
+	$currentMap =~ s/\.(gat|rsw|gnd|fld)$//i;
+	
+	return (undef, undef, undef) unless $char && $char->{pos_to};
+	my $cx = int($char->{pos_to}{x});
+	my $cy = int($char->{pos_to}{y});
+	
+	# ✅ Procura arquivo portals.txt
+	my $portalsFile;
+	foreach my $candidate ('tables/ROla/portals.txt', 'tables/portals.txt') {
+		if (-e $candidate) {
+			$portalsFile = $candidate;
+			last;
+		}
+	}
+	
+	return (undef, undef, undef) unless $portalsFile;
+	
+	# ✅ Lê portals.txt diretamente
+	open my $fh, '<', $portalsFile or return (undef, undef, undef);
+	
+	my ($best_x, $best_y, $best_to, $best_dist);
+	
+	while (my $line = <$fh>) {
+		$line =~ s/\r?\n$//;
+		$line =~ s/#.*$//;
+		next if $line =~ /^\s*$/;
+		
+		my @fields = split /\s+/, $line;
+		next unless @fields == 6;
+		
+		my ($sm, $sx, $sy, $dm, $dx, $dy) = @fields;
+		next unless $sx =~ /^\d+$/ && $sy =~ /^\d+$/;
+		next unless $dx =~ /^\d+$/ && $dy =~ /^\d+$/;
+		
+		my $smn = lc($sm);
+		$smn =~ s/\.(gat|rsw|gnd|fld)$//i;
+		
+		next unless $smn eq $currentMap;
+		
+		# ✅ Ignora portal anterior (se fornecido)
+		if ($exclude_pos && $sx == $exclude_pos->{x} && $sy == $exclude_pos->{y}) {
+			next;
+		}
+		
+		my $dist = abs($sx - $cx) + abs($sy - $cy);
+		
+		if (!defined $best_dist || $dist < $best_dist) {
+			($best_x, $best_y, $best_to, $best_dist) = (int($sx), int($sy), $dm, $dist);
+		}
+	}
+	
+	close $fh;
+	
+	return ($best_x, $best_y, $best_to);
+}
+
+# ✅ FUNÇÃO AUXILIAR: Encontra portal físico mais próximo (adaptada do plugin)
+sub _findNearestPhysicalPortal {
+	my ($exclude_pos) = @_;
+	
+	return (undef, undef, undef) unless $field;
+	my $currentMap = lc($field->baseName);
+	$currentMap =~ s/\.(gat|rsw|gnd|fld)$//i;
+	
+	return (undef, undef, undef) unless $char && $char->{pos_to};
+	my $cx = int($char->{pos_to}{x});
+	my $cy = int($char->{pos_to}{y});
+	
+	# ✅ Procura arquivo portals.txt
+	my $portalsFile;
+	foreach my $candidate ('tables/ROla/portals.txt', 'tables/portals.txt') {
+		if (-e $candidate) {
+			$portalsFile = $candidate;
+			last;
+		}
+	}
+	
+	return (undef, undef, undef) unless $portalsFile;
+	
+	# ✅ Lê portals.txt diretamente
+	open my $fh, '<', $portalsFile or return (undef, undef, undef);
+	
+	my ($best_x, $best_y, $best_to, $best_dist);
+	
+	while (my $line = <$fh>) {
+		$line =~ s/\r?\n$//;
+		$line =~ s/#.*$//;
+		next if $line =~ /^\s*$/;
+		
+		my @fields = split /\s+/, $line;
+		next unless @fields == 6;
+		
+		my ($sm, $sx, $sy, $dm, $dx, $dy) = @fields;
+		next unless $sx =~ /^\d+$/ && $sy =~ /^\d+$/;
+		next unless $dx =~ /^\d+$/ && $dy =~ /^\d+$/;
+		
+		my $smn = lc($sm);
+		$smn =~ s/\.(gat|rsw|gnd|fld)$//i;
+		
+		next unless $smn eq $currentMap;
+		
+		# ✅ Ignora portal anterior (se fornecido)
+		if ($exclude_pos && $sx == $exclude_pos->{x} && $sy == $exclude_pos->{y}) {
+			next;
+		}
+		
+		my $dist = abs($sx - $cx) + abs($sy - $cy);
+		
+		if (!defined $best_dist || $dist < $best_dist) {
+			($best_x, $best_y, $best_to, $best_dist) = (int($sx), int($sy), $dm, $dist);
+		}
+	}
+	
+	close $fh;
+	
+	return ($best_x, $best_y, $best_to);
+}
 ##### AUTO-CART ADD/GET ####
 sub processAutoCart {
 	if ((AI::isIdle || AI::is(qw/route move buyAuto follow sitAuto items_take items_gather/))) {
