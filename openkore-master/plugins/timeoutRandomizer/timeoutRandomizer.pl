@@ -34,6 +34,7 @@ my $hooks;
 my %missing_reported;
 my $orig_timeOut;
 my $override_installed = 0;
+my $stateless_tick = 0;
 
 BEGIN {
         $orig_timeOut = Utils->can('timeOut');
@@ -65,6 +66,9 @@ if ($orig_timeOut) {
                 my $meta = ref($r_time) eq 'HASH' ? $r_time->{timeout_randomizer} : undef;
 
                 if ($meta) {
+                        $meta->{stateful} = 1;
+                        delete $meta->{last_stateless_tick};
+
                         _ensure_seed($r_time, $meta);
 
                         my $result = @_ > 1
@@ -180,7 +184,7 @@ sub apply_ranges {
 
                         my $meta = $entry->{timeout_randomizer} ||= {};
                         @$meta{qw(min max name)} = ($min, $max, $name);
-                        delete @$meta{qw(initialized last_value last_reset_time)};
+                        delete @$meta{qw(initialized last_value last_reset_time last_stateless_tick)};
 
                         _ensure_seed($entry, $meta);
 
@@ -202,6 +206,8 @@ sub apply_ranges {
 }
 
 sub observe_timeouts {
+        $stateless_tick++;
+
         foreach my $name (keys %configured_ranges) {
                 my $entry = $timeout{$name};
                 next unless ref $entry eq 'HASH';
@@ -211,21 +217,29 @@ sub observe_timeouts {
 
                 _ensure_seed($entry, $meta);
 
-                if (exists $entry->{time}) {
-                        my $time_mark = $entry->{time};
+                if ($meta->{stateful}) {
+                        if (exists $entry->{time}) {
+                                my $time_mark = $entry->{time};
 
-                        if (!defined $time_mark) {
+                                if (!defined $time_mark) {
+                                        delete $meta->{last_reset_time};
+                                        next;
+                                }
+
+                                if (!defined $meta->{last_reset_time} || $meta->{last_reset_time} != $time_mark) {
+                                        _assign_random_timeout($entry, $meta);
+                                        $meta->{last_reset_time} = $time_mark;
+                                }
+                        } else {
                                 delete $meta->{last_reset_time};
-                                next;
                         }
-
-                        if (!defined $meta->{last_reset_time} || $meta->{last_reset_time} != $time_mark) {
-                                _assign_random_timeout($entry, $meta);
-                                $meta->{last_reset_time} = $time_mark;
-                        }
-                } else {
-                        delete $meta->{last_reset_time};
+                        next;
                 }
+
+                next if defined $meta->{last_stateless_tick} && $meta->{last_stateless_tick} == $stateless_tick;
+
+                _assign_random_timeout($entry, $meta);
+                $meta->{last_stateless_tick} = $stateless_tick;
         }
 }
 

@@ -13,4 +13,4 @@ ai_teleport 1 8
 ai_attack 0.6..1.4
 ai 3
 ```
-The plugin chooses an initial random value when the timeout is first used and then rolls a new value each time the timeout finishes and the timer is restarted (either by `timeOut()` or by code that manually updates the timeout's `time` field). Successive uses of the same action (for example repeated `ai_teleport` casts) therefore receive independent randomized delays throughout the entire session.
+The plugin chooses an initial random value when the timeout is first used. For timers that rely on `Utils::timeOut`, the plugin rolls a new value every time the timer completes and is restarted (either by `timeOut()` or by code that refreshes the timeout's `time` field). For other delays that simply read the configured value (such as `ai_items_take_start`), a fresh random value is generated on each AI tick so every new use receives an independent delay.
