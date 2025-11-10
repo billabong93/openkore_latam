@@ -44,6 +44,7 @@ Plugins::register('timeoutRandomizer', 'Randomize configured timeouts within ran
 $hooks = Plugins::addHooks(
         ['pos_load_timeouts.txt', \&on_timeouts_loaded, undef],
         ['start3',                \&on_start,           undef],
+        ['AI_pre',                \&observe_timeouts,   undef],
 );
 
 sub on_start {
@@ -179,7 +180,7 @@ sub apply_ranges {
 
                         my $meta = $entry->{timeout_randomizer} ||= {};
                         @$meta{qw(min max name)} = ($min, $max, $name);
-                        delete @$meta{qw(initialized last_value)};
+                        delete @$meta{qw(initialized last_value last_reset_time)};
 
                         _ensure_seed($entry, $meta);
 
@@ -197,6 +198,34 @@ sub apply_ranges {
                 next unless ref $entry eq 'HASH';
                 delete $entry->{timeout_randomizer};
                 delete $missing_reported{$name};
+        }
+}
+
+sub observe_timeouts {
+        foreach my $name (keys %configured_ranges) {
+                my $entry = $timeout{$name};
+                next unless ref $entry eq 'HASH';
+
+                my $meta = $entry->{timeout_randomizer};
+                next unless $meta;
+
+                _ensure_seed($entry, $meta);
+
+                if (exists $entry->{time}) {
+                        my $time_mark = $entry->{time};
+
+                        if (!defined $time_mark) {
+                                delete $meta->{last_reset_time};
+                                next;
+                        }
+
+                        if (!defined $meta->{last_reset_time} || $meta->{last_reset_time} != $time_mark) {
+                                _assign_random_timeout($entry, $meta);
+                                $meta->{last_reset_time} = $time_mark;
+                        }
+                } else {
+                        delete $meta->{last_reset_time};
+                }
         }
 }
 
