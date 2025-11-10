@@ -1823,20 +1823,87 @@ sub processAutoSell {
 			}
 		}
 		
-		if ($hasMoreItems) {
-			# Ainda há itens para vender, continua o ciclo
-			message T("More items to sell, continuing in 2 seconds...\n"), "sell";
+		if ($hasMoreItems && $config{'XKore'} eq "3") {
+			# XKore 3: Procura portal no portals_lut do mapa atual
+			message T("Lote vendido! Procurando portal no portals.txt...\n"), "sell";
+			
+			my $currentMap = $field->baseName;
+			my $nearestPortal;
+			my $minDist = 999999;
+			
+			# Percorre portals_lut procurando portais do mapa atual
+			# A KEY do %portals_lut é "mapa x y" onde x,y é a posição de ORIGEM do portal
+			foreach my $portalKey (keys %portals_lut) {
+				my $portal = $portals_lut{$portalKey};
+				
+				# Verifica se o portal está no mapa atual (source)
+				next unless (exists $portal->{source} && $portal->{source}{map} eq $currentMap);
+				
+				my $x = $portal->{source}{x};
+				my $y = $portal->{source}{y};
+				
+				my $dist = blockDistance($char->{pos_to}, {x => $x, y => $y});
+				if ($dist < $minDist) {
+					$minDist = $dist;
+					$nearestPortal = {
+						x => $x,
+						y => $y
+					};
+				}
+			}
+			
+			if ($nearestPortal) {
+				message TF("Portal encontrado em portals.txt em (%d, %d). Indo até lá...\n", 
+					$nearestPortal->{x}, $nearestPortal->{y}), "sell";
+				
+				# Remove sellAuto atual da fila
+				AI::dequeue;
+				
+				# Adiciona portalWalkSell na fila
+				AI::queue("portalWalkSell", {
+					portalPos => { x => $nearestPortal->{x}, y => $nearestPortal->{y} },
+					originalMap => $currentMap,
+					forcedByBuy => $forcedByBuy,
+					forcedByStorage => $forcedByStorage
+				});
+				
+				# Vai até o portal (distFromGoal = 0 para ENTRAR nele)
+				ai_route(
+					$currentMap,
+					$nearestPortal->{x},
+					$nearestPortal->{y},
+					attackOnRoute => 0,
+					distFromGoal => 0,
+					noSitAuto => 1
+				);
+				return;
+				
+			} else {
+				# Não encontrou portal no portals.txt, aguarda 2s e tenta vender novamente
+				warning TF("Nenhum portal encontrado em portals.txt para o mapa %s! Aguardando 2s...\n", $currentMap), "sell";
+				AI::dequeue;
+				AI::queue("sellAuto", {
+					forcedByBuy => $forcedByBuy,
+					forcedByStorage => $forcedByStorage,
+					waitTime => time + 2
+				});
+				Plugins::callHook('AI_sell_auto_queued');
+			}
+			
+		} elsif ($hasMoreItems) {
+			# Modo normal (não XKore 3): aguarda 2s antes do próximo lote
 			AI::dequeue;
-			# Pequeno delay para evitar anti-bot
 			AI::queue("sellAuto", {
 				forcedByBuy => $forcedByBuy,
 				forcedByStorage => $forcedByStorage,
-				waitTime => time + 2  # Aguarda 2 segundos antes de continuar
+				waitTime => time + 2
 			});
+			message T("Mais itens para vender, continuando em 2 segundos...\n"), "sell";
 			Plugins::callHook('AI_sell_auto_queued');
+			
 		} else {
 			# Terminou de vender tudo
-			message T("Auto-sell sequence completed.\n"), "success";
+			message T("Sequência de venda automática concluída.\n"), "success";
 			AI::dequeue;
 
 			if ($forcedByStorage) {
@@ -1848,6 +1915,125 @@ sub processAutoSell {
 				Plugins::callHook('AI_buy_auto_queued');
 			}
 		}
+		
+	} elsif (AI::action eq "portalWalkSell" && timeOut($timeout{'ai_portalWalkSell'})) {
+		# Processamento da caminhada até o portal
+		my $args = AI::args;
+		
+		if (!exists $args->{portalPos}) {
+			AI::dequeue;
+			return;
+		}
+		
+		# Detecta mudança de mapa (entrou no portal)
+		my $currentMap = $field->baseName;
+		if (exists $args->{originalMap} && $args->{originalMap} ne $currentMap) {
+			# Mudou de mapa - aguarda 3 segundos
+			if (!exists $args->{mapChangedTime}) {
+				message T("Entrou no portal! Aguardando 3 segundos...\n"), "sell";
+				$args->{mapChangedTime} = time;
+			} elsif (time - $args->{mapChangedTime} >= 3) {
+				# Aguardou 3s - volta ao NPC para vender próximo lote
+				message T("Voltando ao NPC para vender próximo lote...\n"), "sell";
+				
+				AI::dequeue;
+				
+				AI::queue("sellAuto", {
+					forcedByBuy => $args->{forcedByBuy},
+					forcedByStorage => $args->{forcedByStorage}
+				});
+				Plugins::callHook('AI_sell_auto_queued');
+			}
+			$timeout{'ai_portalWalkSell'}{'time'} = time;
+			return;
+		}
+		
+		# Verifica se está EXATAMENTE na posição do portal
+		my $onPortal = ($char->{pos_to}{x} == $args->{portalPos}{x} && $char->{pos_to}{y} == $args->{portalPos}{y});
+		
+		if ($onPortal) {
+			# Está em cima do portal
+			if (!exists $args->{portalReachedTime}) {
+				message T("No portal! Aguardando mudança de mapa...\n"), "sell";
+				$args->{portalReachedTime} = time;
+			} elsif (time - $args->{portalReachedTime} >= 5) {
+				# Passou 5s e não mudou - procura outro portal no portals_lut
+				message T("Não mudou de mapa após 5s. Procurando outro portal no portals.txt...\n"), "sell";
+				
+				my $nearestPortal;
+				my $minDist = 999999;
+				
+				# Percorre portals_lut procurando OUTRO portal do mapa atual
+				foreach my $portalKey (keys %portals_lut) {
+					my $portal = $portals_lut{$portalKey};
+					
+					# Verifica se o portal está no mapa atual (source)
+					next unless (exists $portal->{source} && $portal->{source}{map} eq $currentMap);
+					
+					my $x = $portal->{source}{x};
+					my $y = $portal->{source}{y};
+					
+					# Ignora o portal atual
+					next if ($x == $args->{portalPos}{x} && $y == $args->{portalPos}{y});
+					
+					my $dist = blockDistance($char->{pos_to}, {x => $x, y => $y});
+					if ($dist < $minDist) {
+						$minDist = $dist;
+						$nearestPortal = {
+							x => $x,
+							y => $y
+						};
+					}
+				}
+				
+				if ($nearestPortal) {
+					message TF("Novo portal encontrado em portals.txt em (%d, %d)\n", 
+						$nearestPortal->{x}, $nearestPortal->{y}), "sell";
+					
+					# Atualiza para o novo portal
+					$args->{portalPos} = { x => $nearestPortal->{x}, y => $nearestPortal->{y} };
+					delete $args->{portalReachedTime};
+					delete $args->{routingToPortal};
+					
+					ai_route(
+						$field->baseName,
+						$nearestPortal->{x},
+						$nearestPortal->{y},
+						attackOnRoute => 0,
+						distFromGoal => 0,
+						noSitAuto => 1
+					);
+				} else {
+					# Não achou outro portal no portals.txt - volta ao NPC
+					warning T("Nenhum outro portal encontrado no portals.txt. Voltando ao NPC...\n"), "sell";
+					
+					AI::dequeue;
+					
+					AI::queue("sellAuto", {
+						forcedByBuy => $args->{forcedByBuy},
+						forcedByStorage => $args->{forcedByStorage}
+					});
+					Plugins::callHook('AI_sell_auto_queued');
+				}
+			}
+		} elsif (blockDistance($char->{pos_to}, $args->{portalPos}) <= 3 && !$args->{routingToPortal}) {
+			# Está perto - move para posição EXATA do portal
+			message TF("Próximo ao portal (%d, %d). Entrando...\n", $args->{portalPos}{x}, $args->{portalPos}{y}), "sell";
+			
+			$args->{routingToPortal} = 1;
+			
+			ai_route(
+				$field->baseName,
+				$args->{portalPos}{x},
+				$args->{portalPos}{y},
+				attackOnRoute => 0,
+				distFromGoal => 0,
+				noSitAuto => 1
+			);
+		}
+		
+		$timeout{'ai_portalWalkSell'}{'time'} = time;
+		
 	} elsif (AI::action eq "sellAuto" && timeOut($timeout{'ai_sellAuto'})) {
 		my $args = AI::args;
 
@@ -1925,7 +2111,6 @@ sub processAutoSell {
 					stand();
 				} else {
 					$args->{'warpedToSave'} = 1;
-					# If we still haven't warped after a certain amount of time, fallback to walking
 					$args->{warpStart} = time unless $args->{warpStart};
 					message T("Teleporting to auto-sell\n"), "teleport";
 					ai_useTeleport(2);
@@ -1970,12 +2155,12 @@ sub processAutoSell {
 
 			Plugins::callHook('AI_sell_auto');
 
-			# MODIFICADO: Vende apenas 10 tipos de itens por vez para evitar anti-bot
+			# Vende apenas N tipos de itens por vez
 			my @sellItems;
 			my $itemTypeCount = 0;
 			my $maxItemTypes = $config{'sellAuto_maxItemTypes'} || 10;
 			
-			# Inicializa contador de lotes se não existir
+			# Inicializa contador de lotes
 			if (!exists $args->{batchCount}) {
 				$args->{batchCount} = 0;
 			}
@@ -1987,24 +2172,23 @@ sub processAutoSell {
 
 				if ($control->{'sell'} && $item->{'amount'} > $control->{keep}) {
 					$itemTypeCount++;
-					
-					# Para quando atingir o limite
 					last if ($itemTypeCount > $maxItemTypes);
 					
 					my %obj;
 					$obj{ID} = $item->{ID};
 					$obj{amount} = $item->{amount} - $control->{keep};
 					push @sellItems, \%obj;
+					debug "Scheduling $item->{name} ($item->{ID}) x $obj{amount} for selling\n", "ai_sell";
 				}
 			}
 
 			if (@sellItems == 0) {
 				$args->{'sentEmptyList'} = 1;
 			} else {
-				# Incrementa contador de lotes
 				$args->{batchCount}++;
-				message TF("Selling batch #%d: %d types of items (max: %d per batch)\n", 
-					$args->{batchCount}, scalar(@sellItems), $maxItemTypes), "sell";
+				my $xkoreMsg = ($config{'XKore'} eq "3") ? " [XKore3: Indo ao portal do portals.txt]" : "";
+				message TF("Vendendo lote #%d: %d tipos de itens (máx: %d)%s\n", 
+					$args->{batchCount}, scalar(@sellItems), $maxItemTypes, $xkoreMsg), "sell";
 			}
 
 			completeNpcSell(\@sellItems);
