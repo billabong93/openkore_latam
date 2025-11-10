@@ -61,8 +61,20 @@ if ($orig_timeOut) {
         *Utils::timeOut = sub ($;$) {
                 my ($r_time, $timeout_value) = @_;
 
-                if (!defined $timeout_value && ref($r_time) eq 'HASH') {
-                        _maybe_randomize($r_time);
+                my $meta = ref($r_time) eq 'HASH' ? $r_time->{timeout_randomizer} : undef;
+
+                if ($meta) {
+                        _ensure_seed($r_time, $meta);
+
+                        my $result = @_ > 1
+                                ? $orig_timeOut->($r_time, $timeout_value)
+                                : $orig_timeOut->($r_time);
+
+                        if ($result) {
+                                _assign_random_timeout($r_time, $meta);
+                        }
+
+                        return $result;
                 }
 
                 return @_ > 1
@@ -167,6 +179,10 @@ sub apply_ranges {
 
                         my $meta = $entry->{timeout_randomizer} ||= {};
                         @$meta{qw(min max name)} = ($min, $max, $name);
+                        delete @$meta{qw(initialized last_value)};
+
+                        _ensure_seed($entry, $meta);
+
                         delete $missing_reported{$name};
                 } else {
                         next if $missing_reported{$name};
@@ -184,10 +200,20 @@ sub apply_ranges {
         }
 }
 
-sub _maybe_randomize {
-        my ($entry) = @_;
+sub _ensure_seed {
+        my ($entry, $meta) = @_;
 
-        my $meta = $entry->{timeout_randomizer};
+        return unless $meta;
+
+        unless ($meta->{initialized}) {
+                _assign_random_timeout($entry, $meta);
+                $meta->{initialized} = 1;
+        }
+}
+
+sub _assign_random_timeout {
+        my ($entry, $meta) = @_;
+
         return unless $meta;
 
         my ($min, $max) = @$meta{qw(min max)};
@@ -201,6 +227,7 @@ sub _maybe_randomize {
         }
 
         $entry->{timeout} = $value;
+        $meta->{last_value} = $value;
 }
 
 sub reload {

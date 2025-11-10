@@ -13,5 +13,4 @@ ai_teleport 1 8
 ai_attack 0.6..1.4
 ai 3
 ```
-The plugin will choose a fresh random value within the specified range every time the timeout is evaluated, so successive uses o
-f the same action (for example repeated `ai_teleport` casts) each receive their own randomized delay.
+The plugin chooses an initial random value when the timeout is first used and then rolls a new value each time the timeout finishes and resets. Successive uses of the same action (for example repeated `ai_teleport` casts) therefore receive independent randomized delays.
