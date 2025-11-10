@@ -3,7 +3,7 @@ package OpenKore::Plugins::timeoutRandomizer;
 use strict;
 use warnings;
 
-use FastUtils;
+use FastUtils ();
 use Globals qw(%timeout);
 use Log qw(message warning);
 use Plugins;
@@ -17,7 +17,13 @@ my %configured_ranges;
 my $control_handle;
 my $hooks;
 my %missing_reported;
-my $orig_timeOut = \&FastUtils::timeOut;
+my $orig_timeOut;
+my $override_installed = 0;
+
+BEGIN {
+        $orig_timeOut = FastUtils->can('timeOut');
+        $orig_timeOut ||= Utils->can('timeOut');
+}
 
 Plugins::register('timeoutRandomizer', 'Randomize configured timeouts within ranges', \&unload, \&reload);
 
@@ -36,16 +42,21 @@ sub on_start {
         apply_ranges();
 }
 
-no warnings 'redefine';
-*Utils::timeOut = sub ($;$) {
-        my ($r_time, $timeout_value) = @_;
+if ($orig_timeOut) {
+        no warnings 'redefine';
+        *Utils::timeOut = sub ($;$) {
+                my ($r_time, $timeout_value) = @_;
 
-        if (!defined $timeout_value && ref($r_time) eq 'HASH') {
-                _maybe_randomize($r_time);
-        }
+                if (!defined $timeout_value && ref($r_time) eq 'HASH') {
+                        _maybe_randomize($r_time);
+                }
 
-        return $orig_timeOut->($r_time, $timeout_value);
-};
+                return $orig_timeOut->($r_time, $timeout_value);
+        };
+        $override_installed = 1;
+} else {
+        warning "[timeoutRandomizer] Could not locate Utils::timeOut; plugin is disabled.\n";
+}
 
 sub load_range_file {
         my ($file) = @_;
@@ -199,10 +210,11 @@ sub unload {
         Plugins::delHooks($hooks) if $hooks;
         Settings::removeFile($control_handle) if defined $control_handle;
 
-        no warnings 'redefine';
-        *Utils::timeOut = sub {
-                return $orig_timeOut->(@_);
-        };
+        if ($override_installed) {
+                no warnings 'redefine';
+                *Utils::timeOut = $orig_timeOut;
+                $override_installed = 0;
+        }
 }
 
 1;
