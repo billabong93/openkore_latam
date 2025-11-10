@@ -65,7 +65,9 @@ if ($orig_timeOut) {
                         _maybe_randomize($r_time);
                 }
 
-                return $orig_timeOut->($r_time, $timeout_value);
+                return @_ > 1
+                        ? $orig_timeOut->($r_time, $timeout_value)
+                        : $orig_timeOut->($r_time);
         };
         $override_installed = 1;
 } else {
