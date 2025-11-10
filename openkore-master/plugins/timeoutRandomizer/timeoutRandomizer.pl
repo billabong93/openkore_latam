@@ -3,6 +3,22 @@ package OpenKore::Plugins::timeoutRandomizer;
 use strict;
 use warnings;
 
+use File::Basename qw(dirname);
+use File::Spec::Functions qw(catdir rel2abs);
+
+BEGIN {
+        my $plugin_dir = dirname(__FILE__);
+        my $root_dir   = dirname(dirname($plugin_dir));
+
+        my $src_dir  = rel2abs(catdir($root_dir, 'src'));
+        my $deps_dir = rel2abs(catdir($src_dir, 'deps'));
+
+        foreach my $path ($src_dir, $deps_dir) {
+                next unless defined $path && -d $path;
+                unshift @INC, $path unless grep { $_ eq $path } @INC;
+        }
+}
+
 use Globals qw(%timeout);
 use Log qw(message warning);
 use Plugins;
