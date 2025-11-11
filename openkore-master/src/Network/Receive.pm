@@ -9704,18 +9704,22 @@ sub private_airship_type {
                 return;
         }
 
+        my $item_id = $char->{last_private_airship_item};
+        my $item_name = defined $item_id ? itemNameSimple($item_id) : itemNameSimple(25464);
+
         if ($result == 0) {
                 message T("Use Private Airship success.\n"), "info";
         } elsif ($result == 1) {
                 error T("Please try PivateAirship again.\n");
         } elsif ($result == 2) {
-                error T("You do not have enough Item to use PivateAirship.\n");
+                error TF("You do not have enough %s to use Private Airship.\n", $item_name);
         } elsif ($result == 3) {
                 error T("Destination map is invalid.\n");
         } elsif ($result == 4) {
                 error T("Source map is invalid.\n");
         } elsif ($result == 5) {
-                error T("Item unavailable for use PivateAirship.\n");
+                my $required_item = itemNameSimple(25464);
+                error TF("%s cannot be used for Private Airship. Please use %s.\n", $item_name, $required_item);
         } else {
                 warning TF("Unknown Private Airship response %d.\n", $result);
         }

@@ -52,6 +52,7 @@ use Task::ErrorReport;
 use Match;
 use Translation;
 use Network::PacketParser qw(STATUS_STR STATUS_AGI STATUS_VIT STATUS_INT STATUS_DEX STATUS_LUK);
+use constant PRIVATE_AIRSHIP_PASSPORT_ID => 25464;
 
 our (%commands, %completions);
 my $needsInit = 1;
@@ -4959,9 +4960,16 @@ sub cmdPrivateAirship {
 		return;
 	}
 
-	$item_id = '25464' if (!defined $item_id || $item_id eq '');
+	$item_id = PRIVATE_AIRSHIP_PASSPORT_ID if (!defined $item_id || $item_id eq '');
 	if ($item_id !~ /^\d+$/) {
 		error T("Item ID must be numeric for 'privateairship'.\n");
+		return;
+	}
+
+	if ($item_id != PRIVATE_AIRSHIP_PASSPORT_ID) {
+		my $requested_item = itemNameSimple($item_id);
+		my $required_item = itemNameSimple(PRIVATE_AIRSHIP_PASSPORT_ID);
+		error TF("%s cannot be used for Private Airship. Please use %s.\n", $requested_item, $required_item);
 		return;
 	}
 
@@ -4981,16 +4989,16 @@ sub cmdPrivateAirship {
 		return;
 	}
 
-	if ($item_id ne '0') {
-		my $item = $char->inventory->getByNameID($item_id);
-		unless ($item && $item->{amount}) {
-			error TF("You do not have item ID %s required for Private Airship.\n", $item_id);
-			return;
-		}
+	my $item = $char->inventory->getByNameID($item_id);
+	unless ($item && $item->{amount}) {
+		error TF("You do not have %s required for Private Airship.\n", itemNameSimple($item_id));
+		return;
 	}
 
+	$char->{last_private_airship_item} = $item_id + 0;
+	$char->{last_private_airship_map} = $map_name;
 	$messageSender->sendPrivateAirshipRequest($map_name, $item_id + 0);
-	message TF("Requested Private Airship to %s using item ID %s.\n", $map_name, $item_id), "info";
+	message TF("Requested Private Airship to %s using %s.\n", $map_name, itemNameSimple($item_id)), "info";
 }
 
 sub cmdPrivateMessage {
