@@ -4966,13 +4966,13 @@ sub cmdPrivateAirship {
 	}
 
 	my $map_name = $map;
-	$map_name .= '.gat' unless $map_name =~ /\\.gat$/i;
+	$map_name .= '.gat' unless $map_name =~ /\.gat$/i;
 
 	my $field_name = $map_name;
-	$field_name =~ s/\\.gat$//i;
+	$field_name =~ s/\.gat$//i;
 
-	unless (eval { Field->new(name => $field_name, loadWeightMap => 0); 1 }) {
-		error TF("Map '%s' does not exist for Private Airship.\n", $field_name);
+	unless (defined $maps_lut{"$field_name.rsw"}) {
+		error TF("Map '%s' does not exist for Private Airship.\n", $map_name);
 		return;
 	}
 
