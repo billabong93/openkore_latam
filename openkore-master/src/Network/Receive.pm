@@ -9696,20 +9696,29 @@ sub quit_response {
 }
 
 sub private_airship_type {
-	my ($self, $args) = @_;
-	if ($args->{fail} == 0) {
-		message TF("Use Private Airship success.\n"),"info";
-	} elsif ($args->{fail} == 1) {
-		message TF("Please try PivateAirship again.\n"),"info";
-	} elsif ($args->{fail} == 2) {
-		message TF("You do not have enough Item to use PivateAirship.\n"), "info";
-	} elsif ($args->{fail} == 3) {
-		message TF("Destination map is invalid.\n"),"info";
-	} elsif ($args->{fail} == 4) {
-		message TF("Source map is invalid.\n"),"info";
-	} elsif ($args->{fail} == 5) {
-		message TF("Item unavailable for use PivateAirship.\n"),"info";
-	}
+        my ($self, $args) = @_;
+        my $result = $args->{type};
+
+        if (!defined $result) {
+                warning T("Received Private Airship response without a result code.\n");
+                return;
+        }
+
+        if ($result == 0) {
+                message T("Use Private Airship success.\n"), "info";
+        } elsif ($result == 1) {
+                error T("Please try PivateAirship again.\n");
+        } elsif ($result == 2) {
+                error T("You do not have enough Item to use PivateAirship.\n");
+        } elsif ($result == 3) {
+                error T("Destination map is invalid.\n");
+        } elsif ($result == 4) {
+                error T("Source map is invalid.\n");
+        } elsif ($result == 5) {
+                error T("Item unavailable for use PivateAirship.\n");
+        } else {
+                warning TF("Unknown Private Airship response %d.\n", $result);
+        }
 }
 
 # 00CB
