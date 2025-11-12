@@ -19,6 +19,16 @@
 # network subsystem overview.</a>
 package Network::Receive;
 
+BEGIN {
+    eval { require Carp::Assert; 1 } or do {
+        require File::Basename;
+        require File::Spec;
+        my $base = File::Spec->rel2abs(File::Basename::dirname(__FILE__));
+        my $root = File::Spec->rel2abs(File::Spec->catdir($base, '..'));
+        unshift @INC, File::Spec->catdir($root, 'deps');
+    };
+}
+
 use strict;
 use Time::HiRes qw(time);
 use Exporter;
