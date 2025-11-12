@@ -492,6 +492,10 @@ sub initHandlers {
 			["use", T("use the Guillotine Cross Poisonous Weapon Skill")],
 			[T("<poison #>"), T("Apply poison using an item from the 'poison' list")],
 			], \&cmdPoison],
+		['privateairship', [
+			T("Use the Private Airship service."),
+			[T("<map name> [<item ID>]"), T("request teleport to <map name> using the specified item (default: Passport ID 25464)")],
+			], \&cmdPrivateAirship],
 		['portals', [
 			T("List portals that are on screen."),
 			["", T("list portals that are on screen")],
@@ -4928,6 +4932,47 @@ sub cmdPortalList {
 		error T("Syntax Error in function 'portals' (List portals)\n" .
 			"Usage: portals or portals <recompile|add>\n");
 	}
+}
+
+sub cmdPrivateAirship {
+	if (!$net || $net->getState() != Network::IN_GAME) {
+		error TF("You must be logged in the game to use this command '%s'\n", shift);
+		return;
+	}
+
+	my (undef, $args) = @_;
+	my ($map, $item_id) = parseArgs($args, 2);
+
+	if (!defined $map || $map eq '') {
+		error T("Syntax Error in function 'privateairship' (Use Private Airship)\n" .
+			"Usage: privateairship <map name> [<item ID>]\n");
+		return;
+	}
+
+	$item_id = '25464' if (!defined $item_id || $item_id eq '');
+	if ($item_id !~ /^\d+$/) {
+		error T("Item ID must be numeric for 'privateairship'.\n");
+		return;
+	}
+
+	my $map_name = $map;
+	$map_name .= '.gat' unless $map_name =~ /\.gat$/i;
+
+	if (length($map_name) > 16) {
+		error TF("Map name '%s' is too long for Private Airship (maximum 16 characters including extension).\n", $map_name);
+		return;
+	}
+
+	if ($item_id ne '0') {
+		my $item = $char->inventory->getByNameID($item_id);
+		unless ($item && $item->{amount}) {
+			error TF("You do not have item ID %s required for Private Airship.\n", $item_id);
+			return;
+		}
+	}
+
+	$messageSender->sendPrivateAirshipRequest($map_name, $item_id + 0);
+	message TF("Requested Private Airship to %s using item ID %s.\n", $map_name, $item_id), "info";
 }
 
 sub cmdPrivateMessage {
