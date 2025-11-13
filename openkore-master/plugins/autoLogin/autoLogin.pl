@@ -21,6 +21,7 @@ my $relog_start_time  = 0;
 my $relog_port;
 my $stop_flag_time    = 0;
 my $listen_seen_time  = 0; # p/ estabilidade da porta
+my $login_seen_once   = 0; # só habilita lógica após primeiro login bem-sucedido
 
 Plugins::register(
     'autoLogin',
@@ -48,6 +49,7 @@ sub on_reload { 1; }
 
 sub on_dc {
     return unless _enabled();
+    return unless $login_seen_once;
 
     my $delay = _num('autoLogin_relog_delay', 5);
     $relog_port = _resolve_port();
@@ -69,12 +71,19 @@ sub tick {
     my $state = ($net ? ($net->getState() // '') : '');
     my $now   = time;
 
-    # (A) Já IN_GAME => garante stop-flag (1x), limpa estados e não chama AHK
+    # (A) Já IN_GAME => garante stop-flag (1x), registra login inicial, limpa estados e não chama AHK
     if ($state eq 'IN_GAME') {
+        if (!$login_seen_once) {
+            $login_seen_once = 1;
+            message "[autoLogin] Primeiro login detectado. Plugin habilitado após este ponto.\n", 'system';
+        }
         if (!$stop_flag_time) { _emit_stop_flag(_resolve_port()); }
         _reset_cycle();
         return;
     }
+
+    # Não realiza nenhuma ação até que o jogador tenha logado pelo menos uma vez
+    return unless $login_seen_once;
 
     # (B) Fase de conexão (qualquer estado não-vazio e não IN_GAME costuma indicar login/char/map connect)
     if (defined $state && $state ne '' && $state ne 'IN_GAME') {
