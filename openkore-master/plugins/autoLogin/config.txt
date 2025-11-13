@@ -1,0 +1,15 @@
+# habilita o plugin
+autoLogin 1
+
+# porta deste profile (fundamental para multi-instância)
+autoLogin_port 6901
+
+# quando está só "aguardando cliente", também acionar o AHK?
+autoLogin_on_wait 1
+autoLogin_wait_delay 2
+
+# atraso entre 'relog' e o início do AHK (em segundos)
+autoLogin_relog_delay 5
+
+# (opcional) debounce para não abrir vários AHKs
+autoLogin_debounce 20

@@ -1,0 +1,4 @@
+﻿Lista de teclados (AHI) — use keyboard_index ou keyboard_id no autoLogin.ini
+---------------------------------------------------------------
+index=01 | keyboard_id=1 | VID=0x05AC | PID=0x0252 | Handle=HID\VID_05AC&PID_0252&REV_0219&MI_00&Col01
+---------------------------------------------------------------
