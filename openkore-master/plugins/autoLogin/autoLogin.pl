@@ -29,6 +29,7 @@ our $last_fired_wait_count   = 0;     # contagem na qual disparamos por último
 # disparo agendado a partir do wrap do Log::message
 our $need_fire               = 0;     # 1 = disparar AHK no próximo tick
 our $need_fire_seen_count    = 0;     # contagem à qual esse disparo se refere
+our $skip_notice_pending     = 0;     # log amigável para a 1ª ocorrência
 
 Plugins::register(
     'autoLogin',
@@ -50,12 +51,12 @@ BEGIN {
                 $autoLogin::wait_seen_count++;
                 $autoLogin::last_seen_port = $1;
 
-                # Se não for a primeira da sessão, agenda disparo (tick processa antes de relog_pending)
-                if ($autoLogin::wait_seen_count >= 2) {
-                    if ($autoLogin::last_fired_wait_count < $autoLogin::wait_seen_count) {
-                        $autoLogin::need_fire            = 1;
-                        $autoLogin::need_fire_seen_count = $autoLogin::wait_seen_count;
-                    }
+                if (!$autoLogin::first_wait_seen) {
+                    $autoLogin::first_wait_seen     = 1;
+                    $autoLogin::skip_notice_pending = 1;
+                } elsif ($autoLogin::last_fired_wait_count < $autoLogin::wait_seen_count) {
+                    $autoLogin::need_fire            = 1;
+                    $autoLogin::need_fire_seen_count = $autoLogin::wait_seen_count;
                 }
             }
         };
@@ -110,6 +111,11 @@ sub in_game_state {
 sub tick {
     return unless _enabled();
 
+    if ($skip_notice_pending) {
+        message "[autoLogin] Primeira detecção de 'aguardando cliente' — pulando esta vez.\n", 'system';
+        $skip_notice_pending = 0;
+    }
+
     # 0) Se já está no jogo: limpa travas e quaisquer agendamentos
     if (in_game_state()) {
         $waiting_fired  = 0;
@@ -119,15 +125,6 @@ sub tick {
 
     # 1) Processa DISPARO AGENDADO PRIMEIRO (antes de respeitar relog_pending)
     if ($need_fire) {
-        # pular explicitamente a 1ª ocorrência da sessão (com log amigável)
-        if (!$first_wait_seen && $wait_seen_count >= 1) {
-            $first_wait_seen = 1;
-            message "[autoLogin] Primeira detecção de 'aguardando cliente' — pulando esta vez.\n", 'system';
-            # não dispara ainda; próxima vez agenda de novo
-            $need_fire = 0;
-            return;
-        }
-
         # Disparo válido (2ª ocorrência ou mais, e ainda não disparado para essa contagem)
         if ($wait_seen_count >= 2 && $last_fired_wait_count < $need_fire_seen_count) {
             my $port = _resolve_port();
@@ -152,12 +149,6 @@ sub tick {
         return;
     }
 
-    # 3) Mensagem de primeira vez (se o wrap contou fora do passo 1)
-    if (!$first_wait_seen && $wait_seen_count >= 1) {
-        $first_wait_seen = 1;
-        message "[autoLogin] Primeira detecção de 'aguardando cliente' — pulando esta vez.\n", 'system';
-        return;
-    }
 }
 
 # ------------------ helpers ------------------
