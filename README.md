@@ -14,7 +14,6 @@ Aqui você encontra tudo pronto: OpenKore configurado, bypass de IP, executávei
 openkore_latam/<br>
 ├── ByPassIP/ # Ferramenta para burlar restrições de IP<br>
 ├── Configurador de IP/ # Script simples para alterar IP/porta rapidamente<br>
-├── RAGEXE + RECV/ # Executáveis customizados (ragexe / recvpacket)<br>
 ├── openkore-master/ # Cliente OpenKore já configurado<br>
 └── README.md # Este arquivo :)<br>
 
