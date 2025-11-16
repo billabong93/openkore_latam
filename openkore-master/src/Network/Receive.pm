@@ -4608,7 +4608,7 @@ sub cash_shop_open_result {
 }
 
 sub cash_shop_buy_result {
-	my ($self, $args) = @_;
+        my ($self, $args) = @_;
 		# SUCCESS            = 0x0,
 		# WRONG_TAB?         = 0x1, // we should take care with this, as it's detectable by the server
 		# SHORTTAGE_CASH     = 0x2,
@@ -4642,8 +4642,22 @@ sub cash_shop_buy_result {
 
 }
 
+sub _quest_mission_display_name {
+	my ($raw_name) = @_;
+	return unless defined $raw_name;
+
+	my $name = bytesToString($raw_name);
+	$name =~ s/\000.*//s;
+
+	if ($monsters_name_lut{$name}) {
+		return $monsters_name_lut{$name};
+	}
+
+	return $name;
+}
+
 sub sprite_change {
-	my ($self, $args) = @_;
+        my ($self, $args) = @_;
 
 	my ($ID, $type, $value1, $value2) = @{$args}{qw(ID type value1 value2)};
 	my $player = ($ID ne $accountID)? $playersList->getByID($ID) : $char;
@@ -4797,7 +4811,7 @@ sub quest_all_list {
             my $mission;
 
             @{$mission}{@{$quest_info->{mission_keys}}} = unpack($quest_info->{mission_pack}, substr($args->{message}, $offset, $quest_info->{mission_len}));
-			$mission->{mob_name} = bytesToString($mission->{mob_name_original});
+$mission->{mob_name} = _quest_mission_display_name($mission->{mob_name_original});
             $mission->{mission_index} = $j;
 
             %{$questList->{$quest->{quest_id}}->{missions}->{$mission->{mob_id}}} = %$mission;
@@ -4857,7 +4871,7 @@ sub quest_all_mission {
 			my $mission;
 
 			@{$mission}{@{$quest_info->{mission_keys}}} = unpack($quest_info->{mission_pack}, substr($args->{message}, $offset, $quest_info->{mission_len}));
-			$mission->{mob_name} = bytesToString($mission->{mob_name_original});
+$mission->{mob_name} = _quest_mission_display_name($mission->{mob_name_original});
 			$mission->{mission_index} = $j;
 
 			%{$questList->{$char_quest->{quest_id}}->{missions}->{$mission->{mob_id}}} = %$mission;
@@ -4927,7 +4941,7 @@ sub quest_add {
 		my $mission;
 
 		@{$mission}{@{$quest_info->{mission_keys}}} = unpack($quest_info->{mission_pack}, substr($args->{message}, $offset, $quest_info->{mission_len}));
-		$mission->{mob_name} = bytesToString($mission->{mob_name_original});
+$mission->{mob_name} = _quest_mission_display_name($mission->{mob_name_original});
 		$mission->{mission_index} = $j;
 
 		%{$questList->{$quest->{quest_id}}->{missions}->{$mission->{mob_id}}} = %$mission;
