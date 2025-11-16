@@ -121,9 +121,9 @@
 1130 Jakk
 1131 Coringa
 1132 Khalitzburg
-1133 Kobold
-1134 Kobold
-1135 Kobold
+1133 Kobold (Machado)
+1134 Kobold (Martelo)
+1135 Kobold (Maça)
 1138 Magnólia
 1139 Louva-a-Deus
 1140 Marduk
@@ -1586,3 +1586,7 @@
 21579 Ecolordofdeath
 23436 Rei Poring
 23437 Rei Poring
+3956 t48B
+3955 uI8B
+1725 PljfBg
+1438 CQuwBg

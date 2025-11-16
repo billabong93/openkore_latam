@@ -40,7 +40,6 @@ use Utils::Assert;
 use Skill;
 use Field;
 use Network;
-use Network::Send ();
 use AI;
 use Actor;
 use Actor::You;
