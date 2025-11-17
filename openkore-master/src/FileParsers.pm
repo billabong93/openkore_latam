@@ -674,17 +674,23 @@ sub parsePortals {
 		$line =~ s/^\s+|\s+$//g;
 		$line =~ s/(.*)[\s\t]+#.*$/$1/;
 
-		if ($line =~ /^([\w|@|-]+)\s(\d{1,3})\s(\d{1,3})\s([\w|@|-]+)\s(\d{1,3})\s(\d{1,3})\s?(.*)/) {
-		my ($source_map, $source_x, $source_y, $dest_map, $dest_x, $dest_y, $misc) = ($1, $2, $3, $4, $5, $6, $7);
+                if ($line =~ /^([\w|@|-]+)\s(\d{1,3})\s(\d{1,3})\s([\w|@|-]+)\s(\d{1,3})\s(\d{1,3})\s?(.*)/) {
+                        my ($source_map, $source_x, $source_y, $dest_map, $dest_x, $dest_y, $misc) = ($1, $2, $3, $4, $5, $6, $7);
+                        my $force_contact = 0;
+                        if ($misc ne '' && $misc =~ s/^@?touch\s+//i) {
+                                $force_contact = 1;
+                        }
+                        $misc =~ s/^\s+|\s+$//g;
 			my $portal = "$source_map $source_x $source_y";
 			my $dest = "$dest_map $dest_x $dest_y";
 			$$r_hash{$portal}{'source'}{'map'} = $source_map;
 			$$r_hash{$portal}{'source'}{'x'} = $source_x;
 			$$r_hash{$portal}{'source'}{'y'} = $source_y;
-			$$r_hash{$portal}{'dest'}{$dest}{'map'} = $dest_map;
-			$$r_hash{$portal}{'dest'}{$dest}{'x'} = $dest_x;
-			$$r_hash{$portal}{'dest'}{$dest}{'y'} = $dest_y;
-			$$r_hash{$portal}{dest}{$dest}{enabled} = 1; # is available permanently (can be used when calculating a route)
+                        $$r_hash{$portal}{'dest'}{$dest}{'map'} = $dest_map;
+                        $$r_hash{$portal}{'dest'}{$dest}{'x'} = $dest_x;
+                        $$r_hash{$portal}{'dest'}{$dest}{'y'} = $dest_y;
+                        $$r_hash{$portal}{'dest'}{$dest}{'touch'} = $force_contact;
+                        $$r_hash{$portal}{dest}{$dest}{enabled} = 1; # is available permanently (can be used when calculating a route)
 			#$$r_hash{$portal}{dest}{$dest}{active} = 1; # TODO: is available right now (otherwise, wait until it becomes available)
 			if ($misc =~ /^(\d+)\s(\d)\s(.*)$/) { # [cost] [allow_ticket] [talk sequence]
 				$$r_hash{$portal}{'dest'}{$dest}{'cost'} = $1;

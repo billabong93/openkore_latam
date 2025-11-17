@@ -221,9 +221,10 @@ sub iterate {
 	} elsif ( $self->{mapSolution}[0]{is_airship} ) {
 		if (!$self->{timeout} || timeOut($self->{timeout}, 0.5)) {
 			$self->{timeout} = time;
-			
-			my $min_npc_dist = 8;
-			my $max_npc_dist = 10;
+
+                        my $requires_contact = $self->{mapSolution}[0]{touch};
+                        my $min_npc_dist = $requires_contact ? 0 : 8;
+                        my $max_npc_dist = $requires_contact ? 0 : 10;
 			my $realPos = calcPosFromPathfinding($field, $self->{actor});
 			my $dist_to_npc = blockDistance($realPos, $self->{mapSolution}[0]{pos});
 
@@ -369,10 +370,11 @@ sub iterate {
 			}
 		}
 
-	} elsif ( $self->{mapSolution}[0]{steps} ) {
-		my $min_npc_dist = 8;
-		my $max_npc_dist = 10;
-		my $realPos = calcPosFromPathfinding($field, $self->{actor});
+} elsif ( $self->{mapSolution}[0]{steps} ) {
+                my $requires_contact = $self->{mapSolution}[0]{touch};
+                my $min_npc_dist = $requires_contact ? 0 : 8;
+                my $max_npc_dist = $requires_contact ? 0 : 10;
+                my $realPos = calcPosFromPathfinding($field, $self->{actor});
 		my $dist_to_npc = blockDistance($realPos, $self->{mapSolution}[0]{pos});
 		
 		if (!exists $self->{mapSolution}[0]{retry} || !defined $self->{mapSolution}[0]{retry}) {
@@ -737,19 +739,24 @@ sub iterate {
 sub setNpcTalk {
 	my ($self) = @_;
 
-	if (%talk) {
-		warning "[mapRoute] [setNpcTalk] % talk is defined for some reason.\n", "ai_npcTalk";
-	}
-	
-	$self->{substage} = 'Waiting for Warp';
-	@{$self}{qw(old_x old_y)} = @{$self->{actor}{pos}}{qw(x y)};
-	$self->{old_map} = $field->baseName;
-	my $task = new Task::TalkNPC(
-		type => 'talknpc',
-		x => $self->{mapSolution}[0]{pos}{x},
-		y => $self->{mapSolution}[0]{pos}{y},
-		sequence => $self->{mapSolution}[0]{steps});
-	$self->setSubtask($task);
+        if (%talk) {
+                warning "[mapRoute] [setNpcTalk] % talk is defined for some reason.\n", "ai_npcTalk";
+        }
+
+        $self->{substage} = 'Waiting for Warp';
+        @{$self}{qw(old_x old_y)} = @{$self->{actor}{pos}}{qw(x y)};
+        $self->{old_map} = $field->baseName;
+        my $sequence = $self->{mapSolution}[0]{steps};
+        if ($self->{mapSolution}[0]{touch}) {
+                $sequence =~ s/^\s+|\s+$//g if defined $sequence;
+                $sequence = $sequence ? "k $sequence" : 'k';
+        }
+        my $task = new Task::TalkNPC(
+                type => 'talknpc',
+                x => $self->{mapSolution}[0]{pos}{x},
+                y => $self->{mapSolution}[0]{pos}{y},
+                sequence => $sequence);
+        $self->setSubtask($task);
 }
 
 sub initMapCalculator {
