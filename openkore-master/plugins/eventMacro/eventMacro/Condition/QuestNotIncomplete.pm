@@ -100,10 +100,10 @@ sub validate_condition {
 
 sub get_new_variable_list {
         my ($self) = @_;
-        my $new_variables;
+        my $new_variables = {};
 
-        $new_variables{".".$self->{name}."LastID"} = $self->{fulfilled_ID};
-        $new_variables{".".$self->{name}."LastListIndex"} = $self->{fulfilled_member_index};
+        $new_variables->{".".$self->{name}."LastID"} = $self->{fulfilled_ID};
+        $new_variables->{".".$self->{name}."LastListIndex"} = $self->{fulfilled_member_index};
 
         return $new_variables;
 }
