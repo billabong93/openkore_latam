@@ -224,7 +224,7 @@ sub iterate {
 
                         my $requires_contact = $self->{mapSolution}[0]{touch};
                         my $min_npc_dist = $requires_contact ? 0 : 8;
-                        my $max_npc_dist = $requires_contact ? 0 : 10;
+                        my $max_npc_dist = $requires_contact ? 0 : 0;
 			my $realPos = calcPosFromPathfinding($field, $self->{actor});
 			my $dist_to_npc = blockDistance($realPos, $self->{mapSolution}[0]{pos});
 
@@ -373,7 +373,7 @@ sub iterate {
 } elsif ( $self->{mapSolution}[0]{steps} ) {
                 my $requires_contact = $self->{mapSolution}[0]{touch};
                 my $min_npc_dist = $requires_contact ? 0 : 8;
-                my $max_npc_dist = $requires_contact ? 0 : 10;
+                my $max_npc_dist = $requires_contact ? 0 : 0;
                 my $realPos = calcPosFromPathfinding($field, $self->{actor});
 		my $dist_to_npc = blockDistance($realPos, $self->{mapSolution}[0]{pos});
 		
