@@ -677,7 +677,7 @@ sub parsePortals {
                 if ($line =~ /^([\w|@|-]+)\s(\d{1,3})\s(\d{1,3})\s([\w|@|-]+)\s(\d{1,3})\s(\d{1,3})\s?(.*)/) {
                         my ($source_map, $source_x, $source_y, $dest_map, $dest_x, $dest_y, $misc) = ($1, $2, $3, $4, $5, $6, $7);
                         my $force_contact = 0;
-                        if ($misc ne '' && $misc =~ s/^@?touch\s+//i) {
+                        if ($misc ne '' && $misc =~ s/^@?(?:touch|k)(?:\s+|$)//i) {
                                 $force_contact = 1;
                         }
                         $misc =~ s/^\s+|\s+$//g;
