@@ -1438,7 +1438,7 @@ sub chatLog_clear {
 sub checkAllowedMap {
 	my $map = shift;
 
-	return unless AI::state == AI::AUTO;
+	return unless AI::state() == AI::AUTO();
 	return unless $config{allowedMaps};
 	return if existsInList($config{allowedMaps}, $map);
 	return if $config{allowedMaps_reaction} == 0;
@@ -3378,7 +3378,7 @@ sub updateDamageTables {
 				ai_useTeleport(1);
 			}
 
-			if (AI::action eq "attack" && mon_control($monster->{name},$monster->{nameID})->{attack_auto} == 3 && $damage) {
+				if (AI::action() eq "attack" && mon_control($monster->{name},$monster->{nameID})->{attack_auto} == 3 && $damage) {
 				# Mob-training, you only need to attack the monster once to provoke it
 				message TF("%s (%s) has been provoked, searching another monster\n", $monster->{name}, $monster->{binID});
 				$char->sendAttackStop;
@@ -3414,7 +3414,7 @@ sub updateDamageTables {
 			$monster->{target} = $targetID;
 			OpenKoreMod::updateDamageTables($monster) if (defined &OpenKoreMod::updateDamageTables);
 
-			if (AI::state == AI::AUTO && ($accountID eq $targetID or $char->{slaves} && $char->{slaves}{$targetID})) {
+				if (AI::state() == AI::AUTO() && ($accountID eq $targetID or $char->{slaves} && $char->{slaves}{$targetID})) {
 				# object under our control
 				my $teleport = 0;
 				if (mon_control($monster->{name},$monster->{nameID})->{teleport_auto} == 2 && $damage){
@@ -4435,22 +4435,22 @@ sub checkSelfCondition {
 	my $prefix = shift;
 	return 0 if (!$prefix);
 	return 0 if ($config{$prefix . "_disabled"});
-
-	return 0 if ($config{$prefix."_whenIdle"} && !AI::isIdle);
-
-	return 0 if ($config{$prefix."_whenNotIdle"} && AI::isIdle);
+	
+	return 0 if ($config{$prefix."_whenIdle"} && !AI::isIdle());
+	
+	return 0 if ($config{$prefix."_whenNotIdle"} && AI::isIdle());
 	
 	# TODO: Is there any situation where we should use calcPosFromPathfinding or calcPosFromTime here in these checks?
-
+	
 	# *_manualAI 0 = auto only
 	# *_manualAI 1 = manual only
 	# *_manualAI 2 = auto or manual
 	if ($config{$prefix . "_manualAI"} == 0 || !(defined $config{$prefix . "_manualAI"})) {
-		return 0 unless AI::state == AI::AUTO;
+	return 0 unless AI::state() == AI::AUTO();
 	} elsif ($config{$prefix . "_manualAI"} == 1){
-		return 0 unless AI::state == AI::MANUAL;
+	return 0 unless AI::state() == AI::MANUAL();
 	} else {
-		return 0 if AI::state == AI::OFF;
+	return 0 if AI::state() == AI::OFF();
 	}
 
 	if ($config{$prefix . "_hp"}) {

@@ -100,7 +100,9 @@ sub new {
 
 	$self->{validatedAddSequence} = 0;
 
-	debug "Task::TalkNPC::new has been called with sequence '".$self->{sequence}."'.\n", "ai_npcTalk";
+        $self->{await_conversation_start} = $self->{sequence} =~ /^k\b/i ? 1 : 0;
+
+        debug "Task::TalkNPC::new has been called with sequence '".$self->{sequence}."'.\n", "ai_npcTalk";
 
 	return $self;
 }
@@ -110,7 +112,7 @@ sub handleNPCTalk {
 	my $self = $holder->[0];
 
 	# TODO: maybe better create a new task
-	if ($self->{stage} == AFTER_NPC_CANCEL) {
+        if ($self->{stage} == AFTER_NPC_CANCEL) {
 		debug "Npc has restarted conversation after talk cancel was sent.\n", "ai_npcTalk";
 
 		if ($self->noMoreSteps) {
@@ -409,11 +411,23 @@ sub iterate {
 		$messageSender->sendTalkCancel($self->{ID});
 		$self->setError(NPC_NO_RESPONSE, T("The NPC did not respond."));
 
-	} elsif ($self->{stage} == TALKING_TO_NPC) {
-		if (%talk && $ai_v{'npc_talk'}{'talk'} eq 'initiated') {
-			debug "Spining until a response is needed from us\n", "ai_npcTalk";
-			return;
-		}
+        } elsif ($self->{stage} == TALKING_TO_NPC) {
+                if ($self->{await_conversation_start}) {
+                        if (%talk) {
+                                while (@{$self->{steps}} && $self->{steps}[0] =~ /^k/i) {
+                                        shift @{$self->{steps}};
+                                }
+                                $self->{await_conversation_start} = 0;
+                                $self->{time} = time;
+                        } elsif (!$self->{wait_for_answer}) {
+                                return;
+                        }
+                }
+
+                if (%talk && $ai_v{'npc_talk'}{'talk'} eq 'initiated') {
+                        debug "Spining until a response is needed from us\n", "ai_npcTalk";
+                        return;
+                }
 
 		#In theory after the talk_response_cancel is sent we shouldn't receive anything, so just wait the timer and assume it's over
 		if ($self->{sent_talk_response_cancel}) {

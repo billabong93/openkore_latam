@@ -80,6 +80,14 @@ git clone https://github.com/OpenKore/openkore.git
 
 OpenKore is developed by a [team](https://github.com/OpenKore/openkore/graphs/contributors) located around the world. Check out the [documentation](https://openkore.com/wiki/Manual) and if necessary, submit a pull request.
 
+### Quick development check
+
+If you want to run a fast syntax check on a single Perl file (for example `src/FileParsers.pm`), set `PERL5LIB` so it can find the bundled dependencies:
+
+```
+PERL5LIB=src:src/deps perl -c src/FileParsers.pm
+```
+
 ## Contacts
 
 * [OpenKore Wiki](https://openkore.com/wiki/)
