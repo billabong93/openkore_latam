@@ -2952,13 +2952,9 @@ moc_ruins 141 125 job_thief1 133 333 0 c
 job_thief1 180 15 moc_ruins 145 117
 
 # Hugel - Lighthalzen Airship (needs additional configuration)
-
 #airplane 243 73 einbroch 92 278
-
 #airplane 243 73 hugel 181 146
-
 #airplane 243 73 lighthalzen 302 75
-
 #airplane 243 73 yuno 92 260
 new_zone01 148 112 new_zone02 100 9
 new_zone02 126 106 new_zone02 160 171
@@ -3394,19 +3390,13 @@ moc_para01 41 187 moc_para01 179 93
 # MAPAS FALTANTES por CELTOS
 
 # Payon Dungeon (variações)
-
 #pay_dun00_a 20 180 pay_dun01 100 100
-
 #pay_dun00_b 20 180 pay_dun01 100 100
-
 #pay_dun00_c 20 180 pay_dun01 100 100
 
 # Orc Dungeon (variações)
-
 #orcsdun01_a 33 170 orcsdun02 21 185
-
 #orcsdun01_b 33 170 orcsdun02 21 185
-
 #orcsdun01_c 33 170 orcsdun02 21 185
 
 # Izlude (variações)
@@ -3416,11 +3406,8 @@ izlude_c 197 205 izlu2dun 107 50 150 c r0
 izlude_d 197 205 izlu2dun 107 50 150 c r0
 
 # Geffen Field 10 (variações)
-
 #gef_fild10_a 52 326 mjolnir_02 99 351 1700 c r2 c r3
-
 #gef_fild10_b 52 326 mjolnir_02 99 351 1700 c r2 c r3
-
 #gef_fild10_c 52 326 mjolnir_02 99 351 1700 c r2 c r3
 
 # Academia Izlude (iz_ac01 / iz_ac02)
@@ -3428,13 +3415,9 @@ iz_ac01_a 100 24 izlude 127 253
 iz_ac01_b 100 24 izlude 127 253
 iz_ac01_c 100 24 izlude 127 253
 iz_ac01_d 100 24 izlude 127 253
-
 #iz_ac02_a 94 27 iz_ac01 78 28
-
 #iz_ac02_b 94 27 iz_ac01 78 28
-
 #iz_ac02_c 94 27 iz_ac01 78 28
-
 #iz_ac02_d 94 27 iz_ac01 78 28
 
 # Arena / Testes
@@ -3447,9 +3430,7 @@ iz_ac01_d 100 24 izlude 127 253
 1@os_c 100 100 prt_are_in 60 14
 
 # Gl_church
-
 #gl_church_a 150 150 gl_church 50 50
-
 #gl_church_b 150 150 gl_church 50 50
 
 # Prontera evento
@@ -3466,12 +3447,7 @@ que_ba 150 150 prontera 116 72
 iz_ac02_a 217 27 iz_ac01_a 122 25
 iz_ac01_a 122 25 iz_ac02_a 214 27
 
-#
-#
-# De nada (variações e updates) 24.09.25 
-#
-#
-# billabong93
+### De nada (variações e updates) 24.09.25 ### billabong93
 
 # Prontera
 prontera 29 207 alberta 117 56 180 1 c r3 c r5 n
@@ -3840,7 +3816,6 @@ veins 208 128 rachel 115 125 220 1 c r2 c r0 n
 hugel 186 147 airplane 244 58 1 1200 c c r0 n
 
 # Aeroplano
-
 #airplane 243 73 airport 143 39
 #airplane 243 73 hugel 183 149
 #airplane 243 73 lhz_airport 143 39
