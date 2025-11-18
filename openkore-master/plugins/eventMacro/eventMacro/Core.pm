@@ -1451,7 +1451,7 @@ sub manage_event_callbacks {
 
 		my $automacro = $self->{Automacro_List}->get($event_type_automacro_call_index);
 
-		message "[eventMacro] Event of type '".$callback_type."', and of name '".$callback_name."' activated automacro '".$automacro->get_name()."', calling macro '".$automacro->get_parameter('call')."'\n", "system";
+                message "[eventMacro] Event of type '".$callback_type."', and of name '".$callback_name."' activated automacro '".$automacro->get_name()."', calling macro '".$automacro->get_parameter('call')."'\n", "eventMacro";
 
 		$self->call_macro($automacro);
 	}
