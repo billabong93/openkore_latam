@@ -51,6 +51,9 @@ reloadS All done.
 relogS brb
 relogS k, be back..
 
+disconnectS Disconnecting now.
+disconnectS Disconnected. Use 'connect' to log in again.
+
 sitS *boof*
 sitS *plop*
 
