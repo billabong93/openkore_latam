@@ -89,6 +89,7 @@ sub get_log_hook_sub {
 
         $self->{Log_Event_Sub} = sub {
                 my ($type, $domain, $level, $currentVerbosity, $message, $user_data, $near, $far) = @_;
+                return if (defined $domain && $domain eq 'eventMacro');
                 $message =~ s/[\r\n]+$//;
 
                 my $args = {
