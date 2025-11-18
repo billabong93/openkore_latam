@@ -108,8 +108,12 @@ sub new {
 }
 
 sub handleNPCTalk {
-	my ($hook_name, $args, $holder) = @_;
-	my $self = $holder->[0];
+my ($hook_name, $args, $holder) = @_;
+my $self = $holder->[0];
+
+if ($self->{await_conversation_start} && $self->{stage} == TALKING_TO_NPC) {
+$self->release_conversation_wait;
+}
 
 	# TODO: maybe better create a new task
         if ($self->{stage} == AFTER_NPC_CANCEL) {
@@ -411,18 +415,14 @@ sub iterate {
 		$messageSender->sendTalkCancel($self->{ID});
 		$self->setError(NPC_NO_RESPONSE, T("The NPC did not respond."));
 
-        } elsif ($self->{stage} == TALKING_TO_NPC) {
-                if ($self->{await_conversation_start}) {
-                        if (%talk) {
-                                while (@{$self->{steps}} && $self->{steps}[0] =~ /^k/i) {
-                                        shift @{$self->{steps}};
-                                }
-                                $self->{await_conversation_start} = 0;
-                                $self->{time} = time;
-                        } elsif (!$self->{wait_for_answer}) {
-                                return;
-                        }
-                }
+} elsif ($self->{stage} == TALKING_TO_NPC) {
+if ($self->{await_conversation_start}) {
+if (%talk) {
+$self->release_conversation_wait;
+} elsif (!$self->{wait_for_answer}) {
+return;
+}
+}
 
                 if (%talk && $ai_v{'npc_talk'}{'talk'} eq 'initiated') {
                         debug "Spining until a response is needed from us\n", "ai_npcTalk";
@@ -943,17 +943,30 @@ sub noMoreSteps {
 }
 
 sub waitingForSteps {
-	my ($self) = @_;
-	return 0 unless ($self->{stage} == TALKING_TO_NPC);
-	return 0 unless ($self->noMoreSteps);
-	return 0 if ($ai_v{'npc_talk'}{'talk'} eq 'next' && $config{autoTalkCont});
-	my $ai_npc_talk_wait_to_answer = $timeout{'ai_npc_talk_wait_to_answer'}{'timeout'} ? $timeout{'ai_npc_talk_wait_to_answer'}{'timeout'} : 1.5;
-	return 0 unless (timeOut($ai_v{'npc_talk'}{'time'}, $ai_npc_talk_wait_to_answer));
-	return 1;
+my ($self) = @_;
+return 0 unless ($self->{stage} == TALKING_TO_NPC);
+return 0 unless ($self->noMoreSteps);
+return 0 if ($ai_v{'npc_talk'}{'talk'} eq 'next' && $config{autoTalkCont});
+my $ai_npc_talk_wait_to_answer = $timeout{'ai_npc_talk_wait_to_answer'}{'timeout'} ? $timeout{'ai_npc_talk_wait_to_answer'}{'timeout'} : 1.5;
+return 0 unless (timeOut($ai_v{'npc_talk'}{'time'}, $ai_npc_talk_wait_to_answer));
+return 1;
+}
+
+sub release_conversation_wait {
+my ($self) = @_;
+return unless ($self->{await_conversation_start});
+return unless (%talk);
+
+while (@{$self->{steps}} && $self->{steps}[0] =~ /^k/i) {
+shift @{$self->{steps}};
+}
+
+$self->{await_conversation_start} = 0;
+$self->{time} = time;
 }
 
 sub addSteps {
-	my ($self, $steps, $unshift) = @_;
+my ($self, $steps, $unshift) = @_;
 	
 	my @new_steps = parse_portal_conversation_args($steps);
 
