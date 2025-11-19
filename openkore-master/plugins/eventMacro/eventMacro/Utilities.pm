@@ -443,15 +443,21 @@ sub get_equipped_item_by_bin_id {
                 $item = $char->inventory->getByName($identifier);
         }
 
-        return $item if $item && $item->{equipped};
+        my $matched_item = $item if $item && $item->{equipped};
 
         foreach my $equipped_item (@{$char->inventory->getItems}) {
                 next unless $equipped_item->{equipped};
-                return $equipped_item if $is_numeric && $equipped_item->{nameID} == $id;
-                return $equipped_item if !$is_numeric && lc($equipped_item->{name}) eq lc($identifier);
+                if ($is_numeric && $equipped_item->{nameID} == $id) {
+                        $matched_item = $equipped_item;
+                        last;
+                } elsif (!$is_numeric && lc($equipped_item->{name}) eq lc($identifier)) {
+                        $matched_item = $equipped_item;
+                        last;
+                }
         }
 
-        return;
+        # If nothing equipped was found, fall back to the first matching item (even if unequipped)
+        return $matched_item || $item;
 }
 
 sub _split_cards_and_enchants {
@@ -480,15 +486,20 @@ sub getEquipProperty {
         my $item = get_equipped_item_by_bin_id($_[0]);
         return 0 unless $item;
 
-        return $item->{attribute} if defined $item->{attribute};
+        my $element_id;
 
-        my @cards = unpack 'v*', $item->{cards} || '';
-        if (@cards && $cards[0] == 255) {
-                my $element_id = $cards[1] % 10;
-                return $element_id if $element_id;
+        $element_id = $item->{attribute} if defined $item->{attribute};
+
+        if (!defined $element_id) {
+                my @cards = unpack 'v*', $item->{cards} || '';
+                if (@cards && $cards[0] == 255) {
+                        $element_id = $cards[1] % 10;
+                }
         }
 
-        return 0;
+        return 0 unless defined $element_id;
+
+        return $elements_lut{$element_id} || 0;
 }
 
 sub getEquipCards {
