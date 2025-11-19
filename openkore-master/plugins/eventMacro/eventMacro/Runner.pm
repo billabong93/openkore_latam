@@ -19,7 +19,7 @@ use eventMacro::FileParser qw(isNewCommandBlock);
 use eventMacro::Utilities qw(cmpr getnpcID getItemIDs getItemPrice getStorageIDs getInventoryIDs getInventoryTypeIDs
         getPlayerID getMonsterID getVenderID getRandom getRandomRange getInventoryAmount getCartAmount getShopAmount
         getStorageAmount getVendAmount getConfig getWord q4rx q4rx2 getArgFromList get_pattern find_variable get_key_or_index getQuestStatus
-        find_hash_and_get_keys find_hash_and_get_values getEquipProperty getEquipCards getEquipCardAmount getEquipOptions getEquipOptionsAmount getEquipRefinement);
+        find_hash_and_get_keys find_hash_and_get_values getEquipCards getEquipCardAmount getEquipOptions getEquipOptionsAmount);
 use eventMacro::Automacro;
 
 # Creates the object
@@ -2188,9 +2188,6 @@ sub parse_command {
                 } elsif ($keyword eq 'storamount') {
                         $result = getStorageAmount($parsed);
 
-                } elsif ($keyword eq 'itemProperty') {
-                        $result = getEquipProperty($parsed);
-
                 } elsif ($keyword eq 'itemCard') {
                         $result = getEquipCards($parsed);
 
@@ -2202,9 +2199,6 @@ sub parse_command {
 
                 } elsif ($keyword eq 'itemOptAmount') {
                         $result = getEquipOptionsAmount($parsed);
-
-                } elsif ($keyword eq 'itemRefinement') {
-                        $result = getEquipRefinement($parsed);
 
                 } elsif ($keyword eq 'config') {
                         $result = getConfig($parsed);

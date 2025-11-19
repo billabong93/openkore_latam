@@ -56,7 +56,7 @@ our %parameters = (
 our $macroKeywords = join '|', qw(
         arg listlength
         cartamount cart Cart
-        itemProperty itemCard itemCardAmount itemOption itemOptAmount itemRefinement
+        itemCard itemCardAmount itemOption itemOptAmount
         config
         defined
         eval
