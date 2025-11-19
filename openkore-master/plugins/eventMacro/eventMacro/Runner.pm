@@ -2200,7 +2200,7 @@ sub parse_command {
                 } elsif ($keyword eq 'itemOption') {
                         $result = getEquipOptions($parsed);
 
-                } elsif ($keyword eq 'itemOptAmount' || $keyword eq 'itemOptAmout') {
+                } elsif ($keyword eq 'itemOptAmount') {
                         $result = getEquipOptionsAmount($parsed);
 
                 } elsif ($keyword eq 'itemRefinement') {
