@@ -454,6 +454,28 @@ sub get_equipped_item_by_bin_id {
         return;
 }
 
+sub _split_cards_and_enchants {
+        my $item = shift;
+        return ([], []) unless $item;
+
+        my @cards = grep { $_ } unpack 'v*', $item->{cards} || '';
+        return ([], []) unless @cards;
+
+        # Strip sentinel entries such as element markers or zeroed options that
+        # do not represent real cards.
+        if ($cards[0] == 255 && @cards >= 2) {
+                splice @cards, 0, 2;
+        }
+        @cards = grep { $_ != 65280 } @cards;
+
+        my @card_names = map { cardName($_) } @cards;
+
+        my @options_like = grep { $_ !~ /carta/i } @card_names;
+        my @real_cards   = grep { $_ =~ /carta/i } @card_names;
+
+        return (\@real_cards, \@options_like);
+}
+
 sub getEquipProperty {
         my $item = get_equipped_item_by_bin_id($_[0]);
         return 0 unless $item;
@@ -473,23 +495,16 @@ sub getEquipCards {
         my $item = get_equipped_item_by_bin_id($_[0]);
         return 0 unless $item;
 
-        my @cards = grep { $_ } unpack 'v*', $item->{cards} || '';
-        return 0 unless @cards;
-        return 0 if $cards[0] == 255 || $cards[0] == 65280;
-
-        my @card_names = map { cardName($_) } @cards;
-        return @card_names ? join(',', @card_names) : 0;
+        my ($cards, undef) = _split_cards_and_enchants($item);
+        return @$cards ? join(',', @$cards) : 0;
 }
 
 sub getEquipCardAmount {
         my $item = get_equipped_item_by_bin_id($_[0]);
         return 0 unless $item;
 
-        my @cards = grep { $_ } unpack 'v*', $item->{cards} || '';
-        return 0 unless @cards;
-        return 0 if $cards[0] == 255 || $cards[0] == 65280;
-
-        return scalar @cards;
+        my ($cards, undef) = _split_cards_and_enchants($item);
+        return scalar @$cards;
 }
 
 sub getEquipOptions {
@@ -497,9 +512,9 @@ sub getEquipOptions {
         return 0 unless $item;
 
         my @options = grep { $_->{type} } map { my @c = unpack 'vvC', $_; { type => $c[0], value => $c[1], param => $c[2] } } unpack '(a5)*', $item->{options} || '';
-        return 0 unless @options;
+        my ($cards, $card_options) = _split_cards_and_enchants($item);
 
-        my @option_names;
+        my @option_names = @$card_options;
         foreach my $option (@options) {
                 if ($itemOptionHandle{$option->{type}} && $itemOption_lut{$itemOptionHandle{$option->{type}}}) {
                         push @option_names, sprintf($itemOption_lut{$itemOptionHandle{$option->{type}}}, $option->{value});
@@ -516,7 +531,9 @@ sub getEquipOptionsAmount {
         return 0 unless $item;
 
         my @options = grep { $_->{type} } map { my @c = unpack 'vvC', $_; { type => $c[0], value => $c[1], param => $c[2] } } unpack '(a5)*', $item->{options} || '';
-        return scalar @options;
+        my (undef, $card_options) = _split_cards_and_enchants($item);
+
+        return scalar(@options) + scalar(@$card_options);
 }
 
 sub getEquipRefinement {
