@@ -17,9 +17,9 @@ use eventMacro::Data;
 use eventMacro::Core;
 use eventMacro::FileParser qw(isNewCommandBlock);
 use eventMacro::Utilities qw(cmpr getnpcID getItemIDs getItemPrice getStorageIDs getInventoryIDs getInventoryTypeIDs
-	getPlayerID getMonsterID getVenderID getRandom getRandomRange getInventoryAmount getCartAmount getShopAmount
-	getStorageAmount getVendAmount getConfig getWord q4rx q4rx2 getArgFromList get_pattern find_variable get_key_or_index getQuestStatus
-	find_hash_and_get_keys find_hash_and_get_values);
+        getPlayerID getMonsterID getVenderID getRandom getRandomRange getInventoryAmount getCartAmount getShopAmount
+        getStorageAmount getVendAmount getConfig getWord q4rx q4rx2 getArgFromList get_pattern find_variable get_key_or_index getQuestStatus
+        find_hash_and_get_keys find_hash_and_get_values getEquipProperty getEquipCards getEquipCardAmount getEquipOptions getEquipOptionsAmount getEquipRefinement);
 use eventMacro::Automacro;
 
 # Creates the object
@@ -2182,14 +2182,32 @@ sub parse_command {
 		} elsif ($keyword eq 'cartamount') {
 			$result = getCartAmount($parsed);
 
-		} elsif ($keyword eq 'shopamount') {
-			$result = getShopAmount($parsed);
+                } elsif ($keyword eq 'shopamount') {
+                        $result = getShopAmount($parsed);
 
-		} elsif ($keyword eq 'storamount') {
-			$result = getStorageAmount($parsed);
+                } elsif ($keyword eq 'storamount') {
+                        $result = getStorageAmount($parsed);
 
-		} elsif ($keyword eq 'config') {
-			$result = getConfig($parsed);
+                } elsif ($keyword eq 'equipProperty') {
+                        $result = getEquipProperty($parsed);
+
+                } elsif ($keyword eq 'equipCard') {
+                        $result = getEquipCards($parsed);
+
+                } elsif ($keyword eq 'equipCardAmount') {
+                        $result = getEquipCardAmount($parsed);
+
+                } elsif ($keyword eq 'equipOption') {
+                        $result = getEquipOptions($parsed);
+
+                } elsif ($keyword eq 'equipOptAmout') {
+                        $result = getEquipOptionsAmount($parsed);
+
+                } elsif ($keyword eq 'equipRefinement') {
+                        $result = getEquipRefinement($parsed);
+
+                } elsif ($keyword eq 'config') {
+                        $result = getConfig($parsed);
 
 		} elsif ($keyword eq 'arg') {
 			$result = getWord($parsed);

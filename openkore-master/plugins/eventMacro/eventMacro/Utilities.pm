@@ -6,13 +6,15 @@ use strict;
 require Exporter;
 our @ISA = qw(Exporter);
 our @EXPORT_OK = qw(q4rx q4rx2 between cmpr match getArgs getnpcID getPlayerID
-	getMonsterID getVenderID getItemIDs getItemPrice getInventoryIDs getInventoryTypeIDs getStorageIDs getSoldOut getInventoryAmount
-	getCartAmount getShopAmount getStorageAmount getVendAmount getRandom getRandomRange getConfig
-	getWord call_macro getArgFromList sameParty processCmd find_variable get_key_or_index getInventoryAmountbyID
-	getStorageAmountbyID getCartAmountbyID getQuestStatus get_pattern find_hash_and_get_keys find_hash_and_get_values);
+        getMonsterID getVenderID getItemIDs getItemPrice getInventoryIDs getInventoryTypeIDs getStorageIDs getSoldOut getInventoryAmount
+        getCartAmount getShopAmount getStorageAmount getVendAmount getRandom getRandomRange getConfig
+        getWord call_macro getArgFromList sameParty processCmd find_variable get_key_or_index getInventoryAmountbyID
+        getStorageAmountbyID getCartAmountbyID getQuestStatus get_pattern find_hash_and_get_keys find_hash_and_get_values
+        getEquipProperty getEquipCards getEquipCardAmount getEquipOptions getEquipOptionsAmount getEquipRefinement);
 
 use Utils;
 use Globals;
+use Misc qw(cardName);
 use AI;
 use Log qw(message error warning debug);
 use Utils qw(parseArgs);
@@ -414,15 +416,98 @@ sub getStorageAmount {
 # get amount of an item in storage by its ID
 # returns -1 if the storage is closed
 sub getStorageAmountbyID {
-	my $ID = $_[0];
-	return -1 unless ($char->storage->wasOpenedThisSession());
-	my $amount = 0;
-	foreach my $item (@{$char->storage->getItems}) {
-		if ($item->{nameID} == $ID) {
-			$amount += $item->{amount};
-		}
-	}
-	return $amount
+        my $ID = $_[0];
+        return -1 unless ($char->storage->wasOpenedThisSession());
+        my $amount = 0;
+        foreach my $item (@{$char->storage->getItems}) {
+                if ($item->{nameID} == $ID) {
+                        $amount += $item->{amount};
+                }
+        }
+        return $amount
+}
+
+sub get_equipped_item_by_bin_id {
+        my $id = $_[0];
+        return unless defined $id;
+        return unless $char->inventory->isReady();
+
+        my $item = $char->inventory->get($id);
+        return unless $item && $item->{equipped};
+
+        return $item;
+}
+
+sub getEquipProperty {
+        my $item = get_equipped_item_by_bin_id($_[0]);
+        return 0 unless $item;
+
+        return $item->{attribute} if defined $item->{attribute};
+
+        my @cards = unpack 'v*', $item->{cards} || '';
+        if (@cards && $cards[0] == 255) {
+                my $element_id = $cards[1] % 10;
+                return $element_id if $element_id;
+        }
+
+        return 0;
+}
+
+sub getEquipCards {
+        my $item = get_equipped_item_by_bin_id($_[0]);
+        return 0 unless $item;
+
+        my @cards = grep { $_ } unpack 'v*', $item->{cards} || '';
+        return 0 unless @cards;
+        return 0 if $cards[0] == 255 || $cards[0] == 65280;
+
+        my @card_names = map { cardName($_) } @cards;
+        return @card_names ? join(',', @card_names) : 0;
+}
+
+sub getEquipCardAmount {
+        my $item = get_equipped_item_by_bin_id($_[0]);
+        return 0 unless $item;
+
+        my @cards = grep { $_ } unpack 'v*', $item->{cards} || '';
+        return 0 unless @cards;
+        return 0 if $cards[0] == 255 || $cards[0] == 65280;
+
+        return scalar @cards;
+}
+
+sub getEquipOptions {
+        my $item = get_equipped_item_by_bin_id($_[0]);
+        return 0 unless $item;
+
+        my @options = grep { $_->{type} } map { my @c = unpack 'vvC', $_; { type => $c[0], value => $c[1], param => $c[2] } } unpack '(a5)*', $item->{options} || '';
+        return 0 unless @options;
+
+        my @option_names;
+        foreach my $option (@options) {
+                if ($itemOptionHandle{$option->{type}} && $itemOption_lut{$itemOptionHandle{$option->{type}}}) {
+                        push @option_names, sprintf($itemOption_lut{$itemOptionHandle{$option->{type}}}, $option->{value});
+                } else {
+                        push @option_names, sprintf('Option (%d, %d, %d)', $option->{type}, $option->{value}, $option->{param});
+                }
+        }
+
+        return @option_names ? join(',', @option_names) : 0;
+}
+
+sub getEquipOptionsAmount {
+        my $item = get_equipped_item_by_bin_id($_[0]);
+        return 0 unless $item;
+
+        my @options = grep { $_->{type} } map { my @c = unpack 'vvC', $_; { type => $c[0], value => $c[1], param => $c[2] } } unpack '(a5)*', $item->{options} || '';
+        return scalar @options;
+}
+
+sub getEquipRefinement {
+        my $item = get_equipped_item_by_bin_id($_[0]);
+        return 0 unless $item;
+
+        return $item->{upgrade} || 0;
 }
 
 # get amount of items for the specifical index in another venders shop
