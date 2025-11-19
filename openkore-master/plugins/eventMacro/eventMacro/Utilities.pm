@@ -428,14 +428,30 @@ sub getStorageAmountbyID {
 }
 
 sub get_equipped_item_by_bin_id {
-        my $id = $_[0];
-        return unless defined $id;
+        my $identifier = $_[0];
+        return unless defined $identifier;
         return unless $char->inventory->isReady();
 
-        my $item = $char->inventory->get($id);
-        return unless $item && $item->{equipped};
+        my $item;
+        my $is_numeric = $identifier =~ /^\s*(\d+)\s*$/;
+        my $id = $1 if $is_numeric;
 
-        return $item;
+        if ($is_numeric) {
+                $item = $char->inventory->getByNameID($id);
+                $item ||= $char->inventory->get($id);
+        } else {
+                $item = $char->inventory->getByName($identifier);
+        }
+
+        return $item if $item && $item->{equipped};
+
+        foreach my $equipped_item (@{$char->inventory->getItems}) {
+                next unless $equipped_item->{equipped};
+                return $equipped_item if $is_numeric && $equipped_item->{nameID} == $id;
+                return $equipped_item if !$is_numeric && lc($equipped_item->{name}) eq lc($identifier);
+        }
+
+        return;
 }
 
 sub getEquipProperty {
