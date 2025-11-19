@@ -57,6 +57,7 @@ our $macroKeywords = join '|', qw(
         arg listlength
         cartamount cart Cart
         equipProperty equipCard equipCardAmount equipOption equipOptAmount equipOptAmout equipRefinement
+        itemProperty itemCard itemCardAmount itemOption itemOptAmount itemOptAmout itemRefinement
         config
         defined
         eval
