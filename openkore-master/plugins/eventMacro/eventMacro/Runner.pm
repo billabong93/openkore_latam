@@ -2188,23 +2188,22 @@ sub parse_command {
                 } elsif ($keyword eq 'storamount') {
                         $result = getStorageAmount($parsed);
 
-                } elsif ($keyword eq 'equipProperty' || $keyword eq 'itemProperty') {
+                } elsif ($keyword eq 'itemProperty') {
                         $result = getEquipProperty($parsed);
 
-                } elsif ($keyword eq 'equipCard' || $keyword eq 'itemCard') {
+                } elsif ($keyword eq 'itemCard') {
                         $result = getEquipCards($parsed);
 
-                } elsif ($keyword eq 'equipCardAmount' || $keyword eq 'itemCardAmount') {
+                } elsif ($keyword eq 'itemCardAmount') {
                         $result = getEquipCardAmount($parsed);
 
-                } elsif ($keyword eq 'equipOption' || $keyword eq 'itemOption') {
+                } elsif ($keyword eq 'itemOption') {
                         $result = getEquipOptions($parsed);
 
-                } elsif ($keyword eq 'equipOptAmount' || $keyword eq 'equipOptAmout'
-                        || $keyword eq 'itemOptAmount' || $keyword eq 'itemOptAmout') {
+                } elsif ($keyword eq 'itemOptAmount' || $keyword eq 'itemOptAmout') {
                         $result = getEquipOptionsAmount($parsed);
 
-                } elsif ($keyword eq 'equipRefinement' || $keyword eq 'itemRefinement') {
+                } elsif ($keyword eq 'itemRefinement') {
                         $result = getEquipRefinement($parsed);
 
                 } elsif ($keyword eq 'config') {
