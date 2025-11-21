@@ -176,20 +176,21 @@ sub initHandlers {
 		['closeshop', T("Close your vending shop."), \&cmdCloseShop],
 		['closebuyshop', undef, \&cmdCloseBuyShop],
 		['closebuyershop', undef, \&cmdCloseBuyerShop],
-		['conf', [
-			T("Change a configuration key"),
-			[T("<key>"), T("displays value of <key>")],
-			[T("<key> <value>"), T("sets value of <key> to <value>")],
-			[T("<key> none"), T("unsets <key>")],
+                ['conf', [
+                        T("Change a configuration key"),
+                        [T("<key>"), T("displays value of <key>")],
+                        [T("<key> <value>"), T("sets value of <key> to <value>")],
+                        [T("<key> none"), T("unsets <key>")],
 			[T("<label>.<attribute>"), T("displays value of the specified configuration key through label")],
 			[T("<label>.<attribute> <value>"), T("set a new value for the specified configuration key through label")],
 			[T("<label>.<attribute> none"), T("unset the specified configuration key through label")],
 			[T("<label>.block"), T("display the current value of the specified block")],
-			[T("<label>.block <value>"), T("set a new value for the specified block through <label>")],
-			[T("<label>block none"), T("unset the specified block through <label>")]
-			], \&cmdConf],
-		['connect', undef, \&cmdConnect],
-		['create', undef, \&cmdCreate],
+                        [T("<label>.block <value>"), T("set a new value for the specified block through <label>")],
+                        [T("<label>block none"), T("unset the specified block through <label>")]
+                        ], \&cmdConf],
+                ['connect', undef, \&cmdConnect],
+                ['disconnect', T("Disconnect from the server without closing OpenKore."), \&cmdDisconnect],
+                ['create', undef, \&cmdCreate],
 		['damage', [
 			T("Damage taken report"),
 			["", T("displays the damage taken report")],
@@ -2173,13 +2174,24 @@ sub cmdConf {
 }
 
 sub cmdConnect {
-	$Settings::no_connect = 0;
+        $Settings::no_connect = 0;
+}
+
+sub cmdDisconnect {
+        my $command = shift;
+
+        if (!$net || $net->getState() == Network::NOT_CONNECTED) {
+                error TF("You must be connected to the server to use this command (%s)\n", $command);
+                return;
+        }
+
+        offlineMode();
 }
 
 sub cmdDamage {
-	my (undef, $args) = @_;
+        my (undef, $args) = @_;
 
-	if ($args eq "") {
+        if ($args eq "") {
 		my $total = 0;
 		message T("Damage Taken Report:\n"), "list";
 		message(sprintf("%-40s %-20s %-10s\n", 'Name', 'Skill', 'Damage'), "list");
