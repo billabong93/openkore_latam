@@ -2761,12 +2761,6 @@ lhz_fild01 210 18 lighthalzen 214 324
 lighthalzen 214 329 lhz_fild01 210 23
 lhz_fild01 367 222 lhz_fild02 36 221
 lhz_fild02 29 219 lhz_fild01 361 222
-mosk_fild02 190 256 mosk_dun01 190 46
-mosk_dun01 190 43 mosk_fild02 190 253
-mosk_dun01 200 272 mosk_dun02 163 31
-mosk_dun02 165 28 mosk_dun01 200 269
-mosk_dun02 266 117 mosk_dun03 33 136
-mosk_dun03 30 133 mosk_dun02 263 118
 nameless_n 157 184 abbey01 51 12
 nameless_i 168 257 nameless_in 12 43
 nameless_in 12 40 nameless_i 168 254
@@ -2788,8 +2782,6 @@ prontera 263 279 prt_in 227 18
 prt_in 227 15 prontera 263 275
 prt_church 115 122 prt_church 168 106
 prt_church 166 106 prt_church 112 122
-alberta 246 51 moscovia 162 56 10000 c r1 c r0 n
-moscovia 166 53 alberta 243 67 0 c r0 n
 alberta 189 151 izlude 190 209 500 c r1
 hu_fild06 200 372 hugel 95 37
 hu_fild06 28 119 hu_fild05 347 130
@@ -2960,13 +2952,9 @@ moc_ruins 141 125 job_thief1 133 333 0 c
 job_thief1 180 15 moc_ruins 145 117
 
 # Hugel - Lighthalzen Airship (needs additional configuration)
-
 #airplane 243 73 einbroch 92 278
-
 #airplane 243 73 hugel 181 146
-
 #airplane 243 73 lighthalzen 302 75
-
 #airplane 243 73 yuno 92 260
 new_zone01 148 112 new_zone02 100 9
 new_zone02 126 106 new_zone02 160 171
@@ -2996,7 +2984,7 @@ geffen 132 66 moc_para01 31 14 c c r0
 geffen 196 147 moc_para01 31 14 c c r0
 payon 177 111 moc_para01 31 14 c c r0
 aldebaran 133 119 moc_para01 31 14 c c r0
-moscovia 220 192 moc_para01 31 14 c c r0
+moscovia 209 197 moc_para01 31 14 c c r0
 einbroch 55 202 moc_para01 31 14 c c r0
 yuno 144 189 moc_para01 31 14 c c r0
 alberta 124 67 moc_para01 31 14 c c r0
@@ -3402,19 +3390,13 @@ moc_para01 41 187 moc_para01 179 93
 # MAPAS FALTANTES por CELTOS
 
 # Payon Dungeon (variações)
-
 #pay_dun00_a 20 180 pay_dun01 100 100
-
 #pay_dun00_b 20 180 pay_dun01 100 100
-
 #pay_dun00_c 20 180 pay_dun01 100 100
 
 # Orc Dungeon (variações)
-
 #orcsdun01_a 33 170 orcsdun02 21 185
-
 #orcsdun01_b 33 170 orcsdun02 21 185
-
 #orcsdun01_c 33 170 orcsdun02 21 185
 
 # Izlude (variações)
@@ -3424,11 +3406,8 @@ izlude_c 197 205 izlu2dun 107 50 150 c r0
 izlude_d 197 205 izlu2dun 107 50 150 c r0
 
 # Geffen Field 10 (variações)
-
 #gef_fild10_a 52 326 mjolnir_02 99 351 1700 c r2 c r3
-
 #gef_fild10_b 52 326 mjolnir_02 99 351 1700 c r2 c r3
-
 #gef_fild10_c 52 326 mjolnir_02 99 351 1700 c r2 c r3
 
 # Academia Izlude (iz_ac01 / iz_ac02)
@@ -3436,13 +3415,9 @@ iz_ac01_a 100 24 izlude 127 253
 iz_ac01_b 100 24 izlude 127 253
 iz_ac01_c 100 24 izlude 127 253
 iz_ac01_d 100 24 izlude 127 253
-
 #iz_ac02_a 94 27 iz_ac01 78 28
-
 #iz_ac02_b 94 27 iz_ac01 78 28
-
 #iz_ac02_c 94 27 iz_ac01 78 28
-
 #iz_ac02_d 94 27 iz_ac01 78 28
 
 # Arena / Testes
@@ -3455,9 +3430,7 @@ iz_ac01_d 100 24 izlude 127 253
 1@os_c 100 100 prt_are_in 60 14
 
 # Gl_church
-
 #gl_church_a 150 150 gl_church 50 50
-
 #gl_church_b 150 150 gl_church 50 50
 
 # Prontera evento
@@ -3474,12 +3447,7 @@ que_ba 150 150 prontera 116 72
 iz_ac02_a 217 27 iz_ac01_a 122 25
 iz_ac01_a 122 25 iz_ac02_a 214 27
 
-#
-#
-# De nada (variações e updates) 24.09.25 
-#
-#
-# billabong93
+### De nada (variações e updates) 24.09.25 ### billabong93
 
 # Prontera
 prontera 29 207 alberta 117 56 180 1 c r3 c r5 n
@@ -3795,6 +3763,7 @@ alberta 245 29 ayothaya 149 71 10000 c r1 c r0 n
 alberta 245 40 lou_fild01 190 101 10000 c r1 c c r0
 alberta 245 62 gon_fild01 258 82 10000 c r1 c c r0 n
 alberta 245 74 amatsu 197 83 10000 c r1 c c c r0 n
+alberta 246 51 moscovia 163 55 10000 c r1 c c r0 n
 alberta 245 82 brasilis 314 60 10000 c c r0 n
 alberta 247 119 tur_dun01 157 39 10000 c r1 c r0 c c n
 alberta_in 66 113 alberta_in 66 132
@@ -3847,19 +3816,12 @@ veins 208 128 rachel 115 125 220 1 c r2 c r0 n
 hugel 186 147 airplane 244 58 1 1200 c c r0 n
 
 # Aeroplano
-
 #airplane 243 73 airport 143 39
-
 #airplane 243 73 hugel 183 149
-
 #airplane 243 73 lhz_airport 143 39
-
 #airplane 243 73 y_airport 143 39
-
 #airplane_01 243 74 izlude 200 73
-
 #airplane_01 243 74 ra_fild12 292 204
-
 #airplane_01 243 74 y_airport 143 39
 airport 138 46 airplane 244 58 1200 1 c r0 c r0 n
 airport 148 46 airplane 244 58 1200 1 c r0 c r0 n
@@ -3868,6 +3830,18 @@ airport 148 46 airplane 244 58 1200 1 c r0 c r0 n
 brasilis 316 57 alberta 244 115 c r0 n
 brasilis 308 336 bra_fild01 74 34
 bra_fild01 72 34 brasilis 309 334
+
+# Moskovia
+moscovia 166 53 alberta 244 86 c c r0 n 
+moscovia 136 46 mosk_fild01 95 93
+mosk_fild01 86 104 mosk_fild02 204 54 c c r2 c c c r1 c n
+mosk_fild02 198 53 moscovia 140 54 c r0 n
+mosk_fild02 190 256 mosk_dun01 190 46
+mosk_dun01 190 43 mosk_fild02 190 253
+mosk_dun01 207 276 mosk_dun02 165 30 c c r0 n
+mosk_dun02 168 28 mosk_dun01 201 269 c c r0 n
+mosk_dun02 268 117 mosk_dun03 32 135 c c r0 n
+mosk_dun03 27 131 mosk_dun02 262 118 c c r0 n
 
 # Arredores de Prontera 08
 prt_fild08a 16 187 prt_fild07 380 186
@@ -4058,9 +4032,9 @@ ve_fild03a 222 43 ve_fild05 200 325
 ve_fild03b 222 43 ve_fild05 200 325
 ve_fild03a 168 240 thor_v01 21 229
 ve_fild03b 168 240 thor_v01 21 229
-ve_fild07a 147 371 veins 146 28							  
+ve_fild07a 147 371 veins 146 28
 ve_fild07a 127 130 nameless_n 257 217
-ve_fild07b 147 371 veins 146 28							  
+ve_fild07b 147 371 veins 146 28
 ve_fild07b 127 130 nameless_n 257 217
 
 # Caverna de Magma
@@ -4252,5 +4226,4 @@ veins 198 133 eclage 100 28 17000 c r1 c r0 n
 veins 198 133 splendide 271 386 17000 c r2 c r0 n
 veins 198 133 mid_camp 210 288 19000 c r3 c r0 n
 veins 198 133 manuk 112 352 22000 c r4 c r0 n
-
 veins 198 133 dic_fild01 149 279 24000 c r5 c r0 n

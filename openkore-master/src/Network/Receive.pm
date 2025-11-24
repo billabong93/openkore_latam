@@ -4608,7 +4608,7 @@ sub cash_shop_open_result {
 }
 
 sub cash_shop_buy_result {
-	my ($self, $args) = @_;
+        my ($self, $args) = @_;
 		# SUCCESS            = 0x0,
 		# WRONG_TAB?         = 0x1, // we should take care with this, as it's detectable by the server
 		# SHORTTAGE_CASH     = 0x2,
@@ -4642,8 +4642,28 @@ sub cash_shop_buy_result {
 
 }
 
+sub _quest_mission_display_name {
+	my ($raw_name, $mob_id) = @_;
+	return unless defined $raw_name;
+
+	my $name = bytesToString($raw_name);
+	$name =~ s/\000.*//s;
+
+	if ($monsters_name_lut{$name}) {
+		return $monsters_name_lut{$name};
+	}
+
+	if (defined $mob_id && $monsters_lut{$mob_id}) {
+		my $entry = $monsters_lut{$mob_id};
+		return $entry->{name} if ref $entry eq 'HASH' && $entry->{name};
+		return $entry;
+	}
+
+	return $name;
+}
+
 sub sprite_change {
-	my ($self, $args) = @_;
+        my ($self, $args) = @_;
 
 	my ($ID, $type, $value1, $value2) = @{$args}{qw(ID type value1 value2)};
 	my $player = ($ID ne $accountID)? $playersList->getByID($ID) : $char;
@@ -4796,8 +4816,8 @@ sub quest_all_list {
         for ( my $j = 0 ; $j < $quest->{mission_amount}; $j++ ) {
             my $mission;
 
-            @{$mission}{@{$quest_info->{mission_keys}}} = unpack($quest_info->{mission_pack}, substr($args->{message}, $offset, $quest_info->{mission_len}));
-			$mission->{mob_name} = bytesToString($mission->{mob_name_original});
+		@{$mission}{@{$quest_info->{mission_keys}}} = unpack($quest_info->{mission_pack}, substr($args->{message}, $offset, $quest_info->{mission_len}));
+		$mission->{mob_name} = _quest_mission_display_name($mission->{mob_name_original}, $mission->{mob_id});
             $mission->{mission_index} = $j;
 
             %{$questList->{$quest->{quest_id}}->{missions}->{$mission->{mob_id}}} = %$mission;
@@ -4856,8 +4876,8 @@ sub quest_all_mission {
 
 			my $mission;
 
-			@{$mission}{@{$quest_info->{mission_keys}}} = unpack($quest_info->{mission_pack}, substr($args->{message}, $offset, $quest_info->{mission_len}));
-			$mission->{mob_name} = bytesToString($mission->{mob_name_original});
+		@{$mission}{@{$quest_info->{mission_keys}}} = unpack($quest_info->{mission_pack}, substr($args->{message}, $offset, $quest_info->{mission_len}));
+		$mission->{mob_name} = _quest_mission_display_name($mission->{mob_name_original}, $mission->{mob_id});
 			$mission->{mission_index} = $j;
 
 			%{$questList->{$char_quest->{quest_id}}->{missions}->{$mission->{mob_id}}} = %$mission;
@@ -4927,7 +4947,7 @@ sub quest_add {
 		my $mission;
 
 		@{$mission}{@{$quest_info->{mission_keys}}} = unpack($quest_info->{mission_pack}, substr($args->{message}, $offset, $quest_info->{mission_len}));
-		$mission->{mob_name} = bytesToString($mission->{mob_name_original});
+		$mission->{mob_name} = _quest_mission_display_name($mission->{mob_name_original}, $mission->{mob_id});
 		$mission->{mission_index} = $j;
 
 		%{$questList->{$quest->{quest_id}}->{missions}->{$mission->{mob_id}}} = %$mission;
@@ -9697,18 +9717,31 @@ sub quit_response {
 
 sub private_airship_type {
 	my ($self, $args) = @_;
-	if ($args->{fail} == 0) {
-		message TF("Use Private Airship success.\n"),"info";
-	} elsif ($args->{fail} == 1) {
-		message TF("Please try PivateAirship again.\n"),"info";
-	} elsif ($args->{fail} == 2) {
-		message TF("You do not have enough Item to use PivateAirship.\n"), "info";
-	} elsif ($args->{fail} == 3) {
-		message TF("Destination map is invalid.\n"),"info";
-	} elsif ($args->{fail} == 4) {
-		message TF("Source map is invalid.\n"),"info";
-	} elsif ($args->{fail} == 5) {
-		message TF("Item unavailable for use PivateAirship.\n"),"info";
+	my $result = $args->{type};
+
+	if (!defined $result) {
+			warning T("Received Private Airship response without a result code.\n");
+			return;
+	}
+
+	my $item_id = $char->{last_private_airship_item};
+	my $item_name = defined $item_id ? itemNameSimple($item_id) : itemNameSimple(25464);
+
+	if ($result == 0) {
+			message T("Use Private Airship success.\n"), "info";
+	} elsif ($result == 1) {
+			error T("Please try PivateAirship again.\n");
+	} elsif ($result == 2) {
+			error TF("You do not have enough %s to use Private Airship.\n", $item_name);
+	} elsif ($result == 3) {
+			error T("Destination map is invalid.\n");
+	} elsif ($result == 4) {
+			error T("Source map is invalid.\n");
+	} elsif ($result == 5) {
+			my $required_item = itemNameSimple(25464);
+			error TF("%s cannot be used for Private Airship. Please use %s.\n", $item_name, $required_item);
+	} else {
+			warning TF("Unknown Private Airship response %d.\n", $result);
 	}
 }
 

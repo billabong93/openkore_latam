@@ -28,6 +28,7 @@ use utf8;
 use Modules 'register';
 use Globals;
 use Log qw(message debug error warning);
+use Field;
 use Misc;
 use Network;
 use Network::Send ();
@@ -42,6 +43,7 @@ use Task::ErrorReport;
 use Match;
 use Translation;
 use Network::PacketParser qw(STATUS_STR STATUS_AGI STATUS_VIT STATUS_INT STATUS_DEX STATUS_LUK);
+use constant PRIVATE_AIRSHIP_PASSPORT_ID => 25464;
 
 our (%commands, %completions);
 my $needsInit = 1;
@@ -174,20 +176,21 @@ sub initHandlers {
 		['closeshop', T("Close your vending shop."), \&cmdCloseShop],
 		['closebuyshop', undef, \&cmdCloseBuyShop],
 		['closebuyershop', undef, \&cmdCloseBuyerShop],
-		['conf', [
-			T("Change a configuration key"),
-			[T("<key>"), T("displays value of <key>")],
-			[T("<key> <value>"), T("sets value of <key> to <value>")],
-			[T("<key> none"), T("unsets <key>")],
+                ['conf', [
+                        T("Change a configuration key"),
+                        [T("<key>"), T("displays value of <key>")],
+                        [T("<key> <value>"), T("sets value of <key> to <value>")],
+                        [T("<key> none"), T("unsets <key>")],
 			[T("<label>.<attribute>"), T("displays value of the specified configuration key through label")],
 			[T("<label>.<attribute> <value>"), T("set a new value for the specified configuration key through label")],
 			[T("<label>.<attribute> none"), T("unset the specified configuration key through label")],
 			[T("<label>.block"), T("display the current value of the specified block")],
-			[T("<label>.block <value>"), T("set a new value for the specified block through <label>")],
-			[T("<label>block none"), T("unset the specified block through <label>")]
-			], \&cmdConf],
-		['connect', undef, \&cmdConnect],
-		['create', undef, \&cmdCreate],
+                        [T("<label>.block <value>"), T("set a new value for the specified block through <label>")],
+                        [T("<label>block none"), T("unset the specified block through <label>")]
+                        ], \&cmdConf],
+                ['connect', undef, \&cmdConnect],
+                ['disconnect', T("Disconnect from the server without closing OpenKore."), \&cmdDisconnect],
+                ['create', undef, \&cmdCreate],
 		['damage', [
 			T("Damage taken report"),
 			["", T("displays the damage taken report")],
@@ -2171,13 +2174,24 @@ sub cmdConf {
 }
 
 sub cmdConnect {
-	$Settings::no_connect = 0;
+        $Settings::no_connect = 0;
+}
+
+sub cmdDisconnect {
+        my $command = shift;
+
+        if (!$net || $net->getState() == Network::NOT_CONNECTED) {
+                error TF("You must be connected to the server to use this command (%s)\n", $command);
+                return;
+        }
+
+        offlineMode();
 }
 
 sub cmdDamage {
-	my (undef, $args) = @_;
+        my (undef, $args) = @_;
 
-	if ($args eq "") {
+        if ($args eq "") {
 		my $total = 0;
 		message T("Damage Taken Report:\n"), "list";
 		message(sprintf("%-40s %-20s %-10s\n", 'Name', 'Skill', 'Damage'), "list");
@@ -4949,30 +4963,45 @@ sub cmdPrivateAirship {
 		return;
 	}
 
-	$item_id = '25464' if (!defined $item_id || $item_id eq '');
+	$item_id = PRIVATE_AIRSHIP_PASSPORT_ID if (!defined $item_id || $item_id eq '');
 	if ($item_id !~ /^\d+$/) {
 		error T("Item ID must be numeric for 'privateairship'.\n");
+		return;
+	}
+
+	if ($item_id != PRIVATE_AIRSHIP_PASSPORT_ID) {
+		my $requested_item = itemNameSimple($item_id);
+		my $required_item = itemNameSimple(PRIVATE_AIRSHIP_PASSPORT_ID);
+		error TF("%s cannot be used for Private Airship. Please use %s.\n", $requested_item, $required_item);
 		return;
 	}
 
 	my $map_name = $map;
 	$map_name .= '.gat' unless $map_name =~ /\.gat$/i;
 
+	my $field_name = $map_name;
+	$field_name =~ s/\.gat$//i;
+
+	unless (defined $maps_lut{"$field_name.rsw"}) {
+		error TF("Map '%s' does not exist for Private Airship.\n", $map_name);
+		return;
+	}
+
 	if (length($map_name) > 16) {
 		error TF("Map name '%s' is too long for Private Airship (maximum 16 characters including extension).\n", $map_name);
 		return;
 	}
 
-	if ($item_id ne '0') {
-		my $item = $char->inventory->getByNameID($item_id);
-		unless ($item && $item->{amount}) {
-			error TF("You do not have item ID %s required for Private Airship.\n", $item_id);
-			return;
-		}
+	my $item = $char->inventory->getByNameID($item_id);
+	unless ($item && $item->{amount}) {
+		error TF("You do not have %s required for Private Airship.\n", itemNameSimple($item_id));
+		return;
 	}
 
+	$char->{last_private_airship_item} = $item_id + 0;
+	$char->{last_private_airship_map} = $map_name;
 	$messageSender->sendPrivateAirshipRequest($map_name, $item_id + 0);
-	message TF("Requested Private Airship to %s using item ID %s.\n", $map_name, $item_id), "info";
+	message TF("Requested Private Airship to %s using %s.\n", $map_name, itemNameSimple($item_id)), "info";
 }
 
 sub cmdPrivateMessage {

@@ -1,2 +1,0 @@
-sellAuto_humanize 1  		# 1 = ligado / 0 = desligado
-sellAuto_humanDelay 1.0		# ajuste o intervalo entre itens (segundos)

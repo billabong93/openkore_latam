@@ -294,19 +294,24 @@ sub processChatCommand {
 		}
 
 	} elsif ($switch eq "reload") {
-		parseReload($after);
-		sendMessage($messageSender, $type, getResponse("reloadS"), $user) if $config{verbose};
-		$timeout{ai_thanks_set}{time} = time;
+                parseReload($after);
+                sendMessage($messageSender, $type, getResponse("reloadS"), $user) if $config{verbose};
+                $timeout{ai_thanks_set}{time} = time;
 
-	} elsif ($switch eq "relog") {
-		sendMessage($messageSender, $type, getResponse("relogS"), $user) if $config{verbose};
-		relog($args[0]);
-		$timeout{ai_thanks_set}{time} = time;
+        } elsif ($switch eq "relog") {
+                sendMessage($messageSender, $type, getResponse("relogS"), $user) if $config{verbose};
+                relog($args[0]);
+                $timeout{ai_thanks_set}{time} = time;
 
-	} elsif ($msg =~ /\bshut[\s\S]*up\b/) {
-		if ($config{verbose}) {
-			configModify("verbose", 0);
-			sendMessage($messageSender, $type, getResponse("verboseOffS"), $user);
+        } elsif ($switch eq "disconnect") {
+                offlineMode();
+                sendMessage($messageSender, $type, getResponse("disconnectS"), $user) if $config{verbose};
+                $timeout{ai_thanks_set}{time} = time;
+
+        } elsif ($msg =~ /\bshut[\s\S]*up\b/) {
+                if ($config{verbose}) {
+                        configModify("verbose", 0);
+                        sendMessage($messageSender, $type, getResponse("verboseOffS"), $user);
 			$timeout{ai_thanks_set}{time} = time;
 		} else {
 			sendMessage($messageSender, $type, getResponse("verboseOffF"), $user);
