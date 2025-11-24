@@ -189,7 +189,7 @@ sub iterate {
 		$self->populateOpenListWithGoCommands() unless ($self->{noGoCommand});
 
 		delete $self->{tempPortalsSaveMap} if (exists $self->{tempPortalsSaveMap});
-		if (!$self->{noTeleSpawn} && canUseTeleport(2) && isSaveMapSetAndValid()) {
+		if (!$self->{noTeleSpawn} && canUseTeleport(2) && isSaveMapSetAndValid() && $config{route_saveMapWarp}) {
 			$self->populateOpenListWithWarpToSaveMap();
 		}
 
@@ -349,7 +349,11 @@ sub searchStep {
 					$arg{allow_ticket} = $closelist->{$this}{allow_ticket};
 					$arg{zeny_covered_by_tickets} = $closelist->{$this}{zeny_covered_by_tickets};
 					$arg{amount_of_tickets_used} = $closelist->{$this}{amount_of_tickets_used};
-					if ($closelist->{$this}{is_airship}) {
+					if ($closelist->{$this}{is_teleportToSaveMap}) {
+						# Teleport-to-savepoint has no physical steps between maps; treat as zero to avoid
+						# relying on nonexistent portal metadata.
+						$arg{steps} = 0;
+					} elsif ($closelist->{$this}{is_airship}) {
 						$arg{steps} = $portals_airships{$from}{dest}{$to}{steps};
 					} else {
 						$arg{steps} = $portals_lut{$from}{dest}{$to}{steps};
@@ -458,20 +462,17 @@ sub populateOpenListWithWarpToSaveMap {
 	my $current_x   = $self->{source}{x};
 	my $current_y   = $self->{source}{y};
 	my $from_node   = "$current_map $current_x $current_y";
-	
-	my $dest_map = hashSafeGetValue(\%config, 'saveMap');
-	my $dest_x = hashSafeGetValue(\%config, 'saveMap_x');
-	my $dest_y = hashSafeGetValue(\%config, 'saveMap_y');
-	
-	my $dest = $dest_map . " " . $dest_x . " " . $dest_y;
 
+	my ($dest_map, $dest_x, $dest_y, $dest) = getSaveMapDestination();
+	return unless $dest_map;
+	
 	debug "CalcMapRoute - Adding savemap '".( $dest )."' to openlist.\n", "calc_map_route";
 
 	my $key = "$from_node=$dest";
 
 	$self->{openlist}{$key} = {
 		parent                   => undef,
-		walk                     => $routeWeights{WARPTOSAVEMAP} || 200,
+		walk                     => $routeWeights{WARPTOSAVEMAP} // 200,
 		zeny                     => 0,
 		allow_ticket             => 0,
 		zeny_covered_by_tickets  => 0,
@@ -486,19 +487,29 @@ sub populateOpenListWithWarpToSaveMap {
 }
 
 sub isSaveMapSetAndValid {
-	my $dest_map = hashSafeGetValue(\%config, 'saveMap');
-	my $dest_x = hashSafeGetValue(\%config, 'saveMap_x');
-	my $dest_y = hashSafeGetValue(\%config, 'saveMap_y');
-	return 0 unless (defined $dest_map);
-	return 0 unless (defined $dest_x);
-	return 0 unless (defined $dest_y);
-	my $dest = $dest_map . " " . $dest_x . " " . $dest_y;
-
-	return 0 unless (hashSafeGetValue(\%portals_spawns, $dest, 'dest', $dest));
-
-	return 1;
+	return getSaveMapDestination() ? 1 : 0;
 }
 
+sub getSaveMapDestination {
+        my $dest_map = hashSafeGetValue(\%config, 'saveMap');
+        return unless defined $dest_map && $dest_map ne '';
+
+        my @candidates;
+        my $dest_x = hashSafeGetValue(\%config, 'saveMap_x');
+        my $dest_y = hashSafeGetValue(\%config, 'saveMap_y');
+        if (defined $dest_x && $dest_x ne '' && defined $dest_y && $dest_y ne '') {
+                push @candidates, "$dest_map $dest_x $dest_y";
+        }
+        push @candidates, grep { /^$dest_map\b/ } keys %portals_spawns;
+
+        foreach my $dest (@candidates) {
+                next unless hashSafeGetValue(\%portals_spawns, $dest, 'dest', $dest);
+                my ($map, $x, $y) = split / /, $dest;
+                return ($map, $x, $y, $dest);
+        }
+
+        return;
+}
 
 
 1;
