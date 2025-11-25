@@ -4401,11 +4401,12 @@ sub processRepairAuto {
 
     my $brokenItems = repairAutoBrokenItems();
 
-    if ((AI::isIdle || AI::action eq "route" || AI::action eq "follow" || AI::action eq "sitAuto")
-            && $config{'repairAuto'}
+    if ($config{'repairAuto'}
             && @$brokenItems
             && !AI::inQueue("storageAuto", "buyAuto", "sellAuto", "repairAuto")
-            && !$ai_v{sitAuto_forcedBySitCommand}) {
+            && !$ai_v{sitAuto_forcedBySitCommand}
+            && !AI::is("repairAuto")) {
+        $timeout{ai_repair}{time} = time;
         AI::queue("repairAuto", {useSkill => $config{'repairAuto_useSkill'}});
     }
 
