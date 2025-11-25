@@ -53,11 +53,11 @@ sub update_validator_var {
 
 sub get_new_variable_list {
     my ($self) = @_;
-    my $new_variables;
+    my $new_variables = {};
     return $new_variables unless (defined $self->{last_member});
 
-    $new_variables{".".$self->{name}."Last"} = $self->{last_member}{wanted};
-    $new_variables{".".$self->{name}."LastAmount"} = $self->{last_member}{amount};
+    $new_variables->{".".$self->{name}."Last"} = $self->{last_member}{wanted};
+    $new_variables->{".".$self->{name}."LastAmount"} = $self->{last_member}{amount};
 
     return $new_variables;
 }
