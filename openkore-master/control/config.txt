@@ -418,6 +418,12 @@ tankersList
 
 repairAuto 0
 repairAuto_list
+repairAuto_npc
+repairAuto_standpoint
+repairAuto_distance 3
+repairAuto_maxDistance
+repairAuto_npc_steps
+repairAuto_useSkill 0
 
 status_mapProperty 0
 status_mapType 0

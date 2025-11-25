@@ -700,6 +700,12 @@ repairAuto 0
 # 是否自動修理武器裝備 必須要有此技能的職業
 repairAuto_list
 # 自動修理列表
+repairAuto_npc
+repairAuto_standpoint
+repairAuto_distance 3
+repairAuto_maxDistance
+repairAuto_npc_steps
+repairAuto_useSkill 0
 
 
 #════════════
