@@ -1,6 +1,14 @@
 package eventMacro::Condition::Base::Inventory;
 
 use strict;
+use FindBin qw($RealBin);
+use File::Spec;
+use lib File::Spec->catdir($RealBin, '..', '..');
+use lib File::Spec->catdir($RealBin, '..', '..', '..');
+use lib File::Spec->catdir($RealBin, '..', '..', '..', '..');
+use lib File::Spec->catdir($RealBin, '..', '..', '..', '..', '..');
+use lib File::Spec->catdir($RealBin, '..', '..', '..', '..', '..', 'src');
+use lib File::Spec->catdir($RealBin, '..', '..', '..', '..', '..', 'src', 'deps');
 
 use base 'eventMacro::Conditiontypes::NumericConditionState';
 

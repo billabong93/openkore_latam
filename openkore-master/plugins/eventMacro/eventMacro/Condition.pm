@@ -1,6 +1,11 @@
 package eventMacro::Condition;
 
 use strict;
+use FindBin qw($RealBin);
+use File::Spec;
+use lib File::Spec->catdir($RealBin, '..');
+use lib File::Spec->catdir($RealBin, '..', '..', '..', 'src');
+use lib File::Spec->catdir($RealBin, '..', '..', '..', 'src', 'deps');
 use eventMacro::Data qw( $eventMacro EVENT_TYPE STATE_TYPE );
 use Log qw(message error warning debug);
 
