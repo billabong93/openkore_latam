@@ -4388,6 +4388,30 @@ sub repairAutoBrokenItems {
     return \@broken;
 }
 
+sub repairAutoEquipAfter {
+    my ($args) = @_;
+
+    return 1 unless ($config{repairAuto_equipAfter} && $args->{repairTargets});
+
+    $args->{equipQueue} ||= [@{$args->{repairTargets}}];
+
+    # Let pending equip requests finish before sending another.
+    return 0 if ($ai_v{temp}{waitForEquip});
+
+    while (my $itemID = shift @{$args->{equipQueue}}) {
+        my $item = $char->inventory->getByID($itemID);
+        next unless $item && $item->equippable;
+        next if $item->{broken} || $item->{equipped};
+
+        $item->equip;
+        return 0;
+    }
+
+    delete $args->{equipQueue};
+    $args->{equippedAfterRepair} = 1;
+    return 1;
+}
+
 sub repairAutoSkillHandle {
     foreach my $handle (qw(NC_REPAIR BS_REPAIRWEAPON ABR_NET_REPAIR)) {
         return $handle if ($char->{skills}{$handle}{lv});
@@ -4425,15 +4449,7 @@ sub processRepairAuto {
         $args->{useSkill} = $config{'repairAuto_useSkill'};
 
         if (!@$brokenItems) {
-            if ($config{repairAuto_equipAfter} && $args->{repairTargets} && !$args->{equippedAfterRepair}) {
-                foreach my $itemID (@{$args->{repairTargets}}) {
-                    my $item = $char->inventory->getByID($itemID);
-                    next unless $item && $item->equippable;
-                    next if $item->{broken} || $item->{equipped};
-                    $item->equip;
-                }
-                $args->{equippedAfterRepair} = 1;
-            }
+            return unless ($args->{equippedAfterRepair} || repairAutoEquipAfter($args));
             $args->{done} = 1;
             return;
         }
@@ -4556,15 +4572,7 @@ sub processRepairAuto {
                 delete @{$args}{qw(sentNpcTalk sentNpcTalk_time repairing sentRepair waitingForList distance)};
                 $timeout{ai_repair}{time} = time;
             } else {
-                if ($config{repairAuto_equipAfter} && $args->{repairTargets} && !$args->{equippedAfterRepair}) {
-                    foreach my $itemID (@{$args->{repairTargets}}) {
-                        my $item = $char->inventory->getByID($itemID);
-                        next unless $item && $item->equippable;
-                        next if $item->{broken} || $item->{equipped};
-                        $item->equip;
-                    }
-                    $args->{equippedAfterRepair} = 1;
-                }
+                return unless ($args->{equippedAfterRepair} || repairAutoEquipAfter($args));
                 $args->{done} = 1;
             }
         }
