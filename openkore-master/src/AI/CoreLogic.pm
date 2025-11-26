@@ -4399,6 +4399,11 @@ sub repairAutoSkillHandle {
 sub processRepairAuto {
     return if ($net->getState() != Network::IN_GAME);
 
+    if ($config{repairAuto_inTownOnly} && !$field->isCity) {
+        AI::dequeue if (AI::action eq "repairAuto");
+        return;
+    }
+
     my $brokenItems = repairAutoBrokenItems();
 
     if ($config{'repairAuto'}
