@@ -4399,6 +4399,11 @@ sub repairAutoSkillHandle {
 sub processRepairAuto {
     return if ($net->getState() != Network::IN_GAME);
 
+    if ($config{repairAuto_inTownOnly} && !$field->isCity) {
+        AI::dequeue if (AI::action eq "repairAuto");
+        return;
+    }
+
     my $brokenItems = repairAutoBrokenItems();
 
     if ($config{'repairAuto'}
@@ -4407,7 +4412,7 @@ sub processRepairAuto {
             && !$ai_v{sitAuto_forcedBySitCommand}
             && !AI::is("repairAuto")) {
         $timeout{ai_repair}{time} = time;
-        AI::queue("repairAuto", {useSkill => $config{'repairAuto_useSkill'}});
+        AI::queue("repairAuto", {useSkill => $config{'repairAuto_useSkill'}, repairTargets => [map { $_->{ID} } @$brokenItems]});
     }
 
     if (AI::action eq "repairAuto" && AI::args->{done}) {
@@ -4420,6 +4425,15 @@ sub processRepairAuto {
         $args->{useSkill} = $config{'repairAuto_useSkill'};
 
         if (!@$brokenItems) {
+            if ($config{repairAuto_equipAfter} && $args->{repairTargets} && !$args->{equippedAfterRepair}) {
+                foreach my $itemID (@{$args->{repairTargets}}) {
+                    my $item = $char->inventory->getByID($itemID);
+                    next unless $item && $item->equippable;
+                    next if $item->{broken} || $item->{equipped};
+                    $item->equip;
+                }
+                $args->{equippedAfterRepair} = 1;
+            }
             $args->{done} = 1;
             return;
         }
@@ -4488,11 +4502,30 @@ sub processRepairAuto {
             }
 
             if ($ai_v{temp}{do_route}) {
-                ai_route($args->{npc}{map}, $args->{npc}{pos}{x}, $args->{npc}{pos}{y},
-                        attackOnRoute => 1,
-                        distFromGoal => $args->{distance},
-                        noSitAuto => 1);
-                $timeout{ai_repair}{time} = time;
+                if ($args->{warpedToSave} && !$args->{mapChanged} && !timeOut($args->{warpStart}, 8)) {
+                    undef $args->{warpedToSave};
+                }
+
+                if ($config{'saveMap'} ne "" && $config{'repairAuto_warp'} && !$args->{warpedToSave}
+                    && !$field->isCity && $config{'saveMap'} ne $field->baseName) {
+                    if ($char->{sitting}) {
+                        message T("Standing up to auto-repair\n"), "teleport";
+                        ai_setSuspend(0);
+                        stand();
+                    } else {
+                        $args->{warpedToSave} = 1;
+                        $args->{warpStart} = time unless $args->{warpStart};
+                        message T("Teleporting to auto-repair\n"), "teleport";
+                        ai_useTeleport(2);
+                    }
+                    $timeout{ai_repair}{time} = time;
+                } else {
+                    ai_route($args->{npc}{map}, $args->{npc}{pos}{x}, $args->{npc}{pos}{y},
+                            attackOnRoute => 1,
+                            distFromGoal => $args->{distance},
+                            noSitAuto => 1);
+                    $timeout{ai_repair}{time} = time;
+                }
             } else {
                 if (!exists $args->{sentNpcTalk}) {
                     my $realpos = {};
@@ -4523,6 +4556,15 @@ sub processRepairAuto {
                 delete @{$args}{qw(sentNpcTalk sentNpcTalk_time repairing sentRepair waitingForList distance)};
                 $timeout{ai_repair}{time} = time;
             } else {
+                if ($config{repairAuto_equipAfter} && $args->{repairTargets} && !$args->{equippedAfterRepair}) {
+                    foreach my $itemID (@{$args->{repairTargets}}) {
+                        my $item = $char->inventory->getByID($itemID);
+                        next unless $item && $item->equippable;
+                        next if $item->{broken} || $item->{equipped};
+                        $item->equip;
+                    }
+                    $args->{equippedAfterRepair} = 1;
+                }
                 $args->{done} = 1;
             }
         }
