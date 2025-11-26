@@ -354,6 +354,9 @@ tankersList
 
 repairAuto 0
 repairAuto_list
+repairAuto_equipAfter 0
+repairAuto_warp 0
+repairAuto_inTownOnly 0
 
 status_mapProperty 0
 status_mapType 0

@@ -700,6 +700,9 @@ repairAuto 0
 # 是否自動修理武器裝備 必須要有此技能的職業
 repairAuto_list
 # 自動修理列表
+repairAuto_equipAfter 0
+repairAuto_warp 0
+repairAuto_inTownOnly 0
 
 
 #════════════

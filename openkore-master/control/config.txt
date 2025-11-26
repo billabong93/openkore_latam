@@ -424,6 +424,9 @@ repairAuto_distance 3
 repairAuto_maxDistance
 repairAuto_npc_steps c r0 c c r0 n
 repairAuto_useSkill 0
+repairAuto_equipAfter 0
+repairAuto_warp 0
+repairAuto_inTownOnly 0
 
 status_mapProperty 0
 status_mapType 0
