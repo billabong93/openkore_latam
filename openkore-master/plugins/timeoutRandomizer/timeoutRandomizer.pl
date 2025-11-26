@@ -45,6 +45,16 @@ BEGIN {
         $orig_timeOut = Utils->can('timeOut');
 }
 
+sub _original_timeout_sub {
+        $orig_timeOut ||= Utils->can('timeOut');
+
+        unless ($orig_timeOut) {
+                warning "[timeoutRandomizer] Could not locate Utils::timeOut; plugin is disabled.\n";
+        }
+
+        return $orig_timeOut;
+}
+
 Plugins::register('timeoutRandomizer', 'Randomize configured timeouts within ranges', \&unload, \&reload);
 
 $hooks = Plugins::addHooks(
@@ -63,10 +73,12 @@ sub on_start {
         apply_ranges();
 }
 
-if ($orig_timeOut) {
+if (_original_timeout_sub()) {
         no warnings 'redefine';
         *Utils::timeOut = sub ($;$) {
                 my ($r_time, $timeout_value) = @_;
+                my $original = _original_timeout_sub();
+                return unless $original;
 
                 my $meta = ref($r_time) eq 'HASH' ? $r_time->{timeout_randomizer} : undef;
 
@@ -77,8 +89,8 @@ if ($orig_timeOut) {
                         _ensure_seed($r_time, $meta);
 
                         my $result = @_ > 1
-                                ? $orig_timeOut->($r_time, $timeout_value)
-                                : $orig_timeOut->($r_time);
+                                ? $original->($r_time, $timeout_value)
+                                : $original->($r_time);
 
                         if ($result) {
                                 _assign_random_timeout($r_time, $meta);
@@ -88,12 +100,10 @@ if ($orig_timeOut) {
                 }
 
                 return @_ > 1
-                        ? $orig_timeOut->($r_time, $timeout_value)
-                        : $orig_timeOut->($r_time);
+                        ? $original->($r_time, $timeout_value)
+                        : $original->($r_time);
         };
         $override_installed = 1;
-} else {
-        warning "[timeoutRandomizer] Could not locate Utils::timeOut; plugin is disabled.\n";
 }
 
 sub load_range_file {
