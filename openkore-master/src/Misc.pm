@@ -1560,6 +1560,9 @@ sub is_aggressive_slave {
 sub checkMonsterCleanness {
 	my ($ID) = @_;
 	return 1 if (!$config{attackAuto});
+
+	# If kill-steal is explicitly enabled, don't drop targets just because they're contested
+	return 1 if ($config{attackAuto_steal});
 	return 1 if $playersList->getByID($ID) || $slavesList->getByID($ID);
 	my $monster = $monstersList->getByID($ID);
 
@@ -1687,6 +1690,9 @@ sub checkMonsterCleanness {
 sub slave_checkMonsterCleanness {
 	my ($slave, $ID) = @_;
 	return 1 if (!$config{$slave->{configPrefix}.'attackAuto'});
+
+	# Allow followers to honor explicit kill-steal configuration like the master
+	return 1 if ($config{attackAuto_steal});
 	return 1 if $playersList->getByID($ID) || $slavesList->getByID($ID);
 	my $monster = $monstersList->getByID($ID);
 
