@@ -1579,8 +1579,8 @@ sub checkMonsterCleanness {
 		return 1;
 	}
 
-	if ($config{aggressiveAntiKS}) {
-		# Aggressive anti-KS mode, for people who are paranoid about not kill stealing.
+        if ($config{aggressiveAntiKS} && !$config{attackAuto_steal}) {
+                # Aggressive anti-KS mode, for people who are paranoid about not kill stealing.
 
 		# If we attacked the monster first, do not drop it, we are being KSed
 		return 1 if ($monster->{dmgFromYou} || $monster->{missedFromYou} || $monster->{castOnByYou});
@@ -1669,15 +1669,18 @@ sub checkMonsterCleanness {
 		}
 	}
 
-	# The monster didn't attack you.
-	# Other players attacked it, or it attacked other players.
-	if ($monster->{dmgFromYou} || $monster->{missedFromYou} || $monster->{castOnByYou}) {
-		# If you have already attacked the monster before, then consider it clean
-		return 1;
-	}
-	# If you haven't attacked the monster yet, it's unclean.
+        # The monster didn't attack you.
+        # Other players attacked it, or it attacked other players.
+        if ($monster->{dmgFromYou} || $monster->{missedFromYou} || $monster->{castOnByYou}) {
+                # If you have already attacked the monster before, then consider it clean
+                return 1;
+        }
 
-	return 0;
+        # Explicitly allow kill stealing if requested
+        return 1 if ($config{attackAuto_steal});
+
+        # If you haven't attacked the monster yet, it's unclean.
+        return 0;
 }
 
 sub slave_checkMonsterCleanness {
@@ -1707,8 +1710,8 @@ sub slave_checkMonsterCleanness {
 		return 1;
 	}
 
-	if ($config{aggressiveAntiKS}) {
-		# Aggressive anti-KS mode, for people who are paranoid about not kill stealing.
+        if ($config{aggressiveAntiKS} && !$config{attackAuto_steal}) {
+                # Aggressive anti-KS mode, for people who are paranoid about not kill stealing.
 
 		# If we attacked the monster first, do not drop it, we are being KSed
 		return 1 if ($monster->{dmgFromPlayer}{$slave->{ID}} || $monster->{missedFromPlayer}{$slave->{ID}} || $monster->{castOnByPlayer}{$slave->{ID}});
@@ -1778,15 +1781,18 @@ sub slave_checkMonsterCleanness {
 		}
 	}
 
-	# The monster didn't attack you.
-	# Other players attacked it, or it attacked other players.
-	if ($monster->{dmgFromPlayer}{$slave->{ID}} || $monster->{missedFromPlayer}{$slave->{ID}} || $monster->{castOnByPlayer}{$slave->{ID}}) {
-		# If you have already attacked the monster before, then consider it clean
-		return 1;
-	}
-	# If you haven't attacked the monster yet, it's unclean.
+        # The monster didn't attack you.
+        # Other players attacked it, or it attacked other players.
+        if ($monster->{dmgFromPlayer}{$slave->{ID}} || $monster->{missedFromPlayer}{$slave->{ID}} || $monster->{castOnByPlayer}{$slave->{ID}}) {
+                # If you have already attacked the monster before, then consider it clean
+                return 1;
+        }
 
-	return 0;
+        # Explicitly allow kill stealing if requested
+        return 1 if ($config{attackAuto_steal});
+
+        # If you haven't attacked the monster yet, it's unclean.
+        return 0;
 }
 
 ##
