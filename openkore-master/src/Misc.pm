@@ -1563,31 +1563,18 @@ sub checkMonsterCleanness {
 	return 1 if $playersList->getByID($ID) || $slavesList->getByID($ID);
 	my $monster = $monstersList->getByID($ID);
 
-	my $otherPlayersAttackedMonster =
-	           scalar(grep { isNotMySlaveID($_) } keys %{$monster->{missedFromPlayer}})
-	        || scalar(grep { isNotMySlaveID($_) } keys %{$monster->{dmgFromPlayer}})
-	        || scalar(grep { isNotMySlaveID($_) } keys %{$monster->{castOnByPlayer}});
-
-	my $monsterInteractedWithOtherPlayers =
-	           scalar(grep { isNotMySlaveID($_) } keys %{$monster->{missedToPlayer}})
-	        || scalar(grep { isNotMySlaveID($_) } keys %{$monster->{dmgToPlayer}})
-	        || scalar(grep { isNotMySlaveID($_) } keys %{$monster->{castOnToPlayer}});
-
-	my $otherPlayersInteracted = $otherPlayersAttackedMonster || $monsterInteractedWithOtherPlayers;
-	my $youInteractedWithMonster = $monster->{dmgFromYou} || $monster->{missedFromYou} || $monster->{castOnByYou};
-
 	# If party attacked monster, or if monster attacked/missed party
 	if ($config{attackAuto_party} && ($monster->{dmgFromParty} > 0 || $monster->{missedFromParty} > 0 || $monster->{dmgToParty} > 0 || $monster->{missedToParty} > 0)) {
 		return 1;
 	}
 
 	if (
-	           scalar(grep { isMySlaveID($_) } keys %{$monster->{missedFromPlayer}})
-	        || scalar(grep { isMySlaveID($_) } keys %{$monster->{dmgFromPlayer}})
-	        || scalar(grep { isMySlaveID($_) } keys %{$monster->{castOnByPlayer}})
-	        || scalar(grep { isMySlaveID($_) } keys %{$monster->{missedToPlayer}})
-	        || scalar(grep { isMySlaveID($_) } keys %{$monster->{dmgToPlayer}})
-	        || scalar(grep { isMySlaveID($_) } keys %{$monster->{castOnToPlayer}})
+		   scalar(grep { isMySlaveID($_) } keys %{$monster->{missedFromPlayer}})
+		|| scalar(grep { isMySlaveID($_) } keys %{$monster->{dmgFromPlayer}})
+		|| scalar(grep { isMySlaveID($_) } keys %{$monster->{castOnByPlayer}})
+		|| scalar(grep { isMySlaveID($_) } keys %{$monster->{missedToPlayer}})
+		|| scalar(grep { isMySlaveID($_) } keys %{$monster->{dmgToPlayer}})
+		|| scalar(grep { isMySlaveID($_) } keys %{$monster->{castOnToPlayer}})
 	) {
 		return 1;
 	}
@@ -1596,10 +1583,17 @@ sub checkMonsterCleanness {
 		# Aggressive anti-KS mode, for people who are paranoid about not kill stealing.
 
 		# If we attacked the monster first, do not drop it, we are being KSed
-		return 1 if ($youInteractedWithMonster);
+		return 1 if ($monster->{dmgFromYou} || $monster->{missedFromYou} || $monster->{castOnByYou});
 
 		# If others attacked the monster then always drop it, wether it attacked us or not!
-		if ($otherPlayersInteracted) {
+		if (
+			   scalar(grep { isNotMySlaveID($_) } keys %{$monster->{missedFromPlayer}})
+			|| scalar(grep { isNotMySlaveID($_) } keys %{$monster->{dmgFromPlayer}})
+			|| scalar(grep { isNotMySlaveID($_) } keys %{$monster->{castOnByPlayer}})
+			|| scalar(grep { isNotMySlaveID($_) } keys %{$monster->{missedToPlayer}})
+			|| scalar(grep { isNotMySlaveID($_) } keys %{$monster->{dmgToPlayer}})
+			|| scalar(grep { isNotMySlaveID($_) } keys %{$monster->{castOnToPlayer}})
+		) {
 			return 0;
 		}
 	}
@@ -1615,12 +1609,12 @@ sub checkMonsterCleanness {
 		if ($following) {
 			# And master attacked monster, or the monster attacked/missed master
 			if (
-			           $monster->{dmgToPlayer}{$followID} > 0
-			        || $monster->{missedToPlayer}{$followID} > 0
-			        || $monster->{dmgFromPlayer}{$followID} > 0
-			        || $monster->{missedFromPlayer}{$followID} > 0
-			        || $monster->{castOnToPlayer}{$followID} > 0
-			        || $monster->{castOnByPlayer}{$followID} > 0
+				   $monster->{dmgToPlayer}{$followID} > 0
+				|| $monster->{missedToPlayer}{$followID} > 0
+				|| $monster->{dmgFromPlayer}{$followID} > 0
+				|| $monster->{missedFromPlayer}{$followID} > 0
+				|| $monster->{castOnToPlayer}{$followID} > 0
+				|| $monster->{castOnByPlayer}{$followID} > 0
 			) {
 				return 1;
 			}
@@ -1657,11 +1651,18 @@ sub checkMonsterCleanness {
 		}
 	}
 
-	if ($allowed && !$otherPlayersInteracted) {
+	if (
+		   $allowed
+		&& scalar(grep { isNotMySlaveID($_) } keys %{$monster->{missedFromPlayer}}) == 0
+		&& scalar(grep { isNotMySlaveID($_) } keys %{$monster->{dmgFromPlayer}}) == 0
+		&& scalar(grep { isNotMySlaveID($_) } keys %{$monster->{missedToPlayer}}) == 0
+		&& scalar(grep { isNotMySlaveID($_) } keys %{$monster->{dmgToPlayer}}) == 0
+		&& scalar(grep { isNotMySlaveID($_) } keys %{$monster->{castOnToPlayer}}) == 0
+	) {
 		# The monster might be getting lured by another player.
 		# So we check whether it's walking towards any other player, but only
 		# if we haven't already attacked the monster.
-		if ($youInteractedWithMonster) {
+		if ($monster->{dmgFromYou} || $monster->{missedFromYou} || $monster->{castOnByYou}) {
 			return 1;
 		} else {
 			return !objectIsMovingTowardsPlayer($monster);
@@ -1670,7 +1671,7 @@ sub checkMonsterCleanness {
 
 	# The monster didn't attack you.
 	# Other players attacked it, or it attacked other players.
-	if ($youInteractedWithMonster) {
+	if ($monster->{dmgFromYou} || $monster->{missedFromYou} || $monster->{castOnByYou}) {
 		# If you have already attacked the monster before, then consider it clean
 		return 1;
 	}
@@ -1679,6 +1680,7 @@ sub checkMonsterCleanness {
 	return 1 if ($config{attackAuto_steal});
 
 	# If you haven't attacked the monster yet, it's unclean.
+
 	return 0;
 }
 
@@ -1688,35 +1690,22 @@ sub slave_checkMonsterCleanness {
 	return 1 if $playersList->getByID($ID) || $slavesList->getByID($ID);
 	my $monster = $monstersList->getByID($ID);
 
-	my $otherPlayersAttackedMonster =
-	           scalar(grep { isNotMySlaveID($_) } keys %{$monster->{missedFromPlayer}})
-	        || scalar(grep { isNotMySlaveID($_) } keys %{$monster->{dmgFromPlayer}})
-	        || scalar(grep { isNotMySlaveID($_) } keys %{$monster->{castOnByPlayer}});
-
-	my $monsterInteractedWithOtherPlayers =
-	           scalar(grep { isNotMySlaveID($_) } keys %{$monster->{missedToPlayer}})
-	        || scalar(grep { isNotMySlaveID($_) } keys %{$monster->{dmgToPlayer}})
-	        || scalar(grep { isNotMySlaveID($_) } keys %{$monster->{castOnToPlayer}});
-
-	my $otherPlayersInteracted = $otherPlayersAttackedMonster || $monsterInteractedWithOtherPlayers;
-	my $slaveInteractedWithMonster = $monster->{dmgFromPlayer}{$slave->{ID}} || $monster->{missedFromPlayer}{$slave->{ID}} || $monster->{castOnByPlayer}{$slave->{ID}};
-
 	# Since openKore considers the slave as a member of the player party we check for attacks against/made by master and/or other slaves
 	if (
 		$config{$slave->{configPrefix}.'attackAuto_party'} &&
 		(
-			           $monster->{dmgFromYou}
-			        || $monster->{missedFromYou}
-			        || $monster->{castOnByYou}
-			        || $monster->{dmgToYou}
-			        || $monster->{missedYou}
-			        || $monster->{castOnToYou}
-			        || scalar(grep { isMySlaveID($_, $slave->{ID}) } keys %{$monster->{missedFromPlayer}})
-			        || scalar(grep { isMySlaveID($_, $slave->{ID}) } keys %{$monster->{dmgFromPlayer}})
-			        || scalar(grep { isMySlaveID($_, $slave->{ID}) } keys %{$monster->{castOnByPlayer}})
-			        || scalar(grep { isMySlaveID($_, $slave->{ID}) } keys %{$monster->{missedToPlayer}})
-			        || scalar(grep { isMySlaveID($_, $slave->{ID}) } keys %{$monster->{dmgToPlayer}})
-			        || scalar(grep { isMySlaveID($_, $slave->{ID}) } keys %{$monster->{castOnToPlayer}})
+			   $monster->{dmgFromYou}
+			|| $monster->{missedFromYou}
+			|| $monster->{castOnByYou}
+			|| $monster->{dmgToYou}
+			|| $monster->{missedYou}
+			|| $monster->{castOnToYou}
+			|| scalar(grep { isMySlaveID($_, $slave->{ID}) } keys %{$monster->{missedFromPlayer}})
+			|| scalar(grep { isMySlaveID($_, $slave->{ID}) } keys %{$monster->{dmgFromPlayer}})
+			|| scalar(grep { isMySlaveID($_, $slave->{ID}) } keys %{$monster->{castOnByPlayer}})
+			|| scalar(grep { isMySlaveID($_, $slave->{ID}) } keys %{$monster->{missedToPlayer}})
+			|| scalar(grep { isMySlaveID($_, $slave->{ID}) } keys %{$monster->{dmgToPlayer}})
+			|| scalar(grep { isMySlaveID($_, $slave->{ID}) } keys %{$monster->{castOnToPlayer}})
 		)
 	) {
 		return 1;
@@ -1726,10 +1715,17 @@ sub slave_checkMonsterCleanness {
 		# Aggressive anti-KS mode, for people who are paranoid about not kill stealing.
 
 		# If we attacked the monster first, do not drop it, we are being KSed
-		return 1 if ($slaveInteractedWithMonster);
+		return 1 if ($monster->{dmgFromPlayer}{$slave->{ID}} || $monster->{missedFromPlayer}{$slave->{ID}} || $monster->{castOnByPlayer}{$slave->{ID}});
 
 		# If others attacked the monster then always drop it, wether it attacked us or not!
-		if ($otherPlayersInteracted) {
+		if (
+			   scalar(grep { isNotMySlaveID($_) } keys %{$monster->{missedFromPlayer}})
+			|| scalar(grep { isNotMySlaveID($_) } keys %{$monster->{dmgFromPlayer}})
+			|| scalar(grep { isNotMySlaveID($_) } keys %{$monster->{castOnByPlayer}})
+			|| scalar(grep { isNotMySlaveID($_) } keys %{$monster->{missedToPlayer}})
+			|| scalar(grep { isNotMySlaveID($_) } keys %{$monster->{dmgToPlayer}})
+			|| scalar(grep { isNotMySlaveID($_) } keys %{$monster->{castOnToPlayer}})
+		) {
 			return 0;
 		}
 	}
@@ -1785,7 +1781,6 @@ sub slave_checkMonsterCleanness {
 			return !objectIsMovingTowardsPlayer($monster);
 		}
 	}
-
 	# The monster didn't attack you.
 	# Other players attacked it, or it attacked other players.
 	if ($monster->{dmgFromPlayer}{$slave->{ID}} || $monster->{missedFromPlayer}{$slave->{ID}} || $monster->{castOnByPlayer}{$slave->{ID}}) {
@@ -1795,10 +1790,11 @@ sub slave_checkMonsterCleanness {
 
 	# Explicitly allow kill stealing if requested
 	return 1 if ($config{attackAuto_steal});
-
 	# If you haven't attacked the monster yet, it's unclean.
+
 	return 0;
 }
+
 ##
 # boolean createCharacter(int slot, String name, int [str,agi,vit,int,dex,luk] = 5)
 # slot: The slot in which to create the character (1st slot is 0).
