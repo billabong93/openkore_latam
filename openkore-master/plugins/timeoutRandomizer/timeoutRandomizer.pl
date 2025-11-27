@@ -80,6 +80,8 @@ if (_original_timeout_sub()) {
                 my $original = _original_timeout_sub();
                 return unless $original;
 
+                return unless defined $r_time;
+
                 my $meta = ref($r_time) eq 'HASH' ? $r_time->{timeout_randomizer} : undef;
 
                 if ($meta) {

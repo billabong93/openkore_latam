@@ -245,6 +245,11 @@ msgstr "Alvo perdido.\n"
 msgid "Dropping target - you will not kill steal others\n"
 msgstr "Desistindo do alvo - você não roubará o monstro de outros.\n"
 
+#: ../AI/Attack.pm:275
+#, perl-format
+msgid "Target %s died\n"
+msgstr "Alvo %s morreu\n"
+
 #: ../AI/Attack.pm:410 ../AI/Slave.pm:489
 #, perl-format
 msgid "%s kiteing from (%d %d) to (%d %d), mob at (%d %d).\n"
