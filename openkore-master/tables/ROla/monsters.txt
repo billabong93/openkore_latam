@@ -170,7 +170,7 @@
 1182 Cogumelo
 1183 Chonchon
 1184 Fabre
-1185 VIcB
+1185 Sussurro
 1186 Cochicho
 1188 Bongun
 1189 Orc Arqueiro
@@ -324,7 +324,7 @@
 1387 Ferrão
 1388 ArchAngeling
 1389 Drácula
-1390 HIgB
+1390 Violinista
 1391 Pingu
 1392 Giro-Goblin
 1400 Karakasa
@@ -397,12 +397,12 @@
 1637 Margaretha
 1638 Cecil
 1639 Kathryne
-1640 KYkB
-1641 Kokb
-1642 K4kB
-1643 LIkB
-1644 LYkB
-1645 LokB
+1640 Lorde Seyren
+1641 Algoz Eremes
+1642 Mestre-ferreiro Howard
+1643 Sacerdotisa Margaretha
+1644 Atiradora Cecil
+1645 Arquimaga Kathryne
 1646 Lorde Seyren
 1647 Algoz Eremes
 1648 Mestre Ferreiro Howard
@@ -464,15 +464,15 @@
 1735 Alicel
 1736 Aliot
 1737 Aliza
-1738 jIkB
-1745 k4kB
+1738 Constant
+1745 Constant
 1751 Valquíria Randgris
 1752 Skogul
 1753 Frus
 1754 Skeggiold
-1761 o4kB
-1762 pIkB
-1765 mYkB
+1761 Skogul
+1762 Frus
+1765 Valquíria
 1768 Pesar Noturno
 1769 Agav
 1770 Echio
@@ -491,7 +491,7 @@
 1783 Galion
 1784 Stapo
 1785 Atroce
-1789 vokB
+1789 Estalactite
 1796 Aunoe
 1797 Fanat
 1829 Espadachim Guardião
@@ -529,14 +529,14 @@
 1884 Mavka
 1885 Gorynych
 1894 Pouring
-1917 PYoB
-1918 PooB
-1919 P4oB
-1920 QIoB
-1921 QYoB
+1917 Morroc Ferido
+1918 Sombra Da Inveja
+1919 Sombra Da Gula
+1920 Sombra Da Vaidade
+1921 Sombra Da Ira
 1929 Bafomé
-1932 AIoB
-1933 AYoB
+1932 Guardião
+1933 Vigia
 1957 Entweihen Crothen
 1958 Esqueleto Espinhoso
 1968 Strouf
@@ -575,8 +575,8 @@
 2022 Sombra do Guardião
 2023 Sombra Obscura
 2024 Golem de Bradium
-2047 p4oB
-2049 qYoB
+2047 Naga
+2049 Golem
 2051 Bafomé
 2052 Senhor das Trevas
 2053 Dimik
@@ -597,16 +597,16 @@
 2076 Sombra da Decepção
 2077 Sombra da Ilusão
 2078 Sombra do Prazer
-2081 fYoB
+2081 Anêmona
 2083 Scaraba
 2084 Scaraba
 2085 Scaraba
 2086 Scaraba
 2087 Rainha Scaraba
-2088 uYoB
-2089 uooB
-2090 u4oB
-2091 vIoB
+2088 Ovo De Scaraba Chifre
+2089 Ovo De Chifres Duplos
+2090 Ovo De Scaraba Galhado
+2091 Ovo De Scaraba Ancinho
 2092 Dolomedes
 2094 Orc Herói
 2095 Pé-Grande
@@ -643,10 +643,10 @@
 2163 Scaraba Dourado
 2164 Scaraba Dourado
 2165 Rainha Scaraba Dourada
-2166 3IoB
-2167 3YoB
-2168 3ooB
-2169 34oB
+2166 Ovo De Scaraba Chifre
+2167 Ovo De Chifres Duplos
+2168 Ovo De Scaraba Galhado
+2169 Ovo De Scaraba Ancinho
 2187 Celacanto Sombrio
 2188 Celacanto Cruel
 2189 Celacanto Mutante
@@ -670,13 +670,13 @@
 2225 Gertie
 2226 Alphoccio
 2227 Trentini
-2228 JYsB
-2229 JosB
-2230 J4sB
-2231 KIsB
-2232 KYsB
-2233 KosB
-2234 K4sB
+2228 Paladino Randel
+2229 Criador Flamel
+2230 Professora Celia
+2231 Mestre Chen
+2232 Desordeira Gertie
+2233 Menestrel Alphochio
+2234 Cigana Trentini
 2235 Paladino Randel
 2236 Criador Flamel
 2237 Professora Celia
@@ -694,21 +694,21 @@
 2254 Samurai Soheon
 2255 Guardião Morto Kades
 2256 Rudo
-2281 WYsB
-2282 WosB
-2283 W4sB
-2284 XIsB
-2285 XYsB
-2286 XosB
-2287 X4sB
-2288 YIsB
+2281 Sombra Abissal
+2282 Moldura Abissal
+2283 Sacerdote Abissal
+2284 Kobold Abissal
+2285 Kobold Abissal
+2286 Kobold Abissal
+2287 Arqueiro Abissal
+2288 Velha Arca Do Tesouro
 2306 Besouro-Ladrão Dourado
 2309 Bungisngis
 2310 Engkanto
 2311 Manananggal
 2312 Mangkukulam
 2313 Tikbalang
-2314 aIsB
+2314 Tiyanak
 2315 Wakwak
 2316 Jejeling
 2317 Bangungot
@@ -736,40 +736,40 @@
 2370 Lichtern Inguz
 2371 Gerente de Bifröst
 2398 Bebê Poring
-2401 Mi4B
-2402 44wB
-2403 4owB
-2404 4YwB
-2405 5YwB
-2406 5owB
-2407 5IwB
+2401 Poring
+2402 Poporing Anti-Magia
+2403 Poporing Anti-Ataques
+2404 Plâncton Morto
+2405 Esqueleto Frágil
+2406 Soldado Frágil
+2407 Sailor Skeleton
 2408 Nv.10
 2413 Nv.10 (fogo)
 2414 Livro Fugitivo
-2415 n4sB
-2416 oIsB
-2417 oYsB
-2418 oosB
-2419 o4sB
-2420 pIsB
-2421 pYsB
-2422 posB
-2423 p4sB
-2424 qIsB
-2425 qYsB
-2426 qosB
-2427 q4sB
-2441 uYsB
-2442 uosB
+2415 Cavaleiro
+2416 Mercenário
+2417 Ferreiro
+2418 Caçadora
+2419 Bruxa
+2420 Sacerdotisa
+2421 Templária
+2422 Arruaceira
+2423 Alquimista
+2424 Bardo
+2425 Odalisca
+2426 Sábio
+2427 Monge
+2441 Aprendiz
+2442 Superaprendiz
 2473 Cavaleiro Desmorto
 2474 Cavaleira Desmorta
 2475 Origem da Maldição
 2476 Amdarais
-2477 bYwB
-2478 n4wB
-2479 oIwB
-2480 bIwB
-2481 bowB
+2477 Andarilho Amaldiçoado
+2478 Rideword Distorcido
+2479 Mímico Distorcido
+2480 Druida Amaldiçoado
+2481 Aparição Amaldiçoada
 2483 Bafomé
 2485 Quimera
 2528 Verme com Rosto
@@ -815,11 +815,11 @@
 2616 Rosa Selvagem Feroz
 2617 Ninfa Perversa Fugaz
 2618 Sussurro Brutal
-2619 Co0B
+2619 Esqueleto Frágil Alfa
 2620 Andarilho Feroz
-2621 Di0B
-2622 74wB
-2623 Dy0B
+2621 Violinista Fugaz
+2622 Violinista Ágil
+2623 Violinista Brutal
 2624 Nuvem Venenosa Alfa
 2625 Venatu Feroz (Roxo)
 2626 Baba-Yaga Fugaz
@@ -827,7 +827,7 @@
 2628 Vadon Brutal
 2629 Ungoliant Alfa
 2630 Espírito do Vento Feroz
-2631 Fi0B
+2631 Tiyanak Fugaz
 2632 Besouro-Ladrão Brutal
 2633 Besouro-Ladrão Alfa
 2634 Besouro-Ladrão Feroz
@@ -872,7 +872,7 @@
 2673 Selvagem Alfa
 2674 Arenoso Feroz
 2675 Salamandra Fugaz
-2676 +YwB
+2676 Marinheiro Ágil
 2677 Roween Brutal
 2678 Sapo de Rodda Alfa
 2679 Sapo de Rodda Feroz
@@ -936,9 +936,9 @@
 2739 Múmia Ágil
 2740 Múmia Brutal
 2741 Muka Alfa
-2742 eI0B
-2743 eY0B
-2744 eo0B
+2742 Sombra Da Inveja Feroz
+2743 Sombra Da Inveja Fugaz
+2744 Sombra Da Inveja Ágil
 2745 Holden Brutal
 2746 Boneco de Miyabi Alfa
 2747 Minorous Feroz
@@ -952,7 +952,7 @@
 2755 Metaling Brutal
 2756 Metaling Alfa
 2757 Tritão Feroz
-2758 h40B
+2758 Menblatt Fugaz
 2759 Medusa Ágil
 2760 Martin Brutal
 2761 Marionete Alfa
@@ -960,7 +960,7 @@
 2763 Marduk Fugaz
 2764 Louva-a-Deus Ágil
 2765 Mandrágora Brutal
-2766 j40B
+2766 Manananggal Alfa
 2767 Majoruros Feroz
 2768 Magnólia Fugaz
 2769 Magmaring Ágil
@@ -976,8 +976,8 @@
 2779 Les Ágil
 2780 Leib Olmai Brutal
 2781 Gato de Folha Alfa
-2782 n40B
-2783 Oi0B
+2782 Arruaceira Feroz
+2783 Mercenário Fugaz
 2784 Kobold Arqueiro Ágil
 2785 Kobold Brutal
 2786 Golpeador Alfa
@@ -1011,8 +1011,8 @@
 2814 Goblin Ágil
 2815 Bode Brutal
 2816 Bode Alfa
-2817 wo0B
-2819 xI0B
+2817 Kobold Abissal Feroz
+2819 Sombra Abissal Ágil
 2821 Zangão Gigante Alfa
 2822 Carniçal Feroz
 2823 Carniçal Fugaz
@@ -1066,12 +1066,12 @@
 2871 Relógio Feroz
 2872 Chonchon Fugaz
 2873 Centopéia Ágil
-2874 +o0B
-2875 40B
+2874 Cenere Brutal
+2875 Celia Alde Alfa
 2876 Lagarta Feroz
 2877 Carat Fugaz
 2878 Caramelo Ágil
-2879 40B
+2879 Bungisngis Brutal
 2880 Breeze Alfa
 2881 Breeze Feroz
 2882 Golem de Bradium Fugaz
@@ -1089,8 +1089,8 @@
 2894 Arclouse Alfa
 2895 Apocalipse Feroz
 2896 Scaraba Fugaz
-2897 Ey4B
-2898 Eo4B
+2897 Antigo Livro Ágil
+2898 Antigo Livro Brutal
 2899 Anolian Feroz
 2900 Angra Fugaz
 2901 Louva-a-deus Angra Ágil
@@ -1141,11 +1141,11 @@
 3021 Arenoso de Fogo
 3022 Frilldora de Fogo
 3023 Golem de Fogo
-3026 5osB
+3026 Fosso De Fogo
 3027 Besouro Rola Brasa
-3028 6IsB
+3028 Sonia
 3029 Ceifador Ankou
-3061 6YsB
+3061 Mímico Enfurecido
 3069 Pere Dançante
 3070 Pere Cantante
 3071 Pere Cantante
@@ -1168,12 +1168,12 @@
 3149 Cavaleira Desmorta
 3150 Amdarais Sombrio
 3151 Origem da Escuridão
-3153 hIwB
-3154 hYwB
-3155 howB
-3156 h4wB
-3158 iYwB
-3159 iowB
+3153 Robô Escavador
+3154 Robô De Reconhecimento
+3155 Robô Reparador
+3156 Robô Explorador
+3158 Adorador Do Infortúnio
+3159 Propaganda Ilegal
 3175 Invasores
 3176 Invasores
 3177 Invasores
@@ -1231,8 +1231,8 @@
 3251 Gc109
 3252 Dr815
 3254 T W O
-3255 lYwB
-3256 lIwB
+3255 Carniçal Fedorento
+3256 Zumbi Fedorento
 3259 Cavalo Azul Furioso
 3260 Pequeno Cavalo Azul
 3384 Poring
@@ -1272,25 +1272,25 @@
 3418 Trilobita
 3419 Megalith
 3420 Dríade
-3442 towB
-3443 t4wB
-3444 uIwB
-3451 tIwB
-3452 tYwB
-3490 0IwB
-3495 04wB
-3496 1YwB
-3497 1owB
-3498 14wB
-3499 2IwB
-3500 2YwB
-3501 2owB
+3442 Lobo De Gelo
+3443 Tappy
+3444 Observador
+3451 Legionário Imortal
+3452 Zumbi Da Guarda
+3490 General Imortal
+3495 Omeleting
+3496 Lunático Folhado
+3497 Fabre Gramíneo
+3498 Zangão Selvagem
+3499 Sapo De Rodda Doce
+3500 Filhote De Lobo Caçador
+3501 Esporo De Água Doce
 3502 Basilisco Guarda
-3503 24wB
-3504 3IwB
+3503 Basilisco Guerreiro
+3504 Basilisco General
 3505 Gemaring
-3506 3owB
-3507 3YwB
+3506 Mandrágora Da Selva
+3507 Aranha Pomar
 3634 Presente Gigante
 3636 Bebê Isis
 3637 Esqueleto
@@ -1329,7 +1329,7 @@
 3726 Picky
 3727 Picky com casca
 3728 Zumbi
-3729 eowB
+3729 Esporo Venenoso
 3736 Búfalo Fuzileiro
 3737 Búfalo Atirador
 3738 Búfalo Estripador
@@ -1341,18 +1341,18 @@
 3747 Gado Fuzileiro
 3748 Gado Atirador
 3749 Gado Estripador
-3750 y44B
-3752 zY4B
-3753 zo4B
-3754 z44B
-3755 0I4B
-3759 vo4B
-3760 vY4B
-3761 uY4B
-3762 v44B
-3763 uI4B
-3764 u44B
-3765 uo4B
+3750 Mattiliar
+3752 Zumbi Ilusional
+3753 Carniçal Ilusional
+3754 Doce Pesadelo
+3755 Cogumelo Brilhante
+3759 Raposa Raivosa
+3760 Munak Ressentida
+3761 Bongun Ressentido
+3762 Sohee Maldita
+3763 Arqueiro Cruel
+3764 Veritas
+3765 Aventureiro
 3766 Drake
 3767 Drácula
 3768 Flor do Luar
@@ -1362,10 +1362,10 @@
 3772 Cavaleiro da Tempestade
 3787 Tapuru
 3788 Gabiru
-3792 Bo8B
-3793 B48B
-3794 Ci8B
-3795 Cy8B
+3792 Gazeti De Cristal
+3793 Yeti De Cristal
+3794 Titã De Cristal
+3795 Cristal De Gelo
 3802 Solidificador Ominoso
 3809 Deadly Thief Bug
 3810 Rei Poring
@@ -1433,43 +1433,43 @@
 20609 Plasma Espectral
 20612 Ferus Roxo
 20613 Mímico Precioso
-20614 Qzab
+20614 Acidus Negro
 20615 Acidus Prateado
 20616 Ferus Esqueleto
 20617 Acidus Esqueleto
 20618 Detale Esqueleto
-20630 Z5Ab
-20633 apAB
-20634 a5AB
-20637 bpAB
-20639 bZAB
-20640 dpAB
-20641 d5AB
-20643 eJAB
-20644 dZAB
-20645 hpAB
-20646 eZAB
-20648 e5AB
-20649 fZAB
-20650 f5AB
-20651 epAB
-20652 fpAB
-20653 fJAB
-20679 cpAB
-20680 c5AB
-20682 dJAB
-20683 b5AB
-20684 hJAB
-20685 h5AB
-20686 cJAB
-20687 iJAB
-20688 Zzab
-20689 cZAB
-20690 g5AB
-20691 gJAB
-20692 hZAB
-20693 gZAB
-20694 gpAB
+20630 고장난 베타
+20633 고장난 세신사
+20634 고장난 세신사
+20637 고장난 창고 관리자
+20639 고장난 경비형 베타
+20640 청소로봇Ω
+20641 고장난 청소로봇Ω
+20643 열탕 휀
+20644 열탕 마르크
+20645 열탕 소드 피쉬
+20646 열탕 피라니아
+20648 보스 야옹이
+20649 피타야
+20650 피타야
+20651 피타야
+20652 피타야
+20653 피타야
+20679 가디언 부품
+20680 Caça-Coração
+20682 Caça-Coração
+20683 책벌레
+20684 배회하는 마법서
+20685 하수 베네눔
+20686 하수 크램프
+20687 하수 워터폴
+20688 엘리트 벨라레
+20689 마력중독 돌로르
+20690 풀려난 마력
+20691 마력중독 플라가
+20692 마력중독 사나레
+20693 강력한 마력
+20694 날카로운 마력
 20695 Alhoring
 20773 Empathizer
 20774 Happygiver
@@ -1482,16 +1482,16 @@
 20781 Eldest
 20782 Crowduke
 20783 Crowbaron
-20801 3I8B
-20802 2Y8B
-20803 1I8B
-20804 148B
-20805 2I8B
-20806 248B
-20807 3o8B
-20808 3Y8B
-20809 2o8B
-20810 1Y8B
+20801 Sropho Abismal
+20802 Obeaune Abismal
+20803 Deviace Abismal
+20804 Marse Abismal
+20805 Tritão Abismal
+20806 Sedora Abismal
+20807 Peixe Abismal
+20808 Strouf Abismal
+20809 Fen Abismal
+20810 Dramoh Abismal
 20844 Praygiver
 20845 Smilegiver
 20920 Chimeralava
@@ -1518,40 +1518,40 @@
 20941 Grote
 20942 Pierrotzoist
 20943 Deathwitch
-21064 oY4B
-21065 oo4B
-21066 o44B
-21067 pI4B
-21068 pY4B
-21069 po4B
-21070 p44B
-21071 qI4B
-21072 qY4B
-21073 qo4B
-21074 q44B
-21075 rI4B
-21076 rY4B
-21077 ro4B
-21078 r44B
-21079 sI4B
-21080 sY4B
-21081 so4B
-21082 s44B
-21083 tI4B
-21084 tY4B
-21085 to4B
-21086 t44B
+21064 Dummy - Pequeno
+21065 Dummy - Médio
+21066 Dummy - Grande
+21067 Dummy - Amorfo
+21068 Dummy - Dragão
+21069 Dummy - Bruto
+21070 Dummy - Humanoide
+21071 Dummy - Inseto
+21072 Dummy - Peixe
+21073 Dummy - Demônio
+21074 Dummy - Planta
+21075 Dummy - Anjo
+21076 Dummy - Morto-Vivo
+21077 Dummy - Neutro
+21078 Dummy - Água
+21079 Dummy - Terra
+21080 Dummy - Fogo
+21081 Dummy - Vento
+21082 Dummy - Veneno
+21083 Dummy - Sagrado
+21084 Dummy - Sombrio
+21085 Dummy - Fantasma
+21086 Dummy - Maldito
 21323 Bode
 21324 Filhote de Lobo do Deserto
-21386 Lzab
-21387 Mzab
-21388 KpAB
-21389 LpAB
-21390 L5Ab
-21391 K5Ab
-21392 Mjab
-21393 Ljab
-21394 MpAB
+21386 Andre Diligente
+21387 Guerreiro Andre
+21388 Larva de Formiga
+21389 Deniro Diligente
+21390 Piere Diligente
+21391 Ovo de Formiga
+21392 Giearth Intrépido
+21393 Farmiliar Intrépido
+21394 Vitata Diligente
 21548 Ecocornus
 21549 Ecopinguicula
 21550 Ecohunterfly
@@ -1586,7 +1586,11 @@
 21579 Ecolordofdeath
 23436 Rei Poring
 23437 Rei Poring
-3956 t48B
-3955 uI8B
-1725 PljfBg
-1438 CQuwBg
+3956 Lenha Viva
+3955 Selvagem Faminto
+1725 Poring
+1438 Khalitzburg
+1603 Pé Grande
+20074 Caixa de Presente
+20073 Siroma Natalino
+

@@ -74,7 +74,10 @@ sub onStatInfo {
 
 	# Ignore item changes from more than one second ago. This might result
 	# in some false negatives, but should also prevent some false positives.
-	if ( $inventory_changes == 1 && defined $last_weight && !Utils::timeOut( $last_item->{time}, 1 ) ) {
+	if (    $inventory_changes == 1
+		&& defined $last_weight
+		&& !Utils::timeOut( $last_item->{time}, 1 )
+		&& $last_item->{amount} ) {
 		my $weight = abs( $args->{val} - $last_weight ) / $last_item->{amount};
 		if ( $item_weights->{ $last_item->{item_id} } ne $weight ) {
 			$item_weights->{ $last_item->{item_id} } = $weight;

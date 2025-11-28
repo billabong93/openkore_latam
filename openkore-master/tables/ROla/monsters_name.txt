@@ -2581,3 +2581,6 @@ s5AB#Anopheles#
 tJAB#Livro Fugitivo#
 tZAB#Rei Poring#
 tpAB#Rei Poring#
+8ZAB#Siroma Natalino#
+8pAB#Caixa de Presente#
+8JAB#Vigia do Tempo#
