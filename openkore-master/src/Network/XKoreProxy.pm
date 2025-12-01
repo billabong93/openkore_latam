@@ -20,6 +20,8 @@ package Network::XKoreProxy;
 # FIXME: $syncSync is not set correctly (required for ropp)
 
 use strict;
+use FindBin qw($RealBin);
+use lib "$RealBin/..", "$RealBin/../deps";
 use base qw(Exporter);
 use Exporter;
 use IO::Socket::INET;
@@ -145,16 +147,33 @@ sub serverRecv {
 	return $self->{server}->serverRecv();
 }
 
-sub serverSend {
-	my $self = shift;
-	my $msg = shift;
 
-	if (!defined $msg || length($msg) >= 2) {
-		# Get packet switch
-		my $switch = uc(unpack("H2", substr($msg, 1, 1))) . uc(unpack("H2", substr($msg, 0, 1)));
-		# Handle 'master_login'
-		if ($switch eq "0C26" && $config{username} && $config{password}) {
-			# Log master login packet
+sub serverSend {
+        my $self = shift;
+        my $msg = shift;
+
+        if (!defined $msg || length($msg) >= 2) {
+                # Get packet switch
+                my $switch = uc(unpack("H2", substr($msg, 1, 1))) . uc(unpack("H2", substr($msg, 0, 1)));
+
+                my $packet = $messageSender->{packet_list}{$switch};
+                if ($packet && $packet->[0] eq 'actor_look_at' && $self->clientAlive) {
+                        my ($format, $keys) = @$packet[1, 2];
+                        if ($format && $keys && @$keys) {
+                                my @values = unpack($format, substr($msg, 2));
+                                my %args;
+                                @args{@$keys} = @values;
+                                my $head = $args{head} // $args{headDir} // 0;
+                                my $body = $args{body} // $args{dir} // $args{bodyDir} // 0;
+                                my $ID = ($char && $char->{ID}) ? $char->{ID} : $accountID;
+                                my $switch_to_client = $clientPacketHandler->{packet_lut}{actor_look_at} || 0x009C;
+                                my $clientMsg = pack('v a4 v C', $switch_to_client, $ID, $head, $body);
+                                $self->clientSend($clientMsg);
+                        }
+                }
+                # Handle 'master_login'
+                if ($switch eq "0C26" && $config{username} && $config{password}) {
+                        # Log master login packet
 			warning "Modifying packet 'master_login'...\n", "xkoreProxy";
 			# Parse master login packet
 			my ($game_code, $username, $password_rijndael, $flag) = unpack('a4 Z51 a32 a5', substr($msg, 2));

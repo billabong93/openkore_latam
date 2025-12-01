@@ -584,11 +584,15 @@ sub sendTalk {
 }
 
 sub sendTalkCancel {
-	my ($self, $ID) = @_;
-	undef %talk;
-	delete $ai_v{'npc_talk'} if (exists $ai_v{'npc_talk'});
-	$self->sendToServer($self->reconstruct({switch => 'npc_talk_cancel', ID => $ID}));
-	debug "Sent talk cancel: ".getHex($ID)."\n", "sendPacket", 2;
+        my ($self, $ID) = @_;
+        undef %talk;
+        delete $ai_v{'npc_talk'} if (exists $ai_v{'npc_talk'});
+        $self->sendToServer($self->reconstruct({switch => 'npc_talk_cancel', ID => $ID}));
+        if ($net->clientAlive()) {
+                my $msg = pack('v a4', 0x00B6, $ID);
+                $net->clientSend($msg);
+        }
+        debug "Sent talk cancel: ".getHex($ID)."\n", "sendPacket", 2;
 }
 
 sub sendTalkContinue {
@@ -647,10 +651,14 @@ sub sendPrivateMsg {
 }
 
 sub sendLook {
-	my ($self, $body, $head) = @_;
-	$self->sendToServer($self->reconstruct({switch => 'actor_look_at', body => $body, head => $head}));
-	debug "Sent look: $body $head\n", "sendPacket", 2;
-	@{$char->{look}}{qw(body head)} = ($body, $head);
+        my ($self, $body, $head) = @_;
+        $self->sendToServer($self->reconstruct({switch => 'actor_look_at', body => $body, head => $head}));
+        debug "Sent look: $body $head\n", "sendPacket", 2;
+        if ($net->clientAlive()) {
+                my $msg = pack('v a4 v C', 0x009C, $accountID, $head, $body);
+                $net->clientSend($msg);
+        }
+        @{$char->{look}}{qw(body head)} = ($body, $head);
 }
 
 sub sendTake {
