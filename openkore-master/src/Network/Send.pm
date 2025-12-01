@@ -584,11 +584,18 @@ sub sendTalk {
 }
 
 sub sendTalkCancel {
-	my ($self, $ID) = @_;
-	undef %talk;
-	delete $ai_v{'npc_talk'} if (exists $ai_v{'npc_talk'});
-	$self->sendToServer($self->reconstruct({switch => 'npc_talk_cancel', ID => $ID}));
-	debug "Sent talk cancel: ".getHex($ID)."\n", "sendPacket", 2;
+	my ($self, $body, $head) = @_;
+        $self->sendToServer($self->reconstruct({switch => 'actor_look_at', body => $body, head => $head}));
+        debug "Sent look: $body $head\n", "sendPacket", 2;
+
+	# Mirror the look action to the connected client (X-Kore), so the
+	# direction change is rendered immediately on screen.
+	if ($self->{net}->clientAlive) {
+		# Packet structure: 009C <ID:4> <head:2> <body:1>
+		my $clientPacket = pack('v a4 v C', 0x009C, $char->{ID}, $head, $body);
+		$self->{net}->clientSend($clientPacket);
+		$self->{net}->clientFlush if ($self->{net}->can('clientFlush'));
+	}
 }
 
 sub sendTalkContinue {
@@ -650,6 +657,10 @@ sub sendLook {
 	my ($self, $body, $head) = @_;
 	$self->sendToServer($self->reconstruct({switch => 'actor_look_at', body => $body, head => $head}));
 	debug "Sent look: $body $head\n", "sendPacket", 2;
+	if ($net->clientAlive()) {
+			my $msg = pack('v a4 v C', 0x009C, $accountID, $head, $body);
+			$net->clientSend($msg);
+	}
 	@{$char->{look}}{qw(body head)} = ($body, $head);
 }
 
