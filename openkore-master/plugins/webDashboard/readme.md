@@ -209,27 +209,6 @@ O **webDashboard V2.0 PRO** é um plugin completo para OpenKore que fornece uma 
 - **Persistência**: Salva preferência no localStorage
 </details>
 
----
-
-## 🖼️ Preview
-
-### Desktop
-![Dashboard Desktop](screenshots/desktop.png)
-*Tema escuro - Visão geral do dashboard*
-
-### Mobile
-![Dashboard Mobile](screenshots/mobile.png)
-*Interface otimizada para smartphones*
-
-### Mapa Interativo
-![Mapa](screenshots/map.png)
-*Mapa com visualização de entidades*
-
-### Múltiplas Contas
-![Multi-Account](screenshots/multi-account.png)
-*Gerenciamento de múltiplas instâncias*
-
-> **Nota**: Adicione suas próprias screenshots na pasta `screenshots/`
 
 ---
 
@@ -240,8 +219,3 @@ O **webDashboard V2.0 PRO** é um plugin completo para OpenKore que fornece uma 
 - OpenKore (qualquer versão recente)
 - Perl 5.10 ou superior (geralmente já incluído no OpenKore)
 - Navegador moderno (Chrome, Firefox, Edge, Safari)
-
-### Instalação Simples
-
-1. **Download do Plugin**
-```bash
