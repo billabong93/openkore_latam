@@ -839,9 +839,9 @@ SOFTWARE.
 ### Canais Oficiais
 
 - 🌐 **Website**: [OpenKore.com.br](https://openkore.com.br)
-- 💬 **Discord**: [Ue?ComoAssim!?](https://discord.gg/uecomoassim)
+- 💬 **Discord**: [Ue?ComoAssim!?]
 - 📧 **Email**: contato@openkore.com.br
-- 🐛 **Issues**: [GitHub Issues](https://github.com/seu-repo/webDashboard/issues)
+- 🐛 **Issues**: [GitHub Issues](https://github.com/dhmello/openkore_latam/webDashboard/issues)
 
 ### FAQ
 
