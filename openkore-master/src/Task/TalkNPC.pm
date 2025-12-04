@@ -88,13 +88,16 @@ sub new {
 	$self->{ID} = $args{ID};
 	$self->{nameID} = $args{nameID};
 	$self->{sequence} = $args{sequence};
-	$self->{sequence} =~ s/^ +| +$//g;
-	$self->{steps} = [];
-	$self->{trying_to_cancel} = 0;
-	$self->{sent_talk_response_cancel} = 0;
-	$self->{wait_for_answer} = 0;
-	$self->{error_code} = undef;
-	$self->{error_message} = undef;
+        $self->{sequence} =~ s/^ +| +$//g;
+        $self->{steps} = [];
+        $self->{trying_to_cancel} = 0;
+        $self->{sent_talk_response_cancel} = 0;
+        $self->{wait_for_answer} = 0;
+        $self->{farewell_wait_start} = undef;
+        $self->{farewell_waiting} = 0;
+        $self->{finalizing} = 0;
+        $self->{error_code} = undef;
+        $self->{error_message} = undef;
 	$self->{map_change} = 0;
 	$self->{disconnected} = 0;
 
@@ -104,10 +107,14 @@ sub new {
 
 	return $self;
 }
-
 sub handleNPCTalk {
 	my ($hook_name, $args, $holder) = @_;
 	my $self = $holder->[0];
+
+	if ($self->{finalizing}) {
+		$self->{farewell_wait_start} = time;
+		return;
+	}
 
 	# TODO: maybe better create a new task
 	if ($self->{stage} == AFTER_NPC_CANCEL) {
@@ -128,30 +135,23 @@ sub handleNPCTalk {
 		if ($self->{stage} == NOT_STARTED) {
 			debug "Npc which started autotalk has automatically sent a 'npc_talk_done'.\n", "ai_npcTalk";
 			return;
-
 		} elsif ($self->{stage} != TALKING_TO_NPC || !$self->{target}) {
 			debug "[handleNPCTalk] We received an strange 'npc_talk_done', ignoring it.\n", "ai_npcTalk";
 			return;
 		}
 		$self->{stage} = AFTER_NPC_CLOSE;
 		message TF("%s: Done talking\n", $self->{target}), "ai_npcTalk";
-
 	} elsif ($self->noMoreSteps) {
 		if ($hook_name eq 'packet/npc_talk_continue') {
 			message TF("%s: Type 'talk cont' to continue talking\n", $self->{target}), "ai_npcTalk";
-
 		} elsif ($hook_name eq 'packet/npc_talk_number') {
 			message TF("%s: Type 'talk num <number #>' to input a number.\n", $self->{target}), "ai_npcTalk";
-
 		} elsif ($hook_name eq 'npc_talk_responses') {
 			message TF("%s: Type 'talk resp #' to choose a response.\n", $self->{target}), "ai_npcTalk";
-
 		} elsif ($hook_name eq 'packet/npc_store_begin') {
 			message TF("%s: Type 'store' to start buying, type 'sell' to start selling or type 'canceltransaction' to cancel\n", $self->{target}), "ai_npcTalk";
-
 		} elsif ($hook_name eq 'packet/npc_talk_text') {
 			message TF("%s: Type 'talk text' (Respond to NPC)\n", $self->{target}), "ai_npcTalk";
-
 		} elsif ($hook_name eq 'packet/cash_dealer') {
 			message TF("%s: Type 'cashbuy' to start buying\n", $self->{target}), "ai_npcTalk";
 		}
@@ -159,6 +159,8 @@ sub handleNPCTalk {
 	$self->{time} = time;
 	$self->{sent_talk_response_cancel} = 0;
 	$self->{wait_for_answer} = 0;
+	$self->{farewell_wait_start} = undef;
+	$self->{farewell_waiting} = 0;
 }
 
 sub delHooks {
@@ -730,64 +732,70 @@ sub iterate {
 		$self->{wait_for_answer} = 1;
 		shift @{$self->{steps}};
 
-	# After a 'npc_talk_done' hook we must always send a 'npc_talk_cancel' after a timeout
-	# I noticed that the RO client doesn't send a 'talk cancel' packet
-	# when it receives a 'npc_talk_closed' packet from the server'.
-	# But on pRO Thor (with Kapra password) this is required in order to
-	# open the storage.
-	#
-	# UPDATE: not sending 'talk cancel' breaks autostorage on iRO.
-	# This needs more investigation.
-	} elsif ($self->{stage} == AFTER_NPC_CLOSE) {
-		return unless (timeOut($self->{time}, $ai_npc_talk_wait_after_close_to_cancel));
-		#Now 'n' step is totally unnecessary as we always send it but this must be done for backwards compatibility
-		if ( $self->{steps}[0] =~ /^n/i ) {
-			shift(@{$self->{steps}});
-		}
-		$self->{time} = time;
-		$self->{stage} = AFTER_NPC_CANCEL;
+        # After a 'npc_talk_done' hook we must always send a 'npc_talk_cancel' after a timeout
+        # I noticed that the RO client doesn't send a 'talk cancel' packet
+        # when it receives a 'npc_talk_closed' packet from the server'.
+        # But on pRO Thor (with Kapra password) this is required in order to
+        # open the storage.
+        #
+        # UPDATE: not sending 'talk cancel' breaks autostorage on iRO.
+        # This needs more investigation.
+        } elsif ($self->{stage} == AFTER_NPC_CLOSE) {
+                return unless (timeOut($self->{time}, $ai_npc_talk_wait_after_close_to_cancel));
+                #Now 'n' step is totally unnecessary as we always send it but this must be done for backwards compatibility
+                if ( $self->{steps}[0] =~ /^n/i ) {
+                        shift(@{$self->{steps}});
+                }
+                $self->{time} = time;
+                $self->{stage} = AFTER_NPC_CANCEL;
 
-		my $id = $ai_v{'npc_talk'}{'ID'};
-		debug "$self->{target}: Sending talk cancel [id '".(unpack ('V', $id))."'] after NPC has done talking\n", "ai_npcTalk";
-		$messageSender->sendTalkCancel($id);
+                my $id = $ai_v{'npc_talk'}{'ID'};
+                debug "$self->{target}: Sending talk cancel [id '".(unpack ('V', $id))."'] after NPC has done talking\n", "ai_npcTalk";
+                $messageSender->sendTalkCancel($id);
 
-	# After a 'npc_talk_cancel' and a timeout we decide what to do next
-	} elsif ($self->{stage} == AFTER_NPC_CANCEL) {
-		return unless (timeOut($self->{time}, $ai_npc_talk_wait_after_cancel_to_destroy));
+        # After a 'npc_talk_cancel' and a timeout we decide what to do next
+        } elsif ($self->{stage} == AFTER_NPC_CANCEL) {
+                return unless (timeOut($self->{time}, $ai_npc_talk_wait_after_cancel_to_destroy));
 
-		if (defined $self->{error_code}) {
-			$self->setError($self->{error_code}, $self->{error_message});
-			debug $self->{error_message} . "\n", "ai_npcTalk";
-			return;
-		}
+                if ($self->{finalizing} && $self->{farewell_waiting}) {
+                        $self->conversation_end;
+                        return;
+                }
 
-		# No more steps to be sent
-		# Usual end of a conversation
-		if ($self->noMoreSteps && !%talk) {
-			$self->conversation_end;
+                if (defined $self->{error_code}) {
+                        $self->setError($self->{error_code}, $self->{error_message});
+                        debug $self->{error_message} . "\n", "ai_npcTalk";
+                        return;
+                }
 
-		# There are more steps but no conversation with npc
-		} elsif (!%talk) {
-			# Usual 'x' step
-			if ($self->{steps}[0] =~ /x/i) {
-				debug "$self->{target}: Reinitiating the talk\n", "ai_npcTalk";
-				$self->{stage} = TALKING_TO_NPC;
-				$self->{time} = time;
+                # No more steps to be sent
+                # Usual end of a conversation
+                if ($self->noMoreSteps && !%talk) {
+                        $self->conversation_end;
 
-			# Too many steps
-			} else {
-				if ( scalar @{$self->{steps}} == 1 && $self->{steps}[0] =~ /^n$/i ) {
-					#Here for backwards compatibility
-					$self->conversation_end;
+                # There are more steps but no conversation with npc
+                } elsif (!%talk) {
+                        $self->{farewell_wait_start} = undef;
+                        # Usual 'x' step
+                        if ($self->{steps}[0] =~ /x/i) {
+                                debug "$self->{target}: Reinitiating the talk\n", "ai_npcTalk";
+                                $self->{stage} = TALKING_TO_NPC;
+                                $self->{time} = time;
 
-				} else {
-					# TODO: maybe just warn about remaining steps and do not set error flag?
-					$self->setError(STEPS_AFTER_AFTER_NPC_CLOSE, "There are still steps to be done but the conversation has already ended (current step: ".$self->{steps}[0].").");
-				}
-			}
-		}
-	}
-}
+                        # Too many steps
+                        } else {
+                                if ( scalar @{$self->{steps}} == 1 && $self->{steps}[0] =~ /^n$/i ) {
+                                        #Here for backwards compatibility
+                                        $self->conversation_end;
+
+                                } else {
+                                        # TODO: maybe just warn about remaining steps and do not set error flag?
+                                        $self->setError(STEPS_AFTER_AFTER_NPC_CLOSE, "There are still steps to be done but the conversation has already ended (current step: ".$self->{steps}[0].").");
+                                }
+                        }
+                }
+        }
+        }
 
 sub manage_wrong_sequence {
 	my ( $self, $error_message ) = @_;
@@ -822,11 +830,38 @@ sub manage_wrong_sequence {
 }
 
 sub conversation_end {
-	my ($self) = @_;
-	$self->delHooks;
-	$self->setDone();
-	debug "Task::TalkNPC::conversation_end called at ai npc_talk '".$ai_v{'npc_talk'}{'talk'}."'.\n", "ai_npcTalk";
-	message TF("Done talking with %s.\n", $self->{target}), "ai_npcTalk";
+        my ($self) = @_;
+
+        $self->{finalizing} = 1;
+        $self->{steps} = [] if (@{$self->{steps}});
+
+        if (!$self->{farewell_waiting}) {
+                $self->{farewell_wait_start} = time;
+                $self->{farewell_waiting} = 1;
+                $self->{stage} = AFTER_NPC_CANCEL;
+                $self->{time} = time;
+                debug "$self->{target}: Deferring conversation end while waiting for farewell dialog.\n", "ai_npcTalk";
+                return;
+        }
+
+        if (%talk || ($ai_v{'npc_talk'}{'talk'} && $ai_v{'npc_talk'}{'talk'} ne 'close')) {
+                $self->{farewell_wait_start} = time;
+                debug "$self->{target}: Farewell window elapsed but conversation resumed; restarting wait.\n", "ai_npcTalk";
+                return;
+        }
+
+        if (!timeOut($self->{farewell_wait_start}, 1)) {
+                debug "$self->{target}: Still waiting for farewell dialog before ending conversation.\n", "ai_npcTalk";
+                return;
+        }
+
+        $self->{farewell_wait_start} = undef;
+        $self->{farewell_waiting} = 0;
+        $self->{finalizing} = 0;
+        $self->delHooks;
+        $self->setDone();
+        debug "Task::TalkNPC::conversation_end called at ai npc_talk '".$ai_v{'npc_talk'}{'talk'}."'.\n", "ai_npcTalk";
+        message TF("Done talking with %s.\n", $self->{target}), "ai_npcTalk";
 }
 
 ##
