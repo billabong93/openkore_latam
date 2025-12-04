@@ -38,6 +38,7 @@ use Network;
 use FileParsers;
 use Translation;
 use Field;
+use PathFinding;
 use Task::TalkNPC;
 use Task::UseSkill;
 use Task::ErrorReport;
@@ -2963,6 +2964,47 @@ sub _buildHumanizedLockMapPath {
     return \@points;
 }
 
+sub _reachableHumanizedWaypoint {
+    my ($field, $from, $target) = @_;
+
+    my $start = _nearestWalkablePoint($field, $from->{x}, $from->{y}, 3) || $from;
+    my $dest = _nearestWalkablePoint($field, $target->{x}, $target->{y}, 3) || $target;
+
+    return unless ($start && $dest);
+
+    my $pf = new PathFinding(
+        field => $field,
+        start => { x => $start->{x}, y => $start->{y} },
+        dest => { x => $dest->{x}, y => $dest->{y} },
+        timeout => 200,
+    );
+    my @solution;
+    my $result = $pf->run(\@solution);
+
+    return $result != -1;
+}
+
+sub _nextHumanizedWaypoint {
+    my ($field, $state, $from) = @_;
+
+    return unless ($state->{points} && @{$state->{points}});
+
+    my $startIndex = $state->{index} // 0;
+    for (my $i = 0; $i < @{$state->{points}}; $i++) {
+        my $candidateIndex = ($startIndex + $i) % @{$state->{points}};
+        my $candidate = $state->{points}->[$candidateIndex];
+
+        next unless $candidate;
+
+        if (_reachableHumanizedWaypoint($field, $from, $candidate)) {
+            $state->{index} = $candidateIndex;
+            return $candidate;
+        }
+    }
+
+    return;
+}
+
 sub processLockMap {
     if (AI::isIdle && $config{'lockMap'} && $config{lockMap_humanized_path}
             && !$ai_v{'sitAuto_forcedBySitCommand'}
@@ -2986,28 +3028,32 @@ sub processLockMap {
         }
 
         if ($state->{points} && @{$state->{points}}) {
-            $state->{index} = 0 if ($state->{index} // 0) >= @{$state->{points}};
-            my $target = $state->{points}->[$state->{index}];
+            my $target = _nextHumanizedWaypoint($field, $state, $char->{pos_to});
 
-            if (blockDistance($char->{pos_to}, $target) <= 3) {
+            if ($target && blockDistance($char->{pos_to}, $target) <= 3) {
                 $state->{index} = ($state->{index} + 1) % @{$state->{points}};
-                $target = $state->{points}->[$state->{index}];
+                $target = _nextHumanizedWaypoint($field, $state, $char->{pos_to});
             }
 
             $ai_v{lockMap_humanized_path} = $state;
 
-            message TF("Humanized lockMap route to waypoint %d/%d: %s(%s): %s, %s\n", $state->{index} + 1, scalar(@{$state->{points}}), $maps_lut{$config{'lockMap'}.'.rsw'}, $config{'lockMap'}, $target->{x}, $target->{y}), "route";
-            ai_route(
-                    $field->baseName,
-                    $target->{x},
-                    $target->{y},
-                    maxRouteTime => $config{route_randomWalk_maxRouteTime},
-                    attackOnRoute => (defined $config{attackAuto}) ? $config{attackAuto} : 2,
-                    noMapRoute => ($config{route_randomWalk} == 2 ? 1 : 0),
-                    isRandomWalk => 1,
-                    isLockMapHumanized => 1
-            );
-            return;
+            if ($target) {
+                message TF("Humanized lockMap route to waypoint %d/%d: %s(%s): %s, %s\n", $state->{index} + 1, scalar(@{$state->{points}}), $maps_lut{$config{'lockMap'}.'.rsw'}, $config{'lockMap'}, $target->{x}, $target->{y}), "route";
+                ai_route(
+                        $field->baseName,
+                        $target->{x},
+                        $target->{y},
+                        maxRouteTime => $config{route_randomWalk_maxRouteTime},
+                        attackOnRoute => (defined $config{attackAuto}) ? $config{attackAuto} : 2,
+                        noMapRoute => ($config{route_randomWalk} == 2 ? 1 : 0),
+                        isRandomWalk => 1,
+                        isLockMapHumanized => 1
+                );
+                return;
+            } else {
+                warning TF("No reachable humanized lockMap waypoint found on %s; disabling humanized routing for this map.\n", $field->baseName);
+                delete $ai_v{lockMap_humanized_path};
+            }
         }
     }
 
