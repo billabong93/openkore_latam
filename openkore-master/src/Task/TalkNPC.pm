@@ -95,6 +95,7 @@ sub new {
         $self->{wait_for_answer} = 0;
         $self->{farewell_wait_start} = undef;
         $self->{farewell_waiting} = 0;
+        $self->{farewell_resumed_logged} = 0;
         $self->{finalizing} = 0;
         $self->{error_code} = undef;
         $self->{error_message} = undef;
@@ -156,11 +157,12 @@ sub handleNPCTalk {
 			message TF("%s: Type 'cashbuy' to start buying\n", $self->{target}), "ai_npcTalk";
 		}
 	}
-	$self->{time} = time;
-	$self->{sent_talk_response_cancel} = 0;
-	$self->{wait_for_answer} = 0;
-	$self->{farewell_wait_start} = undef;
-	$self->{farewell_waiting} = 0;
+        $self->{time} = time;
+        $self->{sent_talk_response_cancel} = 0;
+        $self->{wait_for_answer} = 0;
+        $self->{farewell_wait_start} = undef;
+        $self->{farewell_waiting} = 0;
+        $self->{farewell_resumed_logged} = 0;
 }
 
 sub delHooks {
@@ -838,6 +840,7 @@ sub conversation_end {
         if (!$self->{farewell_waiting}) {
                 $self->{farewell_wait_start} = time;
                 $self->{farewell_waiting} = 1;
+                $self->{farewell_resumed_logged} = 0;
                 $self->{stage} = AFTER_NPC_CANCEL;
                 $self->{time} = time;
                 debug "$self->{target}: Deferring conversation end while waiting for farewell dialog.\n", "ai_npcTalk";
@@ -846,9 +849,14 @@ sub conversation_end {
 
         if (%talk || ($ai_v{'npc_talk'}{'talk'} && $ai_v{'npc_talk'}{'talk'} ne 'close')) {
                 $self->{farewell_wait_start} = time;
-                debug "$self->{target}: Farewell window elapsed but conversation resumed; restarting wait.\n", "ai_npcTalk";
+                if (!$self->{farewell_resumed_logged}) {
+                        debug "$self->{target}: Farewell window elapsed but conversation resumed; restarting wait.\n", "ai_npcTalk";
+                        $self->{farewell_resumed_logged} = 1;
+                }
                 return;
         }
+
+        $self->{farewell_resumed_logged} = 0;
 
         if (!timeOut($self->{farewell_wait_start}, 1)) {
                 debug "$self->{target}: Still waiting for farewell dialog before ending conversation.\n", "ai_npcTalk";
@@ -857,6 +865,7 @@ sub conversation_end {
 
         $self->{farewell_wait_start} = undef;
         $self->{farewell_waiting} = 0;
+        $self->{farewell_resumed_logged} = 0;
         $self->{finalizing} = 0;
         $self->delHooks;
         $self->setDone();
