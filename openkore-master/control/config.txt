@@ -267,6 +267,12 @@ route_removeMissingPortals 0
 route_tryToGuessMissingPortalByDistance 1
 route_reAddMissingPortals 1
 route_randomFactor 0
+route_humanize 0
+# Desativa/ativa ajustes que tornam a rota mais orgânica. Quando ligado, pequenos desvios serão inseridos no caminho.
+route_humanize_chance 30
+# Percentual de chance (0-100) de cada passo da rota ser deslocado lateralmente. Valores maiores geram rotas mais sinuosas.
+route_humanize_deviation 1
+# Alcance máximo (em células) que cada passo pode ser deslocado ao criar desvios. Mantém o caminho próximo ao original para não travar em obstáculos.
 route_saveMapWarp 0
 
 runFromTarget 0
