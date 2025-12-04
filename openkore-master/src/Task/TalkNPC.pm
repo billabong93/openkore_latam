@@ -94,9 +94,6 @@ sub new {
         $self->{sent_talk_response_cancel} = 0;
         $self->{wait_for_answer} = 0;
         $self->{farewell_wait_start} = undef;
-        $self->{farewell_waiting} = 0;
-        $self->{farewell_resumed_logged} = 0;
-        $self->{finalizing} = 0;
         $self->{error_code} = undef;
         $self->{error_message} = undef;
 	$self->{map_change} = 0;
@@ -109,28 +106,23 @@ sub new {
 	return $self;
 }
 sub handleNPCTalk {
-	my ($hook_name, $args, $holder) = @_;
-	my $self = $holder->[0];
+        my ($hook_name, $args, $holder) = @_;
+        my $self = $holder->[0];
 
-	if ($self->{finalizing}) {
-		$self->{farewell_wait_start} = time;
-		return;
-	}
+        if ($self->{stage} == AFTER_NPC_CANCEL && $hook_name ne 'npc_talk_done') {
+                debug "Npc has restarted conversation after talk cancel was sent.\n", "ai_npcTalk";
 
-	# TODO: maybe better create a new task
-	if ($self->{stage} == AFTER_NPC_CANCEL) {
-		debug "Npc has restarted conversation after talk cancel was sent.\n", "ai_npcTalk";
+                if ($self->noMoreSteps) {
+                        debug "Continuing the talk within the same task, no conversation steps left.\n", "ai_npcTalk";
+                } else {
+                        debug "Continuing the talk within the same task and remaining conversation steps.\n", "ai_npcTalk";
+                }
 
-		if ($self->noMoreSteps) {
-			debug "Continuing the talk within the same task, no conversation steps left.\n", "ai_npcTalk";
-		} else {
-			debug "Continuing the talk within the same task and remaining conversation steps.\n", "ai_npcTalk";
-		}
-
-		$self->find_and_set_target;
-		$self->{stage} = TALKING_TO_NPC;
-		$self->{time} = time;
-	}
+                $self->find_and_set_target;
+                $self->{stage} = TALKING_TO_NPC;
+                $self->{time} = time;
+                $self->{farewell_wait_start} = undef;
+        }
 
 	if ($hook_name eq 'npc_talk_done') {
 		if ($self->{stage} == NOT_STARTED) {
@@ -160,9 +152,6 @@ sub handleNPCTalk {
         $self->{time} = time;
         $self->{sent_talk_response_cancel} = 0;
         $self->{wait_for_answer} = 0;
-        $self->{farewell_wait_start} = undef;
-        $self->{farewell_waiting} = 0;
-        $self->{farewell_resumed_logged} = 0;
 }
 
 sub delHooks {
@@ -751,16 +740,20 @@ sub iterate {
                 $self->{time} = time;
                 $self->{stage} = AFTER_NPC_CANCEL;
 
-                my $id = $ai_v{'npc_talk'}{'ID'};
-                debug "$self->{target}: Sending talk cancel [id '".(unpack ('V', $id))."'] after NPC has done talking\n", "ai_npcTalk";
-                $messageSender->sendTalkCancel($id);
+                my $id = $ai_v{'npc_talk'}{'ID'} || $self->{ID};
+                if ($id) {
+                        debug "$self->{target}: Sending talk cancel [id '".(unpack ('V', $id))."'] after NPC has done talking\n", "ai_npcTalk";
+                        $messageSender->sendTalkCancel($id);
+                } else {
+                        debug "$self->{target}: No valid NPC ID to send talk cancel.\n", "ai_npcTalk";
+                }
 
         # After a 'npc_talk_cancel' and a timeout we decide what to do next
         } elsif ($self->{stage} == AFTER_NPC_CANCEL) {
                 return unless (timeOut($self->{time}, $ai_npc_talk_wait_after_cancel_to_destroy));
 
-                if ($self->{finalizing} && $self->{farewell_waiting}) {
-                        $self->conversation_end;
+                if (%talk && $ai_v{'npc_talk'}{'talk'} && $ai_v{'npc_talk'}{'talk'} ne 'close') {
+                        $self->{farewell_wait_start} = undef;
                         return;
                 }
 
@@ -773,6 +766,20 @@ sub iterate {
                 # No more steps to be sent
                 # Usual end of a conversation
                 if ($self->noMoreSteps && !%talk) {
+                        my $farewell_wait = 1;
+
+                        if (!defined $self->{farewell_wait_start}) {
+                                $self->{farewell_wait_start} = time;
+                                debug "$self->{target}: Deferring conversation end while waiting for farewell dialog.\n", "ai_npcTalk";
+                                return;
+                        }
+
+                        if (!timeOut($self->{farewell_wait_start}, $farewell_wait)) {
+                                debug "$self->{target}: Still waiting for farewell dialog before ending conversation.\n", "ai_npcTalk";
+                                return;
+                        }
+
+                        $self->{farewell_wait_start} = undef;
                         $self->conversation_end;
 
                 # There are more steps but no conversation with npc
@@ -834,39 +841,7 @@ sub manage_wrong_sequence {
 sub conversation_end {
         my ($self) = @_;
 
-        $self->{finalizing} = 1;
         $self->{steps} = [] if (@{$self->{steps}});
-
-        if (!$self->{farewell_waiting}) {
-                $self->{farewell_wait_start} = time;
-                $self->{farewell_waiting} = 1;
-                $self->{farewell_resumed_logged} = 0;
-                $self->{stage} = AFTER_NPC_CANCEL;
-                $self->{time} = time;
-                debug "$self->{target}: Deferring conversation end while waiting for farewell dialog.\n", "ai_npcTalk";
-                return;
-        }
-
-        if (%talk || ($ai_v{'npc_talk'}{'talk'} && $ai_v{'npc_talk'}{'talk'} ne 'close')) {
-                $self->{farewell_wait_start} = time;
-                if (!$self->{farewell_resumed_logged}) {
-                        debug "$self->{target}: Farewell window elapsed but conversation resumed; restarting wait.\n", "ai_npcTalk";
-                        $self->{farewell_resumed_logged} = 1;
-                }
-                return;
-        }
-
-        $self->{farewell_resumed_logged} = 0;
-
-        if (!timeOut($self->{farewell_wait_start}, 1)) {
-                debug "$self->{target}: Still waiting for farewell dialog before ending conversation.\n", "ai_npcTalk";
-                return;
-        }
-
-        $self->{farewell_wait_start} = undef;
-        $self->{farewell_waiting} = 0;
-        $self->{farewell_resumed_logged} = 0;
-        $self->{finalizing} = 0;
         $self->delHooks;
         $self->setDone();
         debug "Task::TalkNPC::conversation_end called at ai npc_talk '".$ai_v{'npc_talk'}{'talk'}."'.\n", "ai_npcTalk";
