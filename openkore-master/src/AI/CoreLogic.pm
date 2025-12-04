@@ -38,7 +38,7 @@ use Network;
 use FileParsers;
 use Translation;
 use Field;
-use PathFinding;
+use Utils::PathFinding;
 use Task::TalkNPC;
 use Task::UseSkill;
 use Task::ErrorReport;
