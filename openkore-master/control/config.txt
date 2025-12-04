@@ -247,6 +247,8 @@ lockMap_x
 lockMap_y
 lockMap_randX
 lockMap_randY
+lockMap_humanized_path 0
+lockMap_humanized_step 12
 
 route_escape_reachedNoPortal 1
 route_escape_randomWalk 1

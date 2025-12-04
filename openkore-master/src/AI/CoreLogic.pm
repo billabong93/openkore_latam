@@ -2918,10 +2918,102 @@ sub processAutoCart {
 }
 
 ##### LOCKMAP #####
+sub _nearestWalkablePoint {
+    my ($field, $x, $y, $radius) = @_;
+    $radius ||= 5;
+
+    return { x => $x, y => $y } if $field->isWalkable($x, $y);
+
+    for my $r (1 .. $radius) {
+        for my $dx (-$r .. $r) {
+            for my $dy (-$r .. $r) {
+                next unless (abs($dx) == $r || abs($dy) == $r);
+                my $nx = $x + $dx;
+                my $ny = $y + $dy;
+                next if ($nx < 1 || $ny < 1 || $nx >= $field->width || $ny >= $field->height);
+                return { x => $nx, y => $ny } if $field->isWalkable($nx, $ny);
+            }
+        }
+    }
+
+    return;
+}
+
+sub _buildHumanizedLockMapPath {
+    my ($field) = @_;
+    my $step = $config{lockMap_humanized_step} || 12;
+    my $maxX = $field->width - 1;
+    my $maxY = $field->height - 1;
+    my @points;
+
+    my $row = 0;
+    for (my $y = 1; $y <= $maxY; $y += $step) {
+        my $rowY = $y > $maxY ? $maxY : $y;
+        my @xs = grep { ($_ - 1) % $step == 0 } (1 .. $maxX);
+        @xs = reverse @xs if ($row % 2);
+
+        foreach my $x (@xs) {
+            my $point = _nearestWalkablePoint($field, $x, $rowY, int($step / 2) || 3);
+            push(@points, $point) if $point;
+        }
+
+        $row++;
+    }
+
+    return \@points;
+}
+
 sub processLockMap {
-	if (AI::isIdle && $config{'lockMap'}
-		&& !$ai_v{'sitAuto_forcedBySitCommand'}
-		&& ($field->baseName ne $config{'lockMap'}
+    if (AI::isIdle && $config{'lockMap'} && $config{lockMap_humanized_path}
+            && !$ai_v{'sitAuto_forcedBySitCommand'}
+            && $field->baseName eq $config{'lockMap'}) {
+
+        my $state = $ai_v{lockMap_humanized_path} || {};
+
+        if (!$state->{map} || $state->{map} ne $field->baseName || !$state->{points}) {
+            my $points = _buildHumanizedLockMapPath($field);
+            if (!$points || !@$points) {
+                warning TF("Could not build humanized lockMap path for %s; falling back to default behavior.\n", $field->baseName);
+                delete $ai_v{lockMap_humanized_path};
+            } else {
+                $state = {
+                    map => $field->baseName,
+                    points => $points,
+                    index => 0,
+                };
+                $ai_v{lockMap_humanized_path} = $state;
+            }
+        }
+
+        if ($state->{points} && @{$state->{points}}) {
+            $state->{index} = 0 if ($state->{index} // 0) >= @{$state->{points}};
+            my $target = $state->{points}->[$state->{index}];
+
+            if (blockDistance($char->{pos_to}, $target) <= 3) {
+                $state->{index} = ($state->{index} + 1) % @{$state->{points}};
+                $target = $state->{points}->[$state->{index}];
+            }
+
+            $ai_v{lockMap_humanized_path} = $state;
+
+            message TF("Humanized lockMap route to waypoint %d/%d: %s(%s): %s, %s\n", $state->{index} + 1, scalar(@{$state->{points}}), $maps_lut{$config{'lockMap'}.'.rsw'}, $config{'lockMap'}, $target->{x}, $target->{y}), "route";
+            ai_route(
+                    $field->baseName,
+                    $target->{x},
+                    $target->{y},
+                    maxRouteTime => $config{route_randomWalk_maxRouteTime},
+                    attackOnRoute => (defined $config{attackAuto}) ? $config{attackAuto} : 2,
+                    noMapRoute => ($config{route_randomWalk} == 2 ? 1 : 0),
+                    isRandomWalk => 1,
+                    isLockMapHumanized => 1
+            );
+            return;
+        }
+    }
+
+    if (AI::isIdle && $config{'lockMap'}
+            && !$ai_v{'sitAuto_forcedBySitCommand'}
+            && ($field->baseName ne $config{'lockMap'}
 			|| ($config{'lockMap_x'} && ($char->{pos_to}{x} < $config{'lockMap_x'} - $config{'lockMap_randX'} || $char->{pos_to}{x} > $config{'lockMap_x'} + $config{'lockMap_randX'}))
 			|| ($config{'lockMap_y'} && ($char->{pos_to}{y} < $config{'lockMap_y'} - $config{'lockMap_randY'} || $char->{pos_to}{y} > $config{'lockMap_y'} + $config{'lockMap_randY'}))
 	)) {
