@@ -93,7 +93,7 @@ sub new {
         $self->{trying_to_cancel} = 0;
         $self->{sent_talk_response_cancel} = 0;
         $self->{wait_for_answer} = 0;
-        $self->{farewell_wait_start} = undef;
+        $self->{delayed_end_at} = undef;
         $self->{error_code} = undef;
         $self->{error_message} = undef;
 	$self->{map_change} = 0;
@@ -121,7 +121,6 @@ sub handleNPCTalk {
                 $self->find_and_set_target;
                 $self->{stage} = TALKING_TO_NPC;
                 $self->{time} = time;
-                $self->{farewell_wait_start} = undef;
         }
 
 	if ($hook_name eq 'npc_talk_done') {
@@ -227,7 +226,7 @@ sub stop {
 }
 
 sub setTarget {
-	my ($self, $target) = @_;
+        my ($self, $target) = @_;
 
 	if ($target) {
 		message "Talking with $target at ($target->{pos}{x},$target->{pos}{y}), ID ".getHex($target->{ID})."\n", "ai_npcTalk";
@@ -241,7 +240,41 @@ sub setTarget {
 		lookAtPosition($self) unless (%talk);
 	}
 
-	return 1;
+        return 1;
+}
+
+sub scheduleDelayedConversationEnd {
+        my ($self) = @_;
+
+        return if ($self->{delayed_end_at});
+
+        $self->{delayed_end_at} = time;
+        $self->{stage} = AFTER_NPC_CANCEL;
+        $self->{time} = time;
+
+        debug "$self->{target}: Scheduling delayed conversation end in 1 second.\n", "ai_npcTalk";
+}
+
+sub processDelayedConversationEnd {
+        my ($self) = @_;
+
+        return 0 unless defined $self->{delayed_end_at};
+
+        if (!timeOut($self->{delayed_end_at}, 1)) {
+                return 1;
+        }
+
+        my $id = $ai_v{'npc_talk'}{'ID'} || $self->{ID};
+        if ($id) {
+                debug "$self->{target}: Sending talk cancel [id '".(unpack ('V', $id))."'] after delay.\n", "ai_npcTalk";
+                $messageSender->sendTalkCancel($id);
+        } else {
+                debug "$self->{target}: No valid NPC ID to send talk cancel after delay.\n", "ai_npcTalk";
+        }
+
+        $self->{delayed_end_at} = undef;
+        $self->conversation_end;
+        return 1;
 }
 
 sub find_and_set_target {
@@ -266,11 +299,11 @@ sub iterate {
 	$self->SUPER::iterate(); # Do not forget to call this!
 	return unless ($net->getState() == Network::IN_GAME);
 	my $timeResponse = ($config{npcTimeResponse} >= 5) ? $config{npcTimeResponse}:5;
-	my $ai_npc_talk_wait_to_answer = $timeout{'ai_npc_talk_wait_to_answer'}{'timeout'} ? $timeout{'ai_npc_talk_wait_to_answer'}{'timeout'} : 1.5;
-	my $ai_npc_talk_wait_after_close_to_cancel = $timeout{'ai_npc_talk_wait_after_close_to_cancel'}{'timeout'} ? $timeout{'ai_npc_talk_wait_after_close_to_cancel'}{'timeout'} : 0.5;
-	my $ai_npc_talk_wait_after_cancel_to_destroy = $timeout{'ai_npc_talk_wait_after_cancel_to_destroy'}{'timeout'} ? $timeout{'ai_npc_talk_wait_after_cancel_to_destroy'}{'timeout'} : 0.5;
-	my $ai_npc_talk_wait_before_continue = $timeout{'ai_npc_talk_wait_before_continue'}{'timeout'} ? $timeout{'ai_npc_talk_wait_before_continue'}{'timeout'} : 0.7;
-	if ($self->{map_change} || $self->{disconnected}) {
+        my $ai_npc_talk_wait_to_answer = $timeout{'ai_npc_talk_wait_to_answer'}{'timeout'} ? $timeout{'ai_npc_talk_wait_to_answer'}{'timeout'} : 1.5;
+        my $ai_npc_talk_wait_after_close_to_cancel = $timeout{'ai_npc_talk_wait_after_close_to_cancel'}{'timeout'} ? $timeout{'ai_npc_talk_wait_after_close_to_cancel'}{'timeout'} : 0.5;
+        my $ai_npc_talk_wait_after_cancel_to_destroy = $timeout{'ai_npc_talk_wait_after_cancel_to_destroy'}{'timeout'} ? $timeout{'ai_npc_talk_wait_after_cancel_to_destroy'}{'timeout'} : 0.5;
+        my $ai_npc_talk_wait_before_continue = $timeout{'ai_npc_talk_wait_before_continue'}{'timeout'} ? $timeout{'ai_npc_talk_wait_before_continue'}{'timeout'} : 0.7;
+        if ($self->{map_change} || $self->{disconnected}) {
 
 		#A conversation started right after mapchange/disconnection (eg. payon guards)
 		if (%talk) {
@@ -302,7 +335,11 @@ sub iterate {
 			$self->conversation_end;
 		}
 
-	} elsif ($self->{stage} == NOT_STARTED) {
+        }
+
+        return if $self->processDelayedConversationEnd();
+
+        if ($self->{stage} == NOT_STARTED) {
 
 		if (!$self->{validatedAddSequence}) {
 			if (defined $self->{sequence}) {
@@ -408,16 +445,15 @@ sub iterate {
 			return;
 		}
 
-		#In theory after the talk_response_cancel is sent we shouldn't receive anything, so just wait the timer and assume it's over
-		if ($self->{sent_talk_response_cancel}) {
-			undef %talk;
-			if (defined $self->{error_code}) {
-				debug "Done talking with $self->{target}, but with conversation sequence errors\n", "ai_npcTalk";
-				$self->setError($self->{error_code}, $self->{error_message});
-			} else {
-				$self->conversation_end;
-			}
-			return;
+                #In theory after the talk_response_cancel is sent we shouldn't receive anything, so just wait the timer and assume it's over
+                if ($self->{sent_talk_response_cancel}) {
+                        undef %talk;
+                        if (defined $self->{error_code}) {
+                                debug "Done talking with $self->{target}, but with conversation sequence errors\n", "ai_npcTalk";
+                                $self->setError($self->{error_code}, $self->{error_message});
+                        }
+                        $self->scheduleDelayedConversationEnd();
+                        return;
 
 		#This will try to get out of this conversation as much as possible
 		} elsif ($self->{trying_to_cancel}) {
@@ -752,39 +788,18 @@ sub iterate {
         } elsif ($self->{stage} == AFTER_NPC_CANCEL) {
                 return unless (timeOut($self->{time}, $ai_npc_talk_wait_after_cancel_to_destroy));
 
-                if (%talk && $ai_v{'npc_talk'}{'talk'} && $ai_v{'npc_talk'}{'talk'} ne 'close') {
-                        $self->{farewell_wait_start} = undef;
-                        return;
-                }
-
                 if (defined $self->{error_code}) {
                         $self->setError($self->{error_code}, $self->{error_message});
                         debug $self->{error_message} . "\n", "ai_npcTalk";
                         return;
                 }
 
-                # No more steps to be sent
-                # Usual end of a conversation
-                if ($self->noMoreSteps && !%talk) {
-                        my $farewell_wait = 1;
-
-                        if (!defined $self->{farewell_wait_start}) {
-                                $self->{farewell_wait_start} = time;
-                                debug "$self->{target}: Deferring conversation end while waiting for farewell dialog.\n", "ai_npcTalk";
-                                return;
-                        }
-
-                        if (!timeOut($self->{farewell_wait_start}, $farewell_wait)) {
-                                debug "$self->{target}: Still waiting for farewell dialog before ending conversation.\n", "ai_npcTalk";
-                                return;
-                        }
-
-                        $self->{farewell_wait_start} = undef;
-                        $self->conversation_end;
+                if ($self->processDelayedConversationEnd()) {
+                        return;
+                }
 
                 # There are more steps but no conversation with npc
-                } elsif (!%talk) {
-                        $self->{farewell_wait_start} = undef;
+                if (!%talk) {
                         # Usual 'x' step
                         if ($self->{steps}[0] =~ /x/i) {
                                 debug "$self->{target}: Reinitiating the talk\n", "ai_npcTalk";
@@ -870,11 +885,12 @@ sub cancelTalk {
 		debug "Trying to auto close the conversation due to error.\n", "ai_npcTalk";
 	}
 
-	if ($ai_v{'npc_talk'}{'talk'} eq 'select') {
-		$messageSender->sendTalkResponse($talk{ID}, $#{$talk{responses}});
-		$self->{sent_talk_response_cancel} = 1;
+        if ($ai_v{'npc_talk'}{'talk'} eq 'select') {
+                $messageSender->sendTalkResponse($talk{ID}, $#{$talk{responses}});
+                $self->{sent_talk_response_cancel} = 1;
+                $self->scheduleDelayedConversationEnd();
 
-	} elsif ($ai_v{'npc_talk'}{'talk'} eq 'next') {
+        } elsif ($ai_v{'npc_talk'}{'talk'} eq 'next') {
 		$messageSender->sendTalkContinue($talk{ID});
 
 	} elsif ($ai_v{'npc_talk'}{'talk'} eq 'number') {
