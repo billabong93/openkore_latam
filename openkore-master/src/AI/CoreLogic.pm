@@ -2993,6 +2993,7 @@ sub _markHumanizedWaypointVisited {
     $state->{visited} ||= {};
 
     $state->{visited}{$index} = $state->{cycle};
+    delete $state->{unreachable}{$index} if $state->{unreachable};
 
     my $visitedThisCycle = 0;
     foreach my $value (values %{$state->{visited}}) {
@@ -3002,6 +3003,30 @@ sub _markHumanizedWaypointVisited {
     if ($visitedThisCycle >= @{$state->{points}}) {
         $state->{cycle}++;
         $state->{visited} = {};
+    }
+}
+
+sub _markHumanizedWaypointUnreachable {
+    my ($state, $index) = @_;
+
+    return unless (defined $index && $state->{points});
+
+    $state->{cycle} //= 0;
+    $state->{visited} ||= {};
+    $state->{unreachable} ||= {};
+
+    $state->{visited}{$index} = $state->{cycle};
+    $state->{unreachable}{$index} = $state->{cycle};
+
+    my $visitedThisCycle = 0;
+    foreach my $value (values %{$state->{visited}}) {
+        $visitedThisCycle++ if $value == $state->{cycle};
+    }
+
+    if ($visitedThisCycle >= @{$state->{points}}) {
+        $state->{cycle}++;
+        $state->{visited} = {};
+        $state->{unreachable} = {};
     }
 }
 
@@ -3045,20 +3070,43 @@ sub _nextHumanizedWaypoint {
     my $cycle = $state->{cycle} // 0;
     my $direction = $state->{direction} && $state->{direction} < 0 ? -1 : 1;
     my $total = scalar @{$state->{points}};
+    my $attempted = 0;
 
-    for my $allowVisited (0, 1) {
-        for (my $i = 0; $i < $total; $i++) {
-            my $candidateIndex = ($startIndex + ($direction * $i)) % $total;
-            $candidateIndex += $total if $candidateIndex < 0;
-            my $candidate = $state->{points}->[$candidateIndex];
+    for (my $i = 0; $i < $total; $i++) {
+        my $candidateIndex = ($startIndex + ($direction * $i)) % $total;
+        $candidateIndex += $total if $candidateIndex < 0;
+        my $candidate = $state->{points}->[$candidateIndex];
 
-            next unless $candidate;
-            next if (!$allowVisited && $state->{visited} && $state->{visited}{$candidateIndex} && $state->{visited}{$candidateIndex} == $cycle);
+        next unless $candidate;
+        next if ($state->{visited} && $state->{visited}{$candidateIndex} && $state->{visited}{$candidateIndex} == $cycle);
 
-            if (_reachableHumanizedWaypoint($field, $from, $candidate)) {
-                $state->{index} = $candidateIndex;
-                return $candidate;
-            }
+        $attempted++;
+        if (_reachableHumanizedWaypoint($field, $from, $candidate)) {
+            $state->{index} = $candidateIndex;
+            return $candidate;
+        } else {
+            _markHumanizedWaypointUnreachable($state, $candidateIndex);
+        }
+    }
+
+    if (!$attempted && $state->{cycle}) {
+        $state->{cycle}++;
+        $state->{visited} = {};
+        $state->{unreachable} = {};
+    }
+
+    return if (!$state->{points} || !@{$state->{points}});
+
+    for (my $i = 0; $i < $total; $i++) {
+        my $candidateIndex = ($startIndex + ($direction * $i)) % $total;
+        $candidateIndex += $total if $candidateIndex < 0;
+        my $candidate = $state->{points}->[$candidateIndex];
+
+        next unless $candidate;
+
+        if (_reachableHumanizedWaypoint($field, $from, $candidate)) {
+            $state->{index} = $candidateIndex;
+            return $candidate;
         }
     }
 
