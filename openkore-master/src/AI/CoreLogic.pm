@@ -3153,7 +3153,9 @@ sub _nextHumanizedWaypoint {
     my $cycle = $state->{cycle} // 0;
     my $direction = $state->{direction} && $state->{direction} < 0 ? -1 : 1;
     my $total = scalar @{$state->{points}};
+    my $maxPlans = $config{lockMap_humanized_plan_limit} || 60;
     my $attempted = 0;
+    my $planned = 0;
 
     my $best;
     my $bestPlan;
@@ -3169,14 +3171,18 @@ sub _nextHumanizedWaypoint {
         $attempted++;
         my $plan = _planHumanizedRoute($field, $from, $candidate, $state);
         if ($plan) {
+            $planned++;
             if (!$best || $plan->{visited_penalty} < $bestPlan->{visited_penalty} ||
                 ($plan->{visited_penalty} == $bestPlan->{visited_penalty} && $plan->{cost} < $bestPlan->{cost})) {
                 $best = $candidateIndex;
                 $bestPlan = $plan;
             }
+            last if ($planned >= $maxPlans && $bestPlan && $bestPlan->{visited_penalty} == 0);
         } else {
             _markHumanizedWaypointUnreachable($state, $candidateIndex);
         }
+
+        last if ($planned >= $maxPlans);
     }
 
     if (!$attempted && $state->{cycle}) {
@@ -3188,7 +3194,7 @@ sub _nextHumanizedWaypoint {
     return if (!$state->{points} || !@{$state->{points}});
 
     if (!$best) {
-        for (my $i = 0; $i < $total; $i++) {
+        for (my $i = 0; $i < $total && $planned < $maxPlans; $i++) {
             my $candidateIndex = ($startIndex + ($direction * $i)) % $total;
             $candidateIndex += $total if $candidateIndex < 0;
             my $candidate = $state->{points}->[$candidateIndex];
@@ -3197,6 +3203,7 @@ sub _nextHumanizedWaypoint {
 
             my $plan = _planHumanizedRoute($field, $from, $candidate, $state);
             if ($plan) {
+                $planned++;
                 $best = $candidateIndex;
                 $bestPlan = $plan;
                 last;
