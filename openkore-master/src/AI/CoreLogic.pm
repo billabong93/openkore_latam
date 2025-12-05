@@ -2984,21 +2984,47 @@ sub _reachableHumanizedWaypoint {
     return $result != -1;
 }
 
+sub _markHumanizedWaypointVisited {
+    my ($state, $index) = @_;
+
+    return unless (defined $index && $state->{points});
+
+    $state->{cycle} //= 0;
+    $state->{visited} ||= {};
+
+    $state->{visited}{$index} = $state->{cycle};
+
+    my $visitedThisCycle = 0;
+    foreach my $value (values %{$state->{visited}}) {
+        $visitedThisCycle++ if $value == $state->{cycle};
+    }
+
+    if ($visitedThisCycle >= @{$state->{points}}) {
+        $state->{cycle}++;
+        $state->{visited} = {};
+    }
+}
+
 sub _nextHumanizedWaypoint {
     my ($field, $state, $from) = @_;
 
     return unless ($state->{points} && @{$state->{points}});
 
     my $startIndex = $state->{index} // 0;
-    for (my $i = 0; $i < @{$state->{points}}; $i++) {
-        my $candidateIndex = ($startIndex + $i) % @{$state->{points}};
-        my $candidate = $state->{points}->[$candidateIndex];
+    my $cycle = $state->{cycle} // 0;
 
-        next unless $candidate;
+    for my $allowVisited (0, 1) {
+        for (my $i = 0; $i < @{$state->{points}}; $i++) {
+            my $candidateIndex = ($startIndex + $i) % @{$state->{points}};
+            my $candidate = $state->{points}->[$candidateIndex];
 
-        if (_reachableHumanizedWaypoint($field, $from, $candidate)) {
-            $state->{index} = $candidateIndex;
-            return $candidate;
+            next unless $candidate;
+            next if (!$allowVisited && $state->{visited} && $state->{visited}{$candidateIndex} && $state->{visited}{$candidateIndex} == $cycle);
+
+            if (_reachableHumanizedWaypoint($field, $from, $candidate)) {
+                $state->{index} = $candidateIndex;
+                return $candidate;
+            }
         }
     }
 
@@ -3031,6 +3057,7 @@ sub processLockMap {
             my $target = _nextHumanizedWaypoint($field, $state, $char->{pos_to});
 
             if ($target && blockDistance($char->{pos_to}, $target) <= 3) {
+                _markHumanizedWaypointVisited($state, $state->{index});
                 $state->{index} = ($state->{index} + 1) % @{$state->{points}};
                 $target = _nextHumanizedWaypoint($field, $state, $char->{pos_to});
             }
