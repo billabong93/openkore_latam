@@ -2964,6 +2964,12 @@ sub _buildHumanizedLockMapPath {
     return \@points;
 }
 
+sub _hasHumanizedPoints {
+    my ($state) = @_;
+
+    return ($state && $state->{points} && ref($state->{points}) eq 'ARRAY');
+}
+
 sub _humanizedVisitedLimit {
     return $config{lockMap_humanized_trace} || 600;
 }
@@ -3064,7 +3070,7 @@ sub _planHumanizedRoute {
 sub _markHumanizedWaypointVisited {
     my ($state, $index) = @_;
 
-    return unless (defined $index && $state->{points});
+    return unless (defined $index && _hasHumanizedPoints($state));
 
     $state->{cycle} //= 0;
     $state->{visited} ||= {};
@@ -3077,7 +3083,7 @@ sub _markHumanizedWaypointVisited {
         $visitedThisCycle++ if $value == $state->{cycle};
     }
 
-    if ($visitedThisCycle >= @{$state->{points}}) {
+    if (_hasHumanizedPoints($state) && $visitedThisCycle >= @{$state->{points}}) {
         $state->{cycle}++;
         $state->{visited} = {};
     }
@@ -3086,7 +3092,7 @@ sub _markHumanizedWaypointVisited {
 sub _markHumanizedWaypointUnreachable {
     my ($state, $index) = @_;
 
-    return unless (defined $index && $state->{points});
+    return unless (defined $index && _hasHumanizedPoints($state));
 
     $state->{cycle} //= 0;
     $state->{visited} ||= {};
@@ -3100,7 +3106,7 @@ sub _markHumanizedWaypointUnreachable {
         $visitedThisCycle++ if $value == $state->{cycle};
     }
 
-    if ($visitedThisCycle >= @{$state->{points}}) {
+    if (_hasHumanizedPoints($state) && $visitedThisCycle >= @{$state->{points}}) {
         $state->{cycle}++;
         $state->{visited} = {};
         $state->{unreachable} = {};
@@ -3110,7 +3116,7 @@ sub _markHumanizedWaypointUnreachable {
 sub _setHumanizedStartFromPosition {
     my ($state, $from) = @_;
 
-    return unless ($state->{points} && @$state->{points} && $from);
+    return unless (_hasHumanizedPoints($state) && @{$state->{points}} && $from);
 
     my $closestIndex;
     my $closestDistance = 1_000_000;
@@ -3215,7 +3221,7 @@ sub processLockMap {
 
         my $state = $ai_v{lockMap_humanized_path} || {};
 
-        if (!$state->{map} || $state->{map} ne $field->baseName || !$state->{points}) {
+        if (!$state->{map} || $state->{map} ne $field->baseName || !_hasHumanizedPoints($state)) {
             my $points = _buildHumanizedLockMapPath($field);
             if (!$points || !@$points) {
                 warning TF("Could not build humanized lockMap path for %s; falling back to default behavior.\n", $field->baseName);
