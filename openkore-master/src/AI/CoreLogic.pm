@@ -2964,8 +2964,50 @@ sub _buildHumanizedLockMapPath {
     return \@points;
 }
 
-sub _reachableHumanizedWaypoint {
-    my ($field, $from, $target) = @_;
+sub _humanizedVisitedLimit {
+    return $config{lockMap_humanized_trace} || 600;
+}
+
+sub _recordHumanizedVisitedCells {
+    my ($state, $path) = @_;
+
+    return unless ($state && $path && @$path);
+
+    $state->{visited_cells} ||= {};
+    $state->{visited_order} ||= [];
+
+    foreach my $step (@$path) {
+        next unless (defined $step->{x} && defined $step->{y});
+        my $key = join(',', $step->{x}, $step->{y});
+        next if $state->{visited_cells}{$key};
+
+        $state->{visited_cells}{$key} = 1;
+        push @{$state->{visited_order}}, $key;
+
+        while (@{$state->{visited_order}} > _humanizedVisitedLimit()) {
+            my $old = shift @{$state->{visited_order}};
+            delete $state->{visited_cells}{$old};
+        }
+    }
+}
+
+sub _humanizedVisitedWeightMap {
+    my ($state) = @_;
+
+    return [] unless ($state && $state->{visited_cells});
+
+    my $weight = 12;
+    my @weights;
+    foreach my $key (keys %{$state->{visited_cells}}) {
+        my ($x, $y) = split(',', $key);
+        push @weights, { x => $x, y => $y, weight => $weight };
+    }
+
+    return \@weights;
+}
+
+sub _planHumanizedRoute {
+    my ($field, $from, $target, $state) = @_;
 
     my $start = _nearestWalkablePoint($field, $from->{x}, $from->{y}, 3) || $from;
     my $dest = _nearestWalkablePoint($field, $target->{x}, $target->{y}, 3) || $target;
@@ -2976,12 +3018,47 @@ sub _reachableHumanizedWaypoint {
         field => $field,
         start => { x => $start->{x}, y => $start->{y} },
         dest => { x => $dest->{x}, y => $dest->{y} },
-        timeout => 200,
+        timeout => 250,
+        customWeights => 1,
+        secondWeightMap => _humanizedVisitedWeightMap($state),
     );
+
     my @solution;
     my $result = $pf->run(\@solution);
 
-    return $result != -1;
+    return if ($result == -1);
+
+    my %seen;
+    my $visited_penalty = 0;
+    foreach my $step (@solution) {
+        my $key = join(',', $step->{x}, $step->{y});
+        next if $seen{$key}++;
+        $visited_penalty++ if ($state->{visited_cells} && $state->{visited_cells}{$key});
+    }
+
+    my $turn_penalty = 0;
+    if ($state->{last_heading} && @solution > 1) {
+        my $first;
+        foreach my $step (@solution) {
+            next if ($step->{x} == $start->{x} && $step->{y} == $start->{y});
+            $first = $step;
+            last;
+        }
+        if ($first) {
+            my $dx = $first->{x} - $start->{x};
+            my $dy = $first->{y} - $start->{y};
+            if ($dx == -$state->{last_heading}{dx} && $dy == -$state->{last_heading}{dy}) {
+                $turn_penalty = 500;
+            }
+        }
+    }
+
+    return {
+        solution => \@solution,
+        cost => $result,
+        visited_penalty => $visited_penalty + $turn_penalty,
+        start => $start,
+    };
 }
 
 sub _markHumanizedWaypointVisited {
@@ -3072,6 +3149,9 @@ sub _nextHumanizedWaypoint {
     my $total = scalar @{$state->{points}};
     my $attempted = 0;
 
+    my $best;
+    my $bestPlan;
+
     for (my $i = 0; $i < $total; $i++) {
         my $candidateIndex = ($startIndex + ($direction * $i)) % $total;
         $candidateIndex += $total if $candidateIndex < 0;
@@ -3081,9 +3161,13 @@ sub _nextHumanizedWaypoint {
         next if ($state->{visited} && $state->{visited}{$candidateIndex} && $state->{visited}{$candidateIndex} == $cycle);
 
         $attempted++;
-        if (_reachableHumanizedWaypoint($field, $from, $candidate)) {
-            $state->{index} = $candidateIndex;
-            return $candidate;
+        my $plan = _planHumanizedRoute($field, $from, $candidate, $state);
+        if ($plan) {
+            if (!$best || $plan->{visited_penalty} < $bestPlan->{visited_penalty} ||
+                ($plan->{visited_penalty} == $bestPlan->{visited_penalty} && $plan->{cost} < $bestPlan->{cost})) {
+                $best = $candidateIndex;
+                $bestPlan = $plan;
+            }
         } else {
             _markHumanizedWaypointUnreachable($state, $candidateIndex);
         }
@@ -3097,19 +3181,30 @@ sub _nextHumanizedWaypoint {
 
     return if (!$state->{points} || !@{$state->{points}});
 
-    for (my $i = 0; $i < $total; $i++) {
-        my $candidateIndex = ($startIndex + ($direction * $i)) % $total;
-        $candidateIndex += $total if $candidateIndex < 0;
-        my $candidate = $state->{points}->[$candidateIndex];
+    if (!$best) {
+        for (my $i = 0; $i < $total; $i++) {
+            my $candidateIndex = ($startIndex + ($direction * $i)) % $total;
+            $candidateIndex += $total if $candidateIndex < 0;
+            my $candidate = $state->{points}->[$candidateIndex];
 
-        next unless $candidate;
+            next unless $candidate;
 
-        if (_reachableHumanizedWaypoint($field, $from, $candidate)) {
-            $state->{index} = $candidateIndex;
-            return $candidate;
+            my $plan = _planHumanizedRoute($field, $from, $candidate, $state);
+            if ($plan) {
+                $best = $candidateIndex;
+                $bestPlan = $plan;
+                last;
+            }
         }
     }
 
+    if ($best && $bestPlan) {
+        $state->{index} = $best;
+        $state->{current_plan} = $bestPlan;
+        return $state->{points}->[$best];
+    }
+
+    delete $state->{current_plan};
     return;
 }
 
@@ -3151,6 +3246,24 @@ sub processLockMap {
             $ai_v{lockMap_humanized_path} = $state;
 
             if ($target) {
+                if ($state->{current_plan} && $state->{current_plan}{solution}) {
+                    _recordHumanizedVisitedCells($state, $state->{current_plan}{solution});
+
+                    my $start = $state->{current_plan}{start} || $char->{pos_to};
+                    my $firstStep;
+                    foreach my $step (@{$state->{current_plan}{solution}}) {
+                        next if ($step->{x} == $start->{x} && $step->{y} == $start->{y});
+                        $firstStep = $step;
+                        last;
+                    }
+
+                    if ($firstStep) {
+                        $state->{last_heading} = {
+                            dx => $firstStep->{x} - $start->{x},
+                            dy => $firstStep->{y} - $start->{y},
+                        };
+                    }
+                }
                 message TF("Humanized lockMap route to waypoint %d/%d: %s(%s): %s, %s\n", $state->{index} + 1, scalar(@{$state->{points}}), $maps_lut{$config{'lockMap'}.'.rsw'}, $config{'lockMap'}, $target->{x}, $target->{y}), "route";
                 ai_route(
                         $field->baseName,
