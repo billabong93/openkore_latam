@@ -3005,6 +3005,37 @@ sub _markHumanizedWaypointVisited {
     }
 }
 
+sub _setHumanizedStartFromPosition {
+    my ($state, $from) = @_;
+
+    return unless ($state->{points} && @$state->{points} && $from);
+
+    my $closestIndex;
+    my $closestDistance = 1_000_000;
+    for (my $i = 0; $i < @{$state->{points}}; $i++) {
+        my $p = $state->{points}->[$i];
+        next unless $p;
+        my $dist = blockDistance($from, $p);
+        if ($dist < $closestDistance) {
+            $closestDistance = $dist;
+            $closestIndex = $i;
+        }
+    }
+
+    return unless defined $closestIndex;
+
+    $state->{index} = $closestIndex;
+
+    my $nextIndex = ($closestIndex + 1) % @{$state->{points}};
+    my $prevIndex = ($closestIndex - 1);
+    $prevIndex += @{$state->{points}} if $prevIndex < 0;
+
+    my $nextDist = blockDistance($from, $state->{points}->[$nextIndex]);
+    my $prevDist = blockDistance($from, $state->{points}->[$prevIndex]);
+
+    $state->{direction} = ($nextDist <= $prevDist) ? 1 : -1;
+}
+
 sub _nextHumanizedWaypoint {
     my ($field, $state, $from) = @_;
 
@@ -3012,10 +3043,13 @@ sub _nextHumanizedWaypoint {
 
     my $startIndex = $state->{index} // 0;
     my $cycle = $state->{cycle} // 0;
+    my $direction = $state->{direction} && $state->{direction} < 0 ? -1 : 1;
+    my $total = scalar @{$state->{points}};
 
     for my $allowVisited (0, 1) {
-        for (my $i = 0; $i < @{$state->{points}}; $i++) {
-            my $candidateIndex = ($startIndex + $i) % @{$state->{points}};
+        for (my $i = 0; $i < $total; $i++) {
+            my $candidateIndex = ($startIndex + ($direction * $i)) % $total;
+            $candidateIndex += $total if $candidateIndex < 0;
             my $candidate = $state->{points}->[$candidateIndex];
 
             next unless $candidate;
@@ -3048,7 +3082,9 @@ sub processLockMap {
                     map => $field->baseName,
                     points => $points,
                     index => 0,
+                    direction => 1,
                 };
+                _setHumanizedStartFromPosition($state, $char->{pos_to});
                 $ai_v{lockMap_humanized_path} = $state;
             }
         }
@@ -3058,7 +3094,9 @@ sub processLockMap {
 
             if ($target && blockDistance($char->{pos_to}, $target) <= 3) {
                 _markHumanizedWaypointVisited($state, $state->{index});
-                $state->{index} = ($state->{index} + 1) % @{$state->{points}};
+                my $step = ($state->{direction} && $state->{direction} < 0) ? -1 : 1;
+                $state->{index} = ($state->{index} + $step) % @{$state->{points}};
+                $state->{index} += @{$state->{points}} if $state->{index} < 0;
                 $target = _nextHumanizedWaypoint($field, $state, $char->{pos_to});
             }
 
