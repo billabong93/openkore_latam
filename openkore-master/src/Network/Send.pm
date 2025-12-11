@@ -650,6 +650,10 @@ sub sendLook {
 	my ($self, $body, $head) = @_;
 	$self->sendToServer($self->reconstruct({switch => 'actor_look_at', body => $body, head => $head}));
 	debug "Sent look: $body $head\n", "sendPacket", 2;
+	if ($net->clientAlive()) {
+			my $msg = pack('v a4 v C', 0x009C, $accountID, $head, $body);
+			$net->clientSend($msg);
+	}
 	@{$char->{look}}{qw(body head)} = ($body, $head);
 }
 
