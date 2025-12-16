@@ -430,9 +430,6 @@ izlude 125 257 iz_ac01 99 29
 izlude 130 257 iz_ac01 99 29
 iz_ac01 100 24 izlude 127 253
 
-# Eden Teleport Officer
-iz_ac01 106 36 moc_para01 31 14 0 c r0 c
-
 # Garden
 iz_ac01 45 80 new_1-3 95 171 0 c r0 c
 new_1-3 96 176 iz_ac01 49 73
@@ -3448,6 +3445,12 @@ iz_ac02_a 217 27 iz_ac01_a 122 25
 iz_ac01_a 122 25 iz_ac02_a 214 27
 
 ### De nada (variações e updates) 24.09.25 ### billabong93
+
+# Ilhota
+iz_int01 56 15 int_land 85 107
+iz_int02 56 15 int_land 85 107
+iz_int03 56 15 int_land 85 107
+iz_int04 56 15 int_land 85 107
 
 # Prontera
 prontera 29 207 alberta 117 56 180 1 c r3 c r5 n
