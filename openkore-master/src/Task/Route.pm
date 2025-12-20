@@ -107,7 +107,7 @@ sub new {
 		ArgumentException->throw(error => "Invalid Coordinates argument.");
 	}
 
-	my $allowed = new Set(qw(targetNpcPos maxDistance maxTime distFromGoal pyDistFromGoal avoidWalls randomFactor useManhattan notifyUponArrival attackID sendAttackWithMove attackOnRoute noSitAuto LOSSubRoute meetingSubRoute isRandomWalk isFollow isIdleWalk isSlaveRescue isMoveNearSlave isEscape isItemTake isItemGather isDeath isToLockMap runFromTarget));
+    my $allowed = new Set(qw(targetNpcPos maxDistance maxTime distFromGoal pyDistFromGoal avoidWalls randomFactor useManhattan notifyUponArrival attackID sendAttackWithMove attackOnRoute noSitAuto LOSSubRoute meetingSubRoute isRandomWalk isFollow isIdleWalk isSlaveRescue isMoveNearSlave isEscape isItemTake isItemGather isDeath isToLockMap runFromTarget humanizeRoute humanizeChance humanizeDeviation));
 	foreach my $key (keys %args) {
 		if ($allowed->has($key) && defined($args{$key})) {
 			$self->{$key} = $args{$key};
@@ -132,16 +132,30 @@ sub new {
 		$self->{avoidWalls} = 0;
 	}
 	
-	if ($config{$self->{actor}{configPrefix}.'route_randomFactor'}) {
-		if (!defined $self->{randomFactor}) {
-			$self->{randomFactor} = $config{$self->{actor}{configPrefix}.'route_randomFactor'};
-		}
-	} else {
-		$self->{randomFactor} = 0;
-	}
-	if (!defined $self->{useManhattan}) {
-		$self->{useManhattan} = 0;
-	}
+    if ($config{$self->{actor}{configPrefix}.'route_randomFactor'}) {
+            if (!defined $self->{randomFactor}) {
+                    $self->{randomFactor} = $config{$self->{actor}{configPrefix}.'route_randomFactor'};
+            }
+    } else {
+            $self->{randomFactor} = 0;
+    }
+    if ($config{$self->{actor}{configPrefix}.'route_humanize'}) {
+            $self->{humanizeRoute} = 1 if (!defined $self->{humanizeRoute});
+            if (!defined $self->{humanizeChance}) {
+                    $self->{humanizeChance} = $config{$self->{actor}{configPrefix}.'route_humanize_chance'} // 30;
+            }
+            if (!defined $self->{humanizeDeviation}) {
+                    $self->{humanizeDeviation} = $config{$self->{actor}{configPrefix}.'route_humanize_deviation'} // 1;
+            }
+            if (!$self->{randomFactor}) {
+                    $self->{randomFactor} = 4;
+            }
+    } else {
+            $self->{humanizeRoute} = 0 if (!defined $self->{humanizeRoute});
+    }
+    if (!defined $self->{useManhattan}) {
+            $self->{useManhattan} = 0;
+    }
 	
 	$self->{solution} = [];
 	$self->{stage} = NOT_INITIALIZED;
@@ -221,7 +235,8 @@ sub iterate {
 			debug "Route $self->{actor}: Current position and destination are the same.\n", "route";
 			$self->setDone();
 		
-		} elsif ($self->getRoute($self->{solution}, $self->{dest}{map}, $calc_pos, $self->{dest}{pos}, $self->{avoidWalls}, $self->{randomFactor}, $self->{useManhattan}, 1)) {
+                } elsif ($self->getRoute($self->{solution}, $self->{dest}{map}, $calc_pos, $self->{dest}{pos}, $self->{avoidWalls}, $self->{randomFactor}, $self->{useManhattan}, 1)) {
+                        $self->humanizeSolution() if ($self->{humanizeRoute});
 			$self->{stage} = ROUTE_SOLUTION_READY;
 
 			@{$self->{last_pos}}{qw(x y)} = @{$calc_pos}{qw(x y)};
@@ -783,6 +798,67 @@ sub getRoute {
 	}
 
 	return ($ret >= 0 ? 1 : 0);
+}
+
+sub humanizeSolution {
+        my ($self) = @_;
+        my $solution = $self->{solution};
+        return unless ($solution && scalar(@{$solution}) > 2);
+
+        my $chance = $self->{humanizeChance};
+        my $maxDeviation = $self->{humanizeDeviation};
+        return if (!$chance || !$maxDeviation);
+
+	my $field = $self->{dest}{map};
+	my @adjusted = @{$solution};
+
+	my $is_clear_step = sub {
+		my ($from, $to) = @_;
+		return 0 if (blockDistance($from, $to) > 1);
+		return 0 unless ($field->isWalkable($to->{x}, $to->{y}));
+
+		my $dx = $to->{x} - $from->{x};
+		my $dy = $to->{y} - $from->{y};
+		if ($dx && $dy) {
+			return 0 unless (
+				$field->isWalkable($from->{x} + $dx, $from->{y})
+				&& $field->isWalkable($from->{x}, $from->{y} + $dy)
+			);
+		}
+
+		return 1;
+	};
+
+	for (my $i = 1; $i < $#adjusted; $i++) {
+		next if (int(rand(100)) >= $chance);
+
+		my $previous = $adjusted[$i - 1];
+		my $current = $adjusted[$i];
+		my $next    = $adjusted[$i + 1];
+
+		my $dx = $next->{x} - $previous->{x};
+		my $dy = $next->{y} - $previous->{y};
+		next if ($dx == 0 && $dy == 0);
+
+		my ($perp_x, $perp_y) = ($dy <=> 0, -$dx <=> 0);
+		next if (!$perp_x && !$perp_y);
+
+		my $offset = 1 + int(rand($maxDeviation));
+		my @candidates = (
+			{ x => $current->{x} + ($perp_x * $offset), y => $current->{y} + ($perp_y * $offset) },
+			{ x => $current->{x} - ($perp_x * $offset), y => $current->{y} - ($perp_y * $offset) },
+		);
+
+		foreach my $candidate (@candidates) {
+			next unless ($is_clear_step->($previous, $candidate));
+			next unless ($is_clear_step->($candidate, $next));
+
+			$adjusted[$i] = $candidate;
+			last;
+		}
+	}
+
+	@{$solution} = @adjusted;
 }
 
 sub mapChanged {

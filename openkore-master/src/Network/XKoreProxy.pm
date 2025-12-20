@@ -276,6 +276,10 @@ sub clientSend {
 
 	# queue message instead of sending directly
 	$clientBuffer .= $msg;
+	
+	# Flush immediately so client-visible actions (e.g. look direction)
+	# render without waiting for other network traffic to trigger a flush.
+	$self->clientFlush;
 }
 
 sub clientFlush {
