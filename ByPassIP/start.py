@@ -26,9 +26,14 @@ MENU_ALL = "ALL"
 
 DEFAULTS = {
     "6901_EXE_PATH": r"C:\Gravity\Ragnarok\ragexe.exe",
-    "6902_EXE_PATH": r"C:\Gravity\Ragnarok_6902\ragexe.exe",
-    "6903_EXE_PATH": r"C:\Gravity\Ragnarok_6903\ragexe.exe",
-    "IP": "172.65.175.75",
+    "6902_EXE_PATH": r"C:\Gravity\Ragnarok\ragexe.exe",
+    "6903_EXE_PATH": r"C:\Gravity\Ragnarok\ragexe.exe",
+
+    # IP padrão por porta (pode ser igual ou diferente)
+    "IP_6901": "172.65.175.75",
+    "IP_6902": "172.65.175.75",
+    "IP_6903": "172.65.175.75",
+
     "AUTOMATICO": "false",
 }
 
@@ -75,8 +80,12 @@ def ensure_bypass_file():
         f"6901_EXE_PATH = {DEFAULTS['6901_EXE_PATH']}\n"
         f"6902_EXE_PATH = {DEFAULTS['6902_EXE_PATH']}\n"
         f"6903_EXE_PATH = {DEFAULTS['6903_EXE_PATH']}\n\n"
-        "# IP (será combinado com a porta escolhida)\n"
-        f"IP = {DEFAULTS['IP']}\n\n"
+        "# IPs por porta (serão combinados com a porta correspondente)\n"
+        f"IP_6901 = {DEFAULTS['IP_6901']}\n"
+        f"IP_6902 = {DEFAULTS['IP_6902']}\n"
+        f"IP_6903 = {DEFAULTS['IP_6903']}\n\n"
+        "# OPCIONAL (legado): IP global. Se definido, é usado como fallback para todas as portas.\n"
+        f"# IP = {DEFAULTS['IP_6901']}\n\n"
         "# Modo automático: se true, abre 3 instâncias sem mostrar menu\n"
         f"AUTOMATICO = {DEFAULTS['AUTOMATICO']}\n\n"
         "# Ponteiros encontrados (atualizados automaticamente):\n"
@@ -134,13 +143,25 @@ def save_pointers_to_file(ta_addr, domain_ptr_addr):
         print(f"{Fore.YELLOW}Aviso: Não foi possível salvar ponteiros: {e}{Style.RESET_ALL}")
 
 def get_cfg():
+    """
+    Lê bypass.txt e monta o dicionário de config.
+    Para cada porta:
+      - <PORT>_EXE_PATH
+      - IP_<PORT>, com fallback para IP global, se existir.
+    """
     ensure_bypass_file()
     kv = parse_kv_file(BYPASS_FILE)
     cfg = {}
+
     for p in PORT_OPTIONS:
-        key = f"{p}_EXE_PATH"
-        cfg[key] = kv.get(key.upper(), DEFAULTS[key])
-    cfg["IP"] = kv.get("IP", DEFAULTS["IP"])
+        path_key = f"{p}_EXE_PATH"       # ex: 6901_EXE_PATH
+        ip_key   = f"IP_{p}"             # ex: IP_6901
+
+        # parse_kv_file deixa tudo em maiúsculo
+        cfg[path_key] = kv.get(path_key, DEFAULTS[path_key])
+        # Fallback: se não houver IP_690X, usa IP global (se existir), senão default
+        cfg[ip_key] = kv.get(ip_key, kv.get("IP", DEFAULTS[ip_key]))
+
     cfg["AUTOMATICO"] = kv.get("AUTOMATICO", DEFAULTS["AUTOMATICO"]).lower() == "true"
     return cfg
 
@@ -318,7 +339,8 @@ def find_pointers_dynamically(pm):
     return target_addr, domain_ptr_addr, domain_string_addr
 
 # ---------------- UI / Menu ----------------
-def clear(): os.system("cls")
+def clear():
+    os.system("cls")
 
 def render_menu(idx, cfg):
     clear()
@@ -336,24 +358,34 @@ def render_menu(idx, cfg):
             print(f"{marker} {Fore.MAGENTA}Abrir todas (6901/6902/6903){Style.RESET_ALL}")
         else:
             path = cfg.get(f"{it}_EXE_PATH", "")
-            print(f"{marker} Porta {Fore.MAGENTA}{it}{Style.RESET_ALL}  —  {Fore.WHITE}{path}{Style.RESET_ALL}")
+            ip = cfg.get(f"IP_{it}", "")
+            print(
+                f"{marker} Porta {Fore.MAGENTA}{it}{Style.RESET_ALL}  —  {Fore.WHITE}{path}{Style.RESET_ALL}  "
+                f"{Fore.BLUE}[IP: {Fore.WHITE}{ip}{Fore.BLUE}]{Style.RESET_ALL}"
+            )
 
-    print("\n" + f"{Fore.BLUE}IP: {Fore.WHITE}{cfg['IP']}{Style.RESET_ALL}")
+    print("\n" + f"{Fore.BLUE}IPs por porta são configurados em bypass.txt (IP_6901, IP_6902, IP_6903).{Style.RESET_ALL}")
     print(f"{Fore.YELLOW}Ponteiros serão buscados dinamicamente ao iniciar{Style.RESET_ALL}")
 
 def read_key():
     ch = msvcrt.getch()
     if ch in (b'\xe0', b'\x00'):
         ch2 = msvcrt.getch()
-        if ch2 == b'H': return 'UP'
-        if ch2 == b'P': return 'DOWN'
+        if ch2 == b'H':
+            return 'UP'
+        if ch2 == b'P':
+            return 'DOWN'
         return None
-    if ch in (b'\r', b'\n'): return 'ENTER'
-    if ch == b'\x1b': return 'ESC'
+    if ch in (b'\r', b'\n'):
+        return 'ENTER'
+    if ch == b'\x1b':
+        return 'ESC'
     try:
         s = ch.decode('utf-8').lower()
-        if s == 'w': return 'UP'
-        if s == 's': return 'DOWN'
+        if s == 'w':
+            return 'UP'
+        if s == 's':
+            return 'DOWN'
     except Exception:
         pass
     return None
@@ -373,7 +405,8 @@ def choose_item(cfg):
         elif k == 'ENTER':
             return items[i]
         elif k == 'ESC':
-            print("Cancelado."); sys.exit(0)
+            print("Cancelado.")
+            sys.exit(0)
 
 # ---------------- Core: abrir + buscar ponteiros + aplicar bypass ----------------
 def patch_instance(exe_path, ip, port, stagger_msg=""):
@@ -423,7 +456,7 @@ def patch_instance(exe_path, ip, port, stagger_msg=""):
         print(f"{Fore.RED}Falha ao encontrar ponteiros necessários{Style.RESET_ALL}")
         try:
             pm.close_process()
-        except:
+        except Exception:
             pass
         return False
     
@@ -512,24 +545,24 @@ def patch_instance(exe_path, ip, port, stagger_msg=""):
     # Cleanup
     try:
         pm.close_process()
-    except:
+    except Exception:
         try:
             pm.close_handle()
-        except:
+        except Exception:
             pass
     try:
         win32api.CloseHandle(h_thread)
-    except:
+    except Exception:
         pass
     try:
         win32api.CloseHandle(h_process)
-    except:
+    except Exception:
         pass
     
     return success
 
-def launch_all_instances(cfg, ip):
-    """Abre todas as 3 instâncias automaticamente"""
+def launch_all_instances(cfg):
+    """Abre todas as 3 instâncias automaticamente, usando o IP de cada porta."""
     print(f"\n{Fore.CYAN}{Style.BRIGHT}╔══════════════════════════════════════════════════╗{Style.RESET_ALL}")
     print(f"{Fore.CYAN}{Style.BRIGHT}║      MODO AUTOMÁTICO: Abrindo 3 instâncias       ║{Style.RESET_ALL}")
     print(f"{Fore.CYAN}{Style.BRIGHT}╚══════════════════════════════════════════════════╝{Style.RESET_ALL}\n")
@@ -537,6 +570,7 @@ def launch_all_instances(cfg, ip):
     ok_all = True
     for idx, port in enumerate(PORT_OPTIONS, start=1):
         exe_path = cfg.get(f"{port}_EXE_PATH")
+        ip = cfg.get(f"IP_{port}")
         ok = patch_instance(exe_path, ip, port, stagger_msg=f"[{idx}/3] ")
         ok_all = ok_all and ok
         
@@ -557,13 +591,12 @@ def main():
     print(f"{Style.RESET_ALL}")
     
     cfg = get_cfg()
-    ip = cfg["IP"]
     automatico = cfg["AUTOMATICO"]
     
     # Verifica se está no modo automático
     if automatico:
         print(f"{Fore.GREEN}Modo automático ativado (automatico=true no bypass.txt){Style.RESET_ALL}")
-        ok_all = launch_all_instances(cfg, ip)
+        ok_all = launch_all_instances(cfg)
         
         if ok_all:
             print(f"\n{Fore.GREEN}{Style.BRIGHT}✓ Todas as 3 instâncias abertas com sucesso!{Style.RESET_ALL}")
@@ -576,7 +609,7 @@ def main():
     sel = choose_item(cfg)
 
     if sel == MENU_ALL:
-        ok_all = launch_all_instances(cfg, ip)
+        ok_all = launch_all_instances(cfg)
         
         if ok_all:
             print(f"\n{Fore.GREEN}{Style.BRIGHT}✓ Todas as portas abertas com sucesso!{Style.RESET_ALL}")
@@ -587,6 +620,7 @@ def main():
     else:
         port = sel
         exe_path = cfg.get(f"{port}_EXE_PATH")
+        ip = cfg.get(f"IP_{port}")
         print(f"\n{Fore.CYAN}Iniciando cliente na porta {port}...{Style.RESET_ALL}")
         print(f"{Fore.CYAN}Bypass será aplicado para: {ip}:{port}{Style.RESET_ALL}\n")
         ok = patch_instance(exe_path, ip, port)
