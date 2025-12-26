@@ -3455,8 +3455,8 @@ sub updateDamageTables {
 					$teleport = 1;
 
 				} elsif (AI::inQueue("sitAuto") && $config{$player->{configPrefix}.'teleportAuto_attackedWhenSitting'}
-							&& $damage) {
-					message TF("%s hit %s while you are sitting. Teleporting...\n",
+						&& defined $damage) {
+					message TF("%s attacked %s while you are sitting. Teleporting...\n",
 						$monster, $player), "teleport";
 					$teleport = 1;
 
