@@ -1776,7 +1776,7 @@ prt_fild11 362 111 prt_fild10 20 122
 prt_gld 107 240 prtg_cas04 86 9
 prt_gld 129 65 prtg_cas01 103 32
 prt_gld 153 141 prtg_cas03 168 8
-prt_gld 159 25 prt_castle 102 181
+#prt_gld 159 25 prt_castle 102 181
 prt_gld 159 298 prt_fild01 199 24
 prt_gld 212 240 prtg_cas05 17 231
 prt_gld 240 124 prtg_cas02 43 233
@@ -3444,7 +3444,7 @@ que_ba 150 150 prontera 116 72
 iz_ac02_a 217 27 iz_ac01_a 122 25
 iz_ac01_a 122 25 iz_ac02_a 214 27
 
-### De nada (variações e updates) 24.09.25 ### billabong93
+### De nada (variações e updates) 16.12.25 ### billabong93
 
 # Ilhota
 iz_int01 56 15 int_land 85 107
@@ -3498,6 +3498,54 @@ prt_mk_a 152 299 prontera 155 183 c r2 n
 prt_mk_a 162 153 prontera 155 183 c r2 n
 prt_mk_a 172 24 prontera 155 183 c r2 n
 prt_mk_a 295 171 prontera 155 183 c r2 n
+
+# Palácio/Castelo de Prontera
+prontera 156 358 prt_cas 216 146
+prt_cas 216 142 prontera 156 354
+prt_gld 159 24 prt_cas 82 171
+prt_cas 216 184 prt_cas 93 212
+prt_cas 93 208 prt_cas 116 180
+prt_cas 174 235 prt_cas 247 107
+prt_cas 247 111 prt_cas 174 237
+prt_cas 41 275 prt_cas 320 182
+prt_cas 320 178 prt_cas 41 271
+prt_cas 82 175 prt_gld 159 30
+prt_cas 268 176 prt_cas 110 156
+prt_cas 110 152 prt_cas 268 172
+prt_cas 174 40 prt_cas 253 148
+prt_cas 253 148 prt_cas 174 37
+prt_cas 174 108 prt_cas 235 148
+prt_cas 178 148 prt_cas 27 43
+prt_cas 27 47 prt_cas 178 152
+prt_cas 197 148 prt_cas 31 117
+prt_cas 31 120 prt_cas 197 152
+prt_cas 235 148 prt_cas 174 104
+prt_cas 278 163 prt_cas_q 135 119
+prt_cas_q 132 119 prt_cas 274 163
+prt_cas_q 153 119 prt_cas_q 78 21
+prt_cas_q 74 21 prt_cas_q 149 119 
+prt_cas_q 153 143 prt_cas_q 78 77
+prt_cas_q 74 77 prt_cas_q 149 143
+prt_cas_q 153 167 prt_cas_q 78 131
+prt_cas_q 74 131 prt_cas_q 149 167
+prt_cas_q 153 191 prt_cas_q 78 189
+prt_cas_q 74 189 prt_cas_q 149 191
+prt_cas 164 177 prt_cas 54 156
+prt_cas 54 152 prt_cas 164 172
+prt_cas 197 148 prt_cas 31 117
+prt_cas 31 120 prt_cas 197 152 
+prt_cas 172 148 prt_cas 27 43 
+prt_cas 27 47 prt_cas 178 152 
+prt_cas 152 163 prt_cas_q 150 8
+prt_cas_q 154 8 prt_cas_q 156 163 
+prt_cas_q 130 8 prt_cas_q 30 28
+prt_cas_q 34 28 prt_cas_q 134 8
+prt_cas_q 130 32 prt_cas_q 30 78
+prt_cas_q 34 78 prt_cas_q 134 32
+prt_cas_q 130 56 prt_cas_q 30 128
+prt_cas_q 34 128  prt_cas_q 134 56
+prt_cas_q 130 80 prt_cas_q 30 178
+prt_cas_q 34 178 prt_cas_q 134 80
 
 # Izlude
 izlude 20 98 prt_fild08 367 212
