@@ -219,10 +219,14 @@ sub iterate {
 		debug "Route $self->{actor} - we spent too much time; bailing out.\n", "route";
 		$self->setError(TOO_MUCH_TIME, "Too much time spent on walking.");
 
-	} elsif ($field->baseName ne $self->{dest}{map}->baseName || $self->{mapChanged}) {
-		debug "Map changed: ".$self->{dest}{map}->baseName." -> ".$field->baseName."\n", "route";
+	} elsif ($field->baseName ne $self->{dest}{map}->baseName) {
+		debug "Map changed: " . $self->{dest}{map}->baseName . " -> " . $field->baseName . "\n", "route";
 		$self->setDone();
 
+	} elsif ($self->{mapChanged}) {
+		debug "Map reloaded; recalculating route.\n", "route";
+		undef $self->{mapChanged};
+		$self->resetRoute(1);
 	} elsif ($self->{stage} == CALCULATE_ROUTE) {
 		my $pos = $self->{actor}{pos};
 		my $pos_to = $self->{actor}{pos_to};

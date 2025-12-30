@@ -68,24 +68,24 @@ our @EXPORT = (
 ### CATEGORY: AI state constants
 
 ##
-# AI::OFF
+# AI::OFF()
 #
 # AI is turned off.
 use constant OFF => 0;
 
 ##
-# AI::MANUAL
+# AI::MANUAL()
 #
 # AI is set to manual mode.
 use constant MANUAL => 1;
 
 ##
-# AI::AUTO
+# AI::AUTO()
 #
 # AI is turned on.
 use constant AUTO => 2;
 
-# Do not change $AI::AI directly, use AI::state instead
+# Do not change $AI::AI directly, use AI::state() instead
 our $AI = AUTO;
 
 ### CATEGORY: Functions
@@ -93,7 +93,7 @@ our $AI = AUTO;
 sub state {
 	if (defined $_[0]) {
 		if ($_[0] != OFF && $_[0] != MANUAL && $_[0] != AUTO) {
-			error "Invalid AI state value given to AI::state (".($_[0])."). Ignoring state change.\n";
+			error "Invalid AI state value given to AI::state() (".($_[0])."). Ignoring state change.\n";
 			return;
 		}
 		Plugins::callHook('AI_state_change', {

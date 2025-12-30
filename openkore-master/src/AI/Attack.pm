@@ -50,7 +50,7 @@ sub process {
 		my $ID;
 		my $ataqArgs;
 		my $stage; # 1 - moving to attack | 2 - attacking
-		if (AI::action eq "attack") {
+		if (AI::action() eq "attack") {
 			$ID = $args->{ID};
 			$ataqArgs = AI::args(0);
 			$stage = ATTACKING;
@@ -277,7 +277,7 @@ sub finishAttacking {
 		monKilled();
 
     # Pickup loot when monster's dead
-		if (AI::state == AI::AUTO && $config{'itemsTakeAuto'} && $monsters_old{$ID}{dmgFromYou} > 0 && !$monsters_old{$ID}{ignore}) {
+		if (AI::state() == AI::AUTO() && $config{'itemsTakeAuto'} && $monsters_old{$ID}{dmgFromYou} > 0 && !$monsters_old{$ID}{ignore}) {
 			AI::clear("items_take");
 			ai_items_take($monsters_old{$ID}{pos}{x}, $monsters_old{$ID}{pos}{y},
 				      $monsters_old{$ID}{pos_to}{x}, $monsters_old{$ID}{pos_to}{y});
