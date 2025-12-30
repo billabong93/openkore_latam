@@ -292,7 +292,7 @@ sub master {
 	return undef;
 }
 
-sub action { shift; goto &AI::action() }
+sub action { shift; goto &AI::action }
 sub args { shift; goto &AI::args }
 sub queue { shift; goto &AI::queue }
 sub dequeue { shift; goto &AI::dequeue }

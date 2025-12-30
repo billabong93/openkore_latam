@@ -2,21 +2,14 @@
 package SkillTest;
 use strict;
 
-use FindBin qw($RealBin);
-use File::Spec;
 use Test::More;
 use Skill;
 
 sub start {
-print "### Starting SkillTest\n";
-my $data_dir = File::Spec->catdir($RealBin);
-my $skill_id_handle = File::Spec->catfile($data_dir, 'SKILL_id_handle.txt');
-my $skill_name_table = File::Spec->catfile($data_dir, 'skillnametable.txt');
-my $skill_sp = File::Spec->catfile($data_dir, 'skillssp.txt');
-
-Skill::StaticInfo::parseSkillsDatabase_id2handle($skill_id_handle);
-Skill::StaticInfo::parseSkillsDatabase_handle2name($skill_name_table);
-Skill::StaticInfo::parseSPDatabase($skill_sp);
+	print "### Starting SkillTest\n";
+	Skill::StaticInfo::parseSkillsDatabase_id2handle('SKILL_id_handle.txt');
+	Skill::StaticInfo::parseSkillsDatabase_handle2name('skillnametable.txt');
+	Skill::StaticInfo::parseSPDatabase("skillssp.txt");
 	testStaticInfo();
 	testStaticSPInfo();
 	testDynamicInfo();

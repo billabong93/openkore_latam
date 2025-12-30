@@ -2407,7 +2407,7 @@ sub actor_died_or_disappeared {
 	if ($ID eq $accountID) {
 		message T("You have died\n") if (!$char->{dead});
 		Plugins::callHook('self_died');
-		closeShop() unless !$shopstarted || $config{'dcOnDeath'} == -1 || AI::state() == AI::OFF();
+		closeShop() unless !$shopstarted || $config{'dcOnDeath'} == -1 || AI::state == AI::OFF;
 		$char->{deathCount}++;
 		$char->{dead} = 1;
 		$char->{dead_time} = time;
@@ -2425,7 +2425,7 @@ sub actor_died_or_disappeared {
 			debug "Monster Died: " . $monster->name . " ($monster->{binID})\n", "parseMsg_damage";
 			$monster->{dead} = 1;
 
-			if ((AI::action() ne "attack" || AI::args(0)->{ID} eq $ID) &&
+			if ((AI::action ne "attack" || AI::args(0)->{ID} eq $ID) &&
 				($config{itemsTakeAuto_party} &&
 				($monster->{dmgFromParty} > 0 ||
 				 $monster->{dmgFromYou} > 0))) {
@@ -3848,7 +3848,7 @@ sub inventory_item_added {
 
 		$args->{item} = $item;
 
-		if (AI::state() == AI::AUTO()) {
+		if (AI::state == AI::AUTO) {
 			# Auto-drop item
 			if (pickupitems($item->{name}, $item->{nameID}) == -1 && !AI::inQueue('storageAuto', 'buyAuto')) {
 				$messageSender->sendDrop($item->{ID}, $amount);
@@ -5665,7 +5665,7 @@ sub character_moves {
 	}
 
 	# Ugly; AI code in network subsystem! This must be fixed.
-	if (AI::action() eq "mapRoute" && $config{route_escape_reachedNoPortal} && $dist eq "0.0"){
+	if (AI::action eq "mapRoute" && $config{route_escape_reachedNoPortal} && $dist eq "0.0"){
 	   if (!$portalsID[0]) {
 		if ($config{route_escape_shout} ne "" && !defined($timeout{ai_route_escape}{time})){
 			sendMessage("c", $config{route_escape_shout});
@@ -7198,7 +7198,7 @@ sub item_appeared {
 	my $take_delay = $timeout{ai_items_take_start}{timeout};
 	$take_delay = 0 unless defined $take_delay;
 	if ($take_delay <= 0
-	 && AI::state() == AI::AUTO() && pickupitems($item->{name}, $item->{nameID}) == 2
+	 && AI::state == AI::AUTO && pickupitems($item->{name}, $item->{nameID}) == 2
 	 && ($config{'itemsTakeAuto'} || $config{'itemsGatherAuto'})
 	 && (!$config{itemsGatherAuto_notInTown} || !$field->isCity)
 	 && (percent_weight($char) < $config{'itemsMaxWeight'})
@@ -7258,7 +7258,7 @@ sub item_disappeared {
 
 	my $item = $itemsList->getByID($args->{ID});
 	if ($item) {
-		if ($config{attackLooters} && AI::action() ne "sitAuto" && pickupitems($item->{name}, $item->{nameID}) > 0) {
+		if ($config{attackLooters} && AI::action ne "sitAuto" && pickupitems($item->{name}, $item->{nameID}) > 0) {
 			for my Actor::Monster $monster (@$monstersList) { # attack looter code
 				if (my $control = mon_control($monster->name,$monster->{nameID})) {
 					next if ( ($control->{attack_auto}  ne "" && $control->{attack_auto} == -1)
@@ -7790,7 +7790,7 @@ sub npc_store_info {
 	# continue talk sequence now
 	$ai_v{'npc_talk'}{'time'} = time;
 
-	if (AI::action() ne 'buyAuto') {
+	if (AI::action ne 'buyAuto') {
 		Commands::run('store');
 	}
 }
@@ -7902,7 +7902,7 @@ sub npc_market_info {
 
 	return if !$storeList->size;
 
-	if (AI::action() ne 'buyAuto') {
+	if (AI::action ne 'buyAuto') {
 		Commands::run('store');
 	}
 
@@ -7977,7 +7977,7 @@ sub npc_market_purchase_result {
 
 	return if !$storeList->size;
 
-	if (AI::action() ne 'buyAuto') {
+	if (AI::action ne 'buyAuto') {
 		Commands::run('store');
 	}
 
@@ -11275,7 +11275,7 @@ sub storage_password_request {
 		my $index = AI::findAction('storageAuto');
 		if (defined $index) {
 			AI::args($index)->{done} = 1;
-			while (AI::action() ne 'storageAuto') {
+			while (AI::action ne 'storageAuto') {
 				AI::dequeue;
 			}
 		}
@@ -11310,7 +11310,7 @@ sub storage_password_result {
 		my $index = AI::findAction('storageAuto');
 		if (defined $index) {
 			AI::args($index)->{done} = 1;
-			while (AI::action() ne 'storageAuto') {
+			while (AI::action ne 'storageAuto') {
 				AI::dequeue;
 			}
 		}
@@ -11467,7 +11467,7 @@ sub private_message {
 		RawMsg => $privMsg,
 	});
 
-	if ($config{dcOnPM} && AI::state() == AI::AUTO()) {
+	if ($config{dcOnPM} && AI::state == AI::AUTO) {
 		message T("Auto disconnecting on PM!\n");
 		chatLog("k", T("*** You were PM'd, auto disconnect! ***\n"));
 		$messageSender->sendQuit();
@@ -11762,8 +11762,8 @@ sub skill_cast {
 	my $monster = $monstersList->getByID($sourceID);
 	my $control;
 	$control = mon_control($monster->name,$monster->{nameID}) if ($monster);
-	if (AI::state() == AI::AUTO() && $control->{skillcancel_auto}) {
-		if ($targetID eq $accountID || $dist > 0 || (AI::action() eq "attack" && AI::args->{ID} ne $sourceID)) {
+	if (AI::state == AI::AUTO && $control->{skillcancel_auto}) {
+		if ($targetID eq $accountID || $dist > 0 || (AI::action eq "attack" && AI::args->{ID} ne $sourceID)) {
 			message TF("Monster Skill - %s (%d) - Adding it to monsterSkillCancel list to be attacked\n",
 			$monster->name, $monster->{binID});
 			$monster->{monsterSkillCancel} = 1;
@@ -11771,7 +11771,7 @@ sub skill_cast {
 
 		# Skill area casting -> running to monster's back
 		my $ID;
-		if ($dist > 0 && AI::action() eq "attack" && ($ID = AI::args->{ID}) && (my $monster2 = $monstersList->getByID($ID))) {
+		if ($dist > 0 && AI::action eq "attack" && ($ID = AI::args->{ID}) && (my $monster2 = $monstersList->getByID($ID))) {
 			# Calculate X axis
 			if ($char->{pos_to}{x} - $monster2->{pos_to}{x} < 0) {
 				$coords{x} = $monster2->{pos_to}{x} + 3;
