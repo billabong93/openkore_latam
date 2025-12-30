@@ -308,13 +308,14 @@ sub iterate {
 		#undef $self->{last_pos_to};
 		#undef $self->{start};
 		#undef $self->{confirmed_correct_vector};
-                undef $self->{last_best_pos_step};
-                undef $self->{last_best_pos_to_step};
-                undef $self->{next_pos};
-                undef $self->{time_step};
-                $self->{teleportTries} = 0;
-                delete $self->{sentTeleport};
-                delete $self->{teleportTime};
+		undef $self->{last_best_pos_step};
+		undef $self->{last_best_pos_to_step};
+		undef $self->{next_pos};
+		undef $self->{time_step};
+		$self->{teleportTries} = 0;
+		delete $self->{sentTeleport};
+		delete $self->{teleportTime};
+		delete $self->{teleportFrom};
 
                 $self->{stage} = WALK_ROUTE_SOLUTION;
 
@@ -339,6 +340,7 @@ sub iterate {
                         if ($self->{mapChanged}) {
                                 undef $self->{sentTeleport};
                                 undef $self->{mapChanged};
+                                delete $self->{teleportFrom};
                         }
 
                         if ($self->{mapLoadPending}) {
@@ -349,7 +351,21 @@ sub iterate {
                                         return;
                                 }
 
-                        } elsif (!$self->{sentTeleport}) {
+                        } elsif ($self->{sentTeleport}) {
+                                if ($self->{teleportFrom} && ($self->{teleportFrom}{x} != $self->{actor}{pos_to}{x} || $self->{teleportFrom}{y} != $self->{actor}{pos_to}{y})) {
+                                        delete $self->{sentTeleport};
+                                        delete $self->{teleportTime};
+                                        delete $self->{teleportFrom};
+                                } elsif (timeOut($self->{teleportTime}, 4)) {
+                                        debug "Unable to teleport; falling back to walking.\n", "route";
+                                        $self->{teleport} = 0;
+                                } else {
+                                        return;
+                                }
+
+                        }
+
+                        if (!$self->{sentTeleport}) {
                                 my $dist = new PathFinding(
                                         start => $self->{actor}{pos_to},
                                         dest => $self->{dest}{pos},
@@ -368,18 +384,12 @@ sub iterate {
                                                         ai_useTeleport(1);
                                                         $self->{sentTeleport} = 1;
                                                         $self->{teleportTime} = time;
+                                                        $self->{teleportFrom} = {%{$self->{actor}{pos_to}}};
                                                         $self->{teleportTries}++;
                                                         return;
                                                 }
                                         }
                                 }
-
-                        } elsif (timeOut($self->{teleportTime}, 4)) {
-                                debug "Unable to teleport; falling back to walking.\n", "route";
-                                $self->{teleport} = 0;
-                        } else {
-                                return;
-                        }
                 }
 
 		if (!defined $self->{step_index}) {
