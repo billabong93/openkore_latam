@@ -356,12 +356,19 @@ sub iterate {
                                         delete $self->{sentTeleport};
                                         delete $self->{teleportTime};
                                         delete $self->{teleportFrom};
-                                } elsif (timeOut($self->{teleportTime}, 4)) {
+                        } elsif (timeOut($self->{teleportTime}, 4)) {
+                                if ($config{route_teleport_maxTries} && $self->{teleportTries} >= $config{route_teleport_maxTries}) {
                                         debug "Unable to teleport; falling back to walking.\n", "route";
                                         $self->{teleport} = 0;
                                 } else {
-                                        return;
+                                        debug "Teleport attempt timed out without movement; retrying.\n", "route";
+                                        delete $self->{sentTeleport};
+                                        delete $self->{teleportTime};
+                                        delete $self->{teleportFrom};
                                 }
+                        } else {
+                                return;
+                        }
 
                         }
 
