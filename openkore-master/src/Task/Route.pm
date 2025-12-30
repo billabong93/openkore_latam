@@ -34,8 +34,8 @@ use Log qw(message error debug warning);
 use Network;
 use Field;
 use Translation qw(T TF);
-use Misc;
-use Utils qw(timeOut adjustedBlockDistance distance blockDistance calcPosFromPathfinding);
+use Misc qw(canUseTeleport);
+use Utils qw(timeOut adjustedBlockDistance distance blockDistance calcPosFromPathfinding existsInList);
 use Utils::Exceptions;
 use Utils::Set;
 use Utils::PathFinding;
@@ -164,15 +164,17 @@ sub new {
 	# to avoid circular references (memory leaks).
 	my @holder = ($self);
 	Scalar::Util::weaken($holder[0]);
-	$self->{mapChangedHook} = Plugins::addHook('Network::Receive::map_changed', \&mapChanged, \@holder);
+        $self->{mapChangedHook} = Plugins::addHook('Network::Receive::map_changed', \&mapChanged, \@holder);
+        $self->{mapLoadedHook} = Plugins::addHook('map_loaded', \&mapLoaded, \@holder);
 
 	return $self;
 }
 
 sub DESTROY {
-	my ($self) = @_;
-	Plugins::delHook($self->{mapChangedHook}) if $self->{mapChangedHook};
-	$self->SUPER::DESTROY();
+        my ($self) = @_;
+        Plugins::delHook($self->{mapChangedHook}) if $self->{mapChangedHook};
+        Plugins::delHook($self->{mapLoadedHook}) if $self->{mapLoadedHook};
+        $self->SUPER::DESTROY();
 }
 
 ##
@@ -306,12 +308,15 @@ sub iterate {
 		#undef $self->{last_pos_to};
 		#undef $self->{start};
 		#undef $self->{confirmed_correct_vector};
-		undef $self->{last_best_pos_step};
-		undef $self->{last_best_pos_to_step};
-		undef $self->{next_pos};
-		undef $self->{time_step};
+                undef $self->{last_best_pos_step};
+                undef $self->{last_best_pos_to_step};
+                undef $self->{next_pos};
+                undef $self->{time_step};
+                $self->{teleportTries} = 0;
+                delete $self->{sentTeleport};
+                delete $self->{teleportTime};
 
-		$self->{stage} = WALK_ROUTE_SOLUTION;
+                $self->{stage} = WALK_ROUTE_SOLUTION;
 
 		if (@{$self->{solution}} == 0) {
 			debug "Route $self->{actor}: DistFromGoal|pyDistFromGoal trimmed all solution steps.\n", "route";
@@ -321,9 +326,61 @@ sub iterate {
 		}
 
 	# Actual walking algorithm
-	} elsif ($self->{stage} == WALK_ROUTE_SOLUTION) {
-		my $solution = $self->{solution};
-		$self->{route_out_time} = time if !exists $self->{route_out_time};
+        } elsif ($self->{stage} == WALK_ROUTE_SOLUTION) {
+                my $solution = $self->{solution};
+                $self->{route_out_time} = time if !exists $self->{route_out_time};
+
+                $self->{teleport} = $config{route_teleport} if (!defined $self->{teleport});
+                if ($self->{teleport} && !$field->isCity
+                && !existsInList($config{route_teleport_notInMaps}, $field->baseName)
+                && ( !$config{route_teleport_maxTries} || $self->{teleportTries} <= $config{route_teleport_maxTries} )) {
+                        my $minDist = $config{route_teleport_minDistance};
+
+                        if ($self->{mapChanged}) {
+                                undef $self->{sentTeleport};
+                                undef $self->{mapChanged};
+                        }
+
+                        if ($self->{mapLoadPending}) {
+                                if (timeOut($self->{mapLoadPending}, 5)) {
+                                        delete $self->{mapLoadPending};
+                                } else {
+                                        debug "Waiting for map to finish loading before teleporting.\n", "route";
+                                        return;
+                                }
+
+                        } elsif (!$self->{sentTeleport}) {
+                                my $dist = new PathFinding(
+                                        start => $self->{actor}{pos_to},
+                                        dest => $self->{dest}{pos},
+                                        field => $field
+                                )->runcount;
+                                debug "Distance to destination is $dist\n", "route";
+
+                                if ($dist < 0 || $dist > $minDist) {
+                                        if ($dist > 0 && $config{route_teleport_maxTries} && $self->{teleportTries} >= $config{route_teleport_maxTries}) {
+                                                debug "Teleported $config{route_teleport_maxTries} times. Falling back to walking.\n", "route";
+                                        } else {
+                                                message TF("Attempting to teleport near destination, try #%s\n", ($self->{teleportTries} + 1)), "route";
+                                                if (!canUseTeleport(1)) {
+                                                        $self->{teleport} = 0;
+                                                } else {
+                                                        ai_useTeleport(1);
+                                                        $self->{sentTeleport} = 1;
+                                                        $self->{teleportTime} = time;
+                                                        $self->{teleportTries}++;
+                                                        return;
+                                                }
+                                        }
+                                }
+
+                        } elsif (timeOut($self->{teleportTime}, 4)) {
+                                debug "Unable to teleport; falling back to walking.\n", "route";
+                                $self->{teleport} = 0;
+                        } else {
+                                return;
+                        }
+                }
 
 		if (!defined $self->{step_index}) {
 			$self->{step_index} = $config{$self->{actor}{configPrefix}.'route_step'};
@@ -862,9 +919,16 @@ sub humanizeSolution {
 }
 
 sub mapChanged {
-	my (undef, undef, $holder) = @_;
-	my $self = $holder->[0];
-	$self->{mapChanged} = 1;
+        my (undef, undef, $holder) = @_;
+        my $self = $holder->[0];
+        $self->{mapChanged} = 1;
+        $self->{mapLoadPending} = { time => time, timeout => 5 };
+}
+
+sub mapLoaded {
+        my (undef, undef, $holder) = @_;
+        my $self = $holder->[0];
+        delete $self->{mapLoadPending};
 }
 
 1;
