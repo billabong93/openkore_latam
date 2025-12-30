@@ -34,7 +34,7 @@ use Log qw(message error debug warning);
 use Network;
 use Field;
 use Translation qw(T TF);
-use Misc qw(canUseTeleport isCellOccupied);
+use Misc qw(canUseTeleport isCellOccupied calcRectArea2);
 use Utils qw(timeOut adjustedBlockDistance distance blockDistance calcPosFromPathfinding existsInList);
 use Utils::Exceptions;
 use Utils::Set;
@@ -379,11 +379,22 @@ sub iterate {
                       }
 
                       if (!$self->{sentTeleport}) {
-                          my $dist = new PathFinding(
-                              start => $self->{actor}{pos_to},
-                              dest => $self->{dest}{pos},
-                              field => $field
-                          )->runcount;
+                          my $teleDest = $field->closestWalkableSpot($self->{dest}{pos}, 1);
+                          $teleDest ||= $field->closestWalkableSpot($self->{dest}{pos}, 10);
+
+                          if (!$teleDest) {
+                              debug "No walkable destination found for teleport distance check; disabling teleport.\n", "route";
+                              $self->{teleport} = 0;
+                              $self->{teleportTries} = 0;
+                          }
+
+                          my $dist = defined $teleDest
+                              ? new PathFinding(
+                                  start => $self->{actor}{pos_to},
+                                  dest => $teleDest,
+                                  field => $field
+                              )->runcount
+                              : -1;
                           debug "Distance to destination is $dist\n", "route";
 
                           if ($dist < 0 || $dist > $minDist) {
