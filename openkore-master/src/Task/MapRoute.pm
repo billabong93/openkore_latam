@@ -121,17 +121,19 @@ sub new {
 	# to avoid circular references (memory leaks).
 	my @holder = ($self);
 	Scalar::Util::weaken($holder[0]);
-	$self->{mapChangedHook} = Plugins::addHook('Network::Receive::map_changed', \&mapChanged, \@holder);
-	$self->{localBroadcastHook} = Plugins::addHook('packet_localBroadcast', \&localBroadcast, \@holder);
+        $self->{mapChangedHook} = Plugins::addHook('Network::Receive::map_changed', \&mapChanged, \@holder);
+        $self->{mapLoadedHook} = Plugins::addHook('map_loaded', \&mapLoaded, \@holder);
+        $self->{localBroadcastHook} = Plugins::addHook('packet_localBroadcast', \&localBroadcast, \@holder);
 
 	return $self;
 }
 
 sub DESTROY {
-	my ($self) = @_;
-	Plugins::delHook($self->{mapChangedHook}) if $self->{mapChangedHook};
-	Plugins::delHook($self->{localBroadcastHook}) if $self->{localBroadcastHook};
-	$self->SUPER::DESTROY();
+        my ($self) = @_;
+        Plugins::delHook($self->{mapChangedHook}) if $self->{mapChangedHook};
+        Plugins::delHook($self->{mapLoadedHook}) if $self->{mapLoadedHook};
+        Plugins::delHook($self->{localBroadcastHook}) if $self->{localBroadcastHook};
+        $self->SUPER::DESTROY();
 }
 
 sub activate {
@@ -647,16 +649,24 @@ sub iterate {
 			$self->{teleport} = $config{route_teleport} if (!defined $self->{teleport});
 
 			if ($self->{teleport} && !$field->isCity
-			&& !existsInList($config{route_teleport_notInMaps}, $field->baseName)
-			&& ( !$config{route_teleport_maxTries} || $self->{teleportTries} <= $config{route_teleport_maxTries} )) {
-				my $minDist = $config{route_teleport_minDistance};
+                        && !existsInList($config{route_teleport_notInMaps}, $field->baseName)
+                        && ( !$config{route_teleport_maxTries} || $self->{teleportTries} <= $config{route_teleport_maxTries} )) {
+                                my $minDist = $config{route_teleport_minDistance};
 
-				if ($self->{mapChanged}) {
-					undef $self->{sentTeleport};
-					undef $self->{mapChanged};
-				}
+                                if ($self->{mapChanged}) {
+                                        undef $self->{sentTeleport};
+                                        undef $self->{mapChanged};
+                                }
 
-				if (!$self->{sentTeleport}) {
+                                if ($self->{mapLoadPending}) {
+                                        if (timeOut($self->{mapLoadPending}, 5)) {
+                                                delete $self->{mapLoadPending};
+                                        } else {
+                                                debug "Waiting for map to finish loading before teleporting.\n", "map_route";
+                                                return;
+                                        }
+
+                                } elsif (!$self->{sentTeleport}) {
 					# Find first inter-map portal
 					my $portal;
 					for my $x (@{$self->{mapSolution}}) {
@@ -846,10 +856,17 @@ sub subtaskDone {
 }
 
 sub mapChanged {
-	my (undef, undef, $holder) = @_;
-	my $self = $holder->[0];
-	$self->{mapChanged} = 1;
-	undef $self->{localBroadcast};
+        my (undef, undef, $holder) = @_;
+        my $self = $holder->[0];
+        $self->{mapChanged} = 1;
+        $self->{mapLoadPending} = { time => time, timeout => 5 };
+        undef $self->{localBroadcast};
+}
+
+sub mapLoaded {
+        my (undef, undef, $holder) = @_;
+        my $self = $holder->[0];
+        delete $self->{mapLoadPending};
 }
 
 sub localBroadcast {
