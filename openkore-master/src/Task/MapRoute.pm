@@ -663,6 +663,7 @@ sub iterate {
                                                 delete $self->{mapLoadPending};
                                         } else {
                                                 debug "Waiting for map to finish loading before teleporting.\n", "map_route";
+                                                return;
                                         }
 
                                 } elsif (!$self->{sentTeleport}) {
