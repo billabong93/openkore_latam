@@ -34,7 +34,7 @@ use Log qw(message error debug warning);
 use Network;
 use Field;
 use Translation qw(T TF);
-use Misc qw(canUseTeleport);
+use Misc qw(canUseTeleport isCellOccupied);
 use Utils qw(timeOut adjustedBlockDistance distance blockDistance calcPosFromPathfinding existsInList);
 use Utils::Exceptions;
 use Utils::Set;
