@@ -4242,28 +4242,28 @@ sub compilePortals {
 
 	$pathfinding = new PathFinding if (!$checkOnly);
 
-	# Calculate LOS values from each spawn point per map to other portals on same map
-	foreach my $map (sort keys %mapSpawns) {
-		($map, undef) = Field::nameToBaseName(undef, $map); # Hack to clean up InstanceID
-		message TF("Processing map %s...\n", $map), "system" unless $checkOnly;
-		foreach my $spawn (keys %{$mapSpawns{$map}}) {
-			foreach my $portal (keys %{$mapPortals{$map}}) {
-				next if $spawn eq $portal;
-				next if $portals_los{$spawn}{$portal} ne '';
-				return 1 if $checkOnly;
-				if ((!$field || $field->baseName ne $map) && !$missingMap{$map}) {
-					eval {
-						$field = new Field(name => $map);
-					};
-					if ($@) {
-						$missingMap{$map} = 1;
-					}
-				}
+# Calculate LOS values from each spawn point per map to other portals on same map
+MAP: foreach my $map (sort keys %mapSpawns) {
+($map, undef) = Field::nameToBaseName(undef, $map); # Hack to clean up InstanceID
+message TF("Processing map %s...\n", $map), "system" unless $checkOnly;
+next MAP if $missingMap{$map};
+foreach my $spawn (keys %{$mapSpawns{$map}}) {
+foreach my $portal (keys %{$mapPortals{$map}}) {
+next if $spawn eq $portal;
+next if $portals_los{$spawn}{$portal} ne '';
+return 1 if $checkOnly;
+if ((!$field || $field->baseName ne $map) && !$missingMap{$map}) {
+eval { $field = new Field(name => $map); };
+if ($@ || !$field) {
+$missingMap{$map} = 1;
+next MAP;
+}
+}
 
-				my %start = %{$mapSpawns{$map}{$spawn}};
-				my %dest = %{$mapPortals{$map}{$portal}};
-				my $closest_start = $field->closestWalkableSpot(\%start, 1);
-				my $closest_dest = $field->closestWalkableSpot(\%dest, 1);
+my %start = %{$mapSpawns{$map}{$spawn}};
+my %dest = %{$mapPortals{$map}{$portal}};
+my $closest_start = $field->closestWalkableSpot(\%start, 1);
+my $closest_dest = $field->closestWalkableSpot(\%dest, 1);
 				my $count;
 
 				if (!defined $closest_start || !defined $closest_dest) {

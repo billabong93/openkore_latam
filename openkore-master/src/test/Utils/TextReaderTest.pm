@@ -3,12 +3,19 @@ package Utils::TextReaderTest;
 use strict;
 use warnings;
 
+use FindBin qw($RealBin);
+use File::Spec;
 use Test::More;
 use Utils::TextReader;
 
 sub start {
-	subtest '!include support' => sub {
-		my $reader = Utils::TextReader->new( 'data/parent.txt' );
+my $data_dir = File::Spec->catdir($RealBin, 'data');
+my $parent = File::Spec->catfile($data_dir, 'parent.txt');
+my $create_if_missing = File::Spec->catfile($data_dir, 'create_if_missing.txt');
+my $create_if_missing_child = File::Spec->catfile($data_dir, 'create_if_missing_child.txt');
+
+subtest '!include support' => sub {
+my $reader = Utils::TextReader->new($parent);
 
 		is( $reader->readLine, "parent A\n" );
 		is( $reader->readLine, "child\n" );
@@ -23,7 +30,7 @@ sub start {
 	};
 
 	subtest 'hide_includes=0' => sub {
-		my $reader = Utils::TextReader->new( 'data/parent.txt', { hide_includes => 0 } );
+my $reader = Utils::TextReader->new($parent, { hide_includes => 0 });
 
 		is( $reader->readLine, "parent A\n" );
 		is( $reader->readLine, "!include child.txt\n" );
@@ -41,7 +48,7 @@ sub start {
 	};
 
 	subtest 'process_includes=0' => sub {
-		my $reader = Utils::TextReader->new( 'data/parent.txt', { process_includes => 0 } );
+my $reader = Utils::TextReader->new($parent, { process_includes => 0 });
 
 		is( $reader->readLine, "parent A\n" );
 		is( $reader->readLine, "!include child.txt\n" );
@@ -54,18 +61,18 @@ sub start {
 		done_testing();
 	};
 
-	subtest '!include_create_if_missing support' => sub {
-		my $reader = Utils::TextReader->new( 'data/create_if_missing.txt' );
+subtest '!include_create_if_missing support' => sub {
+my $reader = Utils::TextReader->new($create_if_missing);
 
-		# Make sure the referenced child doesn't exist.
-		unlink 'data/create_if_missing_child.txt';
-		ok( !-e 'data/create_if_missing_child.txt' );
+# Make sure the referenced child doesn't exist.
+unlink $create_if_missing_child;
+ok( !-e $create_if_missing_child );
 
-		# Processing the file should create the referenced child.
-		$reader->readLine while !$reader->eof;
-		ok( -e 'data/create_if_missing_child.txt' );
-		done_testing();
-	};
+# Processing the file should create the referenced child.
+$reader->readLine while !$reader->eof;
+ok( -e $create_if_missing_child );
+done_testing();
+};
 }
 
 1;

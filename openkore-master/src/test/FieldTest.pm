@@ -2,6 +2,8 @@
 package FieldTest;
 use strict;
 
+use FindBin qw($RealBin);
+use File::Spec;
 use Test::More;
 use List::MoreUtils qw(mesh);
 use Field;
@@ -11,14 +13,31 @@ use Misc qw(compilePortals);
 use Task::CalcMapRoute;
 
 sub start {
-	print "### Starting FieldTest\n";
-	
-	($Settings::fields_folder) = grep -d, qw(../../../../fieldpack/trunk/fields ../../fields);
-	
-	parseROLUT('resnametable.txt', \%mapAlias_lut, 1, ".gat");
-	parseROLUT('maps.txt', \%maps_lut);
-	parseROLUT('cities.txt', \%cities_lut);
-	parsePortals('portals.txt', \%portals_lut);
+print "### Starting FieldTest\n";
+
+($Settings::fields_folder) = grep -d, qw(../../../../fieldpack/trunk/fields ../../fields);
+
+my @required_maps = qw(alberta aretnorp prontera);
+my $missing_fields = join ', ', grep {
+my $base = File::Spec->catfile($Settings::fields_folder, $_);
+!grep { -e $_ } map { "$base.$_" } qw(fld2.gz fld.gz fld2 fld)
+} @required_maps;
+
+if ($missing_fields) {
+diag "Skipping FieldTest; missing field data for: $missing_fields";
+return;
+}
+
+my $data_dir = $RealBin;
+my $resnametable = File::Spec->catfile($data_dir, 'resnametable.txt');
+my $maps = File::Spec->catfile($data_dir, 'maps.txt');
+my $cities = File::Spec->catfile($data_dir, 'cities.txt');
+my $portals = File::Spec->catfile($data_dir, 'portals.txt');
+
+parseROLUT($resnametable, \%mapAlias_lut, 1, ".gat");
+parseROLUT($maps, \%maps_lut);
+parseROLUT($cities, \%cities_lut);
+parsePortals($portals, \%portals_lut);
 	{ local *Misc::writePortalsLOS = sub {} and compilePortals }
 	
 	for (new Field(name => 'prontera')) {

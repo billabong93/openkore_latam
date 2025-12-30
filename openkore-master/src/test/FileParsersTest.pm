@@ -2,6 +2,8 @@
 package FileParsersTest;
 use strict;
 
+use FindBin qw($RealBin);
+use File::Spec;
 use Test::More;
 use FileParsers;
 use Globals;
@@ -12,8 +14,18 @@ use constant NOT_CONFIGURED_ITEM => 'Random Item';
 
 sub start {
 	subtest 'FileParsers' => sub { SKIP: {
-		binmode STDOUT, ':utf8';
-		binmode STDERR, ':utf8';
+binmode STDOUT, ':utf8';
+binmode STDERR, ':utf8';
+
+my $data_dir = $RealBin;
+my $config_dir = File::Spec->catdir($RealBin, 'data');
+my $items_file = File::Spec->catfile($data_dir, 'items.txt');
+my $item_slot_file = File::Spec->catfile($data_dir, 'itemslotcounttable.txt');
+my $items_control_file = File::Spec->catfile($data_dir, 'items_control.txt');
+my $pickupitems_file = File::Spec->catfile($data_dir, 'pickupitems.txt');
+my $write_config_file = File::Spec->catfile($config_dir, 'write_config.txt');
+my $write_config_out_file = File::Spec->catfile($config_dir, 'write_config.out.txt');
+my $write_config_a_file = File::Spec->catfile($config_dir, 'write_config_a.txt');
 
 		my $items = do {
 			use utf8;
@@ -35,15 +47,15 @@ sub start {
 		)};
 
 		subtest 'tables' => sub {
-			for ('items.txt') {
-				parseROLUT($_, \%items_lut);
-				is_deeply(\%items_lut, $items, 'items.txt');
-			}
+for ($items_file) {
+parseROLUT($_, \%items_lut);
+is_deeply(\%items_lut, $items, $_);
+}
 
-			for ('itemslotcounttable.txt') {
-				parseROLUT($_, \%itemSlotCount_lut);
-				is_deeply(\%itemSlotCount_lut, $itemSlotCount, $_);
-			}
+for ($item_slot_file) {
+parseROLUT($_, \%itemSlotCount_lut);
+is_deeply(\%itemSlotCount_lut, $itemSlotCount, $_);
+}
 			done_testing();
 		} or skip 'failed to load tables', 1;
 
@@ -51,8 +63,8 @@ sub start {
 		my %item_names = map {$_ => itemName({nameID => $_, cards => pack('v*', (0)x4)})} 502, keys %items_lut;
 		my @item_names_part = map {[map {$item_names{$_}} @$_]} List::MoreUtils::part {$_ == 1208} keys %item_names;
 
-		subtest 'items_control.txt' => sub {
-			parseItemsControl('items_control.txt', \%items_control);
+subtest 'items_control.txt' => sub {
+parseItemsControl($items_control_file, \%items_control);
 
 			is(items_control(NOT_CONFIGURED_ITEM)->{keep}, 9, 'all');
 			is(items_control($_,$_)->{keep}, 2, $_) for @{$item_names_part[0]};
@@ -60,8 +72,8 @@ sub start {
 			done_testing();
 		};
 
-		subtest 'pickupitems.txt' => sub {
-			parseDataFile_lc('pickupitems.txt', \%pickupitems);
+subtest 'pickupitems.txt' => sub {
+parseDataFile_lc($pickupitems_file, \%pickupitems);
 
 			is(pickupitems(NOT_CONFIGURED_ITEM), 1, 'all');
 			is(pickupitems($_), 2, $_) for grep {!/Bowman Scroll 1/} @{$item_names_part[0]};
@@ -69,9 +81,9 @@ sub start {
 			done_testing();
 		};
 
-		subtest 'writeDataFileIntact' => sub {
-			my $config = {};
-			parseConfigFile('data/write_config.txt', $config);
+subtest 'writeDataFileIntact' => sub {
+my $config = {};
+parseConfigFile($write_config_file, $config);
 
 			my $expected = {
 				parent_child_unchanged => 2,
@@ -98,16 +110,16 @@ sub start {
 			$config->{no_val_changed}++;
 			$config->{child_changed}++;
 
-            File::Copy::cp 'data/write_config.txt' => 'data/write_config.out.txt';
-			writeDataFileIntact('data/write_config.out.txt', $config);
+File::Copy::cp $write_config_file => $write_config_out_file;
+writeDataFileIntact($write_config_out_file, $config);
 
-			my $reader = Utils::TextReader->new( 'data/write_config.out.txt', { hide_includes => 0 } );
+my $reader = Utils::TextReader->new( $write_config_out_file, { hide_includes => 0 } );
 			is( $reader->readLine, "parent_child_unchanged 2\n" );
 			is( $reader->readLine, "parent_child_changed 3\n" );
 			is( $reader->readLine, "block A {\n" );
 			is( $reader->readLine, "\ttest 2\n" );
 			is( $reader->readLine, "}\n" );
-			is( $reader->readLine, "!include write_config_a.txt\n" );
+is( $reader->readLine, "!include write_config_a.txt\n" );
 			is( $reader->readLine, "parent_child_unchanged 2\n" );
 			is( $reader->readLine, "parent_child_changed 2\n" );
 			is( $reader->readLine, "block b {\n" );
@@ -124,7 +136,7 @@ sub start {
 			is( $reader->readLine, "parent_child_changed 3\n" );
 			is( $reader->eof, 1 );
 
-			unlink 'data/write_config.out.txt';
+unlink $write_config_out_file;
 			done_testing();
 		};
 	}
