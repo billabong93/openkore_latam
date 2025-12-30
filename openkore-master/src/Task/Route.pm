@@ -355,6 +355,9 @@ sub iterate {
                               delete $self->{sentTeleport};
                               delete $self->{teleportTime};
                               delete $self->{teleportFrom};
+                              $self->{route_out_time} = time;
+                              $self->resetRoute(1);
+                              return;
                           } elsif (timeOut($self->{teleportTime}, 4)) {
                               if ($config{route_teleport_maxTries} && $self->{teleportTries} >= $config{route_teleport_maxTries}) {
                                       debug "Unable to teleport; falling back to walking.\n", "route";
@@ -787,9 +790,10 @@ sub setMove {
 }
 
 sub resetRoute {
-	my ($self) = @_;
-	$self->{solution} = [];
-	$self->{stage} = CALCULATE_ROUTE;
+        my ($self, $preserveTeleportTries) = @_;
+        $self->{solution} = [];
+        $self->{stage} = CALCULATE_ROUTE;
+        $self->{teleportTries} = 0 unless $preserveTeleportTries;
 }
 
 ##
