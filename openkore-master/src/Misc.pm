@@ -2524,12 +2524,27 @@ sub manualMove {
 #
 # Returns: the position where the character should go to meet a moving monster.
 sub meetingPosition {
-	my ($actor, $actorType, $target, $attackMaxDistance, $runFromTargetActive) = @_;
+        my ($actor, $actorType, $target, $attackMaxDistance, $runFromTargetActive) = @_;
 
-	if ($attackMaxDistance < 1) {
-		error "attackMaxDistance must be positive ($attackMaxDistance).\n";
-		return;
-	}
+        if ($attackMaxDistance < 1) {
+                my $fallback = 1;
+
+                if ($actorType == 1) {
+                        $fallback = $char->{attack_range} || $config{attackDistance} || 1;
+                } elsif ($actorType == 2) {
+                        my $prefix = $actor->{configPrefix} // '';
+                        $fallback = $actor->{attack_range}
+                                || $config{"${prefix}attackDistance"}
+                                || 1;
+                }
+
+                warning TF(
+                        "attackMaxDistance must be positive (%s); using fallback distance %s instead.\n",
+                        $attackMaxDistance, $fallback
+                );
+
+                $attackMaxDistance = $fallback;
+        }
 
 	my $extra_time_actor = $timeout{'meetingPosition_extra_time_actor'}{'timeout'} ? $timeout{'meetingPosition_extra_time_actor'}{'timeout'} : 0.2;
 	my $extra_time_target = $timeout{'meetingPosition_extra_time_target'}{'timeout'} ? $timeout{'meetingPosition_extra_time_target'}{'timeout'} : 0.2;
