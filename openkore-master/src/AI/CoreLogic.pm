@@ -348,10 +348,17 @@ sub processMisc {
 # for a certain period of time.
 sub processClientSuspend {
 	my $result = 0;
-	if (AI::action eq 'clientSuspend' && timeOut(AI::args)) {
-		debug "AI suspend by clientSuspend dequeued\n";
-		AI::dequeue;
-	} elsif (AI::action eq "clientSuspend" && $net->clientAlive()) {
+    if (
+        AI::action eq 'clientSuspend'
+        && $net->clientAlive()
+        && $ai_v{client}{waiting_for_map_loaded}
+        && time - $ai_v{client}{waiting_for_map_loaded}{start} < ($timeout{ai_clientSuspend_mapLoad}{timeout} || 15)
+    ) {
+            AI::args->{time} = time;
+    } elsif (AI::action eq 'clientSuspend' && timeOut(AI::args)) {
+            debug "AI suspend by clientSuspend dequeued\n";
+            AI::dequeue;
+    } elsif (AI::action eq "clientSuspend" && $net->clientAlive()) {
 		# When XKore mode is turned on, clientSuspend will increase it's timeout
 		# every time the user tries to do something manually.
 		my $args = AI::args;

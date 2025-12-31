@@ -65,10 +65,11 @@ sub map_login {
 
 sub map_loaded {
 	$packetParser->changeToInGameState;
-	AI::clear('clientSuspend');
-	$timeout{ai}{time} = time;
-	if ($firstLoginMap) {
-		undef $sentWelcomeMessage;
+        AI::clear('clientSuspend');
+        delete $ai_v{client}{waiting_for_map_loaded};
+        $timeout{ai}{time} = time;
+        if ($firstLoginMap) {
+                undef $sentWelcomeMessage;
 		undef $firstLoginMap;
 	}
 	$timeout{welcomeText}{time} = time;

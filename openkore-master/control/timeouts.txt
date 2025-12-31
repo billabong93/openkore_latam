@@ -204,6 +204,8 @@ patchserver 120
 
 # Tempo de espera antes de carregar mapa no xKore
 ai_clientSuspend 1.5
+# Tempo máximo que o clientSuspend deve esperar pelo pacote de mapa carregado do cliente
+ai_clientSuspend_mapLoad 15
 
 meetingPosition_extra_time_actor 0.3
 meetingPosition_extra_time_target 0.7

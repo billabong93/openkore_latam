@@ -7399,8 +7399,9 @@ sub map_change {
 	$char->{solution} = [];
 	push(@{$char->{solution}}, { x => $char->{pos}{x}, y => $char->{pos}{y} });
 	message TF("Map Change: %s (%s, %s)\n", $args->{map}, $char->{pos}{x}, $char->{pos}{y}), "connection";
-	if ($net->version == 1) {
-		ai_clientSuspend(0, $timeout{'ai_clientSuspend'}{'timeout'});
+        if ($net->version == 1) {
+                $ai_v{client}{waiting_for_map_loaded} = { start => time };
+                ai_clientSuspend(0, $timeout{'ai_clientSuspend'}{'timeout'});
 	} else {
 		$messageSender->sendMapLoaded();
 		# $messageSender->sendSync(1);
