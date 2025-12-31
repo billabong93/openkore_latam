@@ -111,6 +111,10 @@ sub new {
 	} else {
 		$self->{randomFactor} = 0;
 	}
+
+	# Random walk routes should never teleport between maps; keep their movement on foot
+	# regardless of global route_teleport settings.
+	$self->{teleport} = 0 if $self->{isRandomWalk};
 	$self->{useManhattan} = 0 if (!defined $self->{useManhattan});
 
 	$self->{noGoCommand} = 0 if (!defined $self->{noGoCommand});
