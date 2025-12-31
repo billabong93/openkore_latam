@@ -2537,12 +2537,7 @@ sub meetingPosition {
                                 || $config{"${prefix}attackDistance"}
                                 || 1;
                 }
-
-                warning TF(
-                        "attackMaxDistance must be positive (%s); using fallback distance %s instead.\n",
-                        $attackMaxDistance, $fallback
-                );
-
+				
                 $attackMaxDistance = $fallback;
         }
 
