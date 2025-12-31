@@ -335,7 +335,7 @@ sub iterate {
                 my $solution = $self->{solution};
                 $self->{route_out_time} = time if !exists $self->{route_out_time};
                 $self->{teleport} = $config{route_teleport} if (!defined $self->{teleport});
-                if ($self->{teleport} && !$field->isCity
+                if ($self->{teleport} && !$self->{isRandomWalk} && !$field->isCity
                   && !existsInList($config{route_teleport_notInMaps}, $field->baseName)
                   && ( !$config{route_teleport_maxTries} || $self->{teleportTries} <= $config{route_teleport_maxTries} )) {
                       my $minDist = $config{route_teleport_minDistance};
