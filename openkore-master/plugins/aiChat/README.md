@@ -32,6 +32,7 @@ Configure as opções no `control/config.txt` ou via console do OpenKore (`aicha
 *   `aiChat_max_tokens`: Máx. tokens na resposta (padrão: `150`)
 *   `aiChat_temperature`: Criatividade da IA (0.0-1.0, padrão: `0.6`)
 *   `aiChat_typing_speed`: Velocidade de digitação em caracteres/segundo (padrão: `20`)
+*   `aiChat_public_chat_enabled`: Define se o bot responde ao chat público **apenas** no mapa `sec_pri` (`0` desativa, `1` ativa). Padrão: `0`.
 
 ### B. No Proxy Node.js (`api_proxy.js`)
 
