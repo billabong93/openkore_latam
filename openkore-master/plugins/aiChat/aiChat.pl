@@ -45,6 +45,8 @@ $hooks{map_changed}->hook();
 my $privMsgHookID = Plugins::addHook('packet_privMsg', \&onPrivateMessage, undef);
 # Armazenar o ID para desregistrar depois
 $hooks{packet_privMsg_direct} = $privMsgHookID;
+my $pubMsgHookID = Plugins::addHook('packet_pubMsg', \&onPublicMessage, undef);
+$hooks{packet_pubMsg_direct} = $pubMsgHookID;
 
 
 sub updateBotCharacterData {
@@ -90,6 +92,7 @@ sub onUnload {
     $hooks{in_game}->unhook();
     $hooks{map_changed}->unhook();
     Plugins::delHook($hooks{packet_privMsg_direct}) if defined $hooks{packet_privMsg_direct};
+    Plugins::delHook($hooks{packet_pubMsg_direct}) if defined $hooks{packet_pubMsg_direct};
     
     # Tentar encerrar o servidor Node.js
     my $pid_file = "plugins/aiChat/proxy_pid.txt";
@@ -143,6 +146,7 @@ sub onCommand {
         message "Prompt: " . AIChat::Config::get('prompt'), "list";
         message "Max Tokens: " . AIChat::Config::get('max_tokens'), "list";
         message "Temperatura: " . AIChat::Config::get('temperature'), "list";
+        message "Responder chat público em sec_pri: " . AIChat::Config::get('public_chat_enabled'), "list";
     } elsif ($arg =~ /^provider\s+(openai|deepseek)$/) {
         if (AIChat::Config::set('provider', $1)) {
             message $translator->translatef("%s Provedor alterado para %s\n", PLUGIN_PREFIX, $1), "list";
@@ -180,6 +184,33 @@ sub onPrivateMessage {
         $messageSender->sendPrivateMsg($sender, $response);
     } else {
         debug "[aiChat] Nenhuma resposta da AI gerada para '$message'\n", "plugin";
+    }
+}
+
+sub onPublicMessage {
+    my (undef, $args) = @_;
+    return unless AIChat::Config::get('public_chat_enabled');
+    return unless defined $field && ($field->baseName // '') eq 'sec_pri';
+
+    my $sender = bytesToString($args->{pubMsgUser} || $args->{MsgUser});
+    my $message = bytesToString($args->{pubMsg} || $args->{Msg});
+
+    return unless defined $sender && defined $message;
+    return if $char && defined $char->{name} && $sender eq $char->{name};
+
+    my $response = AIChat::MessageHandler::processMessage($message, $sender);
+
+    if ($response) {
+        my $typing_speed = AIChat::Config::get('typing_speed');
+        if ($typing_speed > 0) {
+            my $delay = length($response) / $typing_speed;
+            message "[aiChat] Simulando digitação em chat público por $delay segundos...\n", "debug";
+            sleep($delay);
+        }
+
+        $messageSender->sendChat($response);
+    } else {
+        debug "[aiChat] Nenhuma resposta pública gerada para '$message'\n", "plugin";
     }
 }
 
