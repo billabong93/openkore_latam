@@ -4261,40 +4261,47 @@ sub compilePortals {
 	foreach my $map (sort keys %mapSpawns) {
 		($map, undef) = Field::nameToBaseName(undef, $map); # Hack to clean up InstanceID
 		message TF("Processing map %s...\n", $map), "system" unless $checkOnly;
-		foreach my $spawn (keys %{$mapSpawns{$map}}) {
-			foreach my $portal (keys %{$mapPortals{$map}}) {
-				next if $spawn eq $portal;
-				next if $portals_los{$spawn}{$portal} ne '';
-				return 1 if $checkOnly;
-				if ((!$field || $field->baseName ne $map) && !$missingMap{$map}) {
-					eval {
-						$field = new Field(name => $map);
-					};
-					if ($@) {
-						$missingMap{$map} = 1;
-					}
-				}
+                foreach my $spawn (keys %{$mapSpawns{$map}}) {
+                        foreach my $portal (keys %{$mapPortals{$map}}) {
+                                next if $spawn eq $portal;
+                                next if $portals_los{$spawn}{$portal} ne '';
+                                return 1 if $checkOnly;
 
-				my %start = %{$mapSpawns{$map}{$spawn}};
-				my %dest = %{$mapPortals{$map}{$portal}};
-				my $closest_start = $field->closestWalkableSpot(\%start, 1);
-				my $closest_dest = $field->closestWalkableSpot(\%dest, 1);
-				my $count;
+                                my %start = %{$mapSpawns{$map}{$spawn}};
+                                my %dest = %{$mapPortals{$map}{$portal}};
+                                my $count;
 
-				if (!defined $closest_start || !defined $closest_dest) {
-					$count = 0;
-				} else {
-					$pathfinding->reset(
-						start => $closest_start,
-						dest  => $closest_dest,
-						field => $field
-						);
-					$count = $pathfinding->runcount;
-				}
-				$portals_los{$spawn}{$portal} = ($count >= 0) ? $count : 0;
-				debug "LOS in $map from $start{x},$start{y} to $dest{x},$dest{y}: $portals_los{$spawn}{$portal}\n";
-			}
-		}
+                                if ((!$field || $field->baseName ne $map) && !$missingMap{$map}) {
+                                        eval {
+                                                $field = new Field(name => $map);
+                                        };
+                                        if ($@) {
+                                                $missingMap{$map} = 1;
+                                        }
+                                }
+
+                                if ($missingMap{$map}) {
+                                        $count = abs($start{x} - $dest{x}) + abs($start{y} - $dest{y});
+                                } else {
+                                        my $closest_start = $field->closestWalkableSpot(\%start, 1);
+                                        my $closest_dest = $field->closestWalkableSpot(\%dest, 1);
+
+                                        if (!defined $closest_start || !defined $closest_dest) {
+                                                $count = 0;
+                                        } else {
+                                                $pathfinding->reset(
+                                                        start => $closest_start,
+                                                        dest  => $closest_dest,
+                                                        field => $field
+                                                        );
+                                                $count = $pathfinding->runcount;
+                                        }
+                                }
+
+                                $portals_los{$spawn}{$portal} = ($count >= 0) ? $count : 0;
+                                debug "LOS in $map from $start{x},$start{y} to $dest{x},$dest{y}: $portals_los{$spawn}{$portal}\n";
+                        }
+                }
 	}
 	return 0 if $checkOnly;
 
