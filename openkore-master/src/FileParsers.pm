@@ -1515,11 +1515,16 @@ sub writePortalsLOS {
 	open(FILE, "+> $file");
 	foreach my $key (sort keys %{$r_hash}) {
 		next if (!$$r_hash{$key} || !(keys %{$$r_hash{$key}}));
-		print FILE $key;
-		foreach (keys %{$$r_hash{$key}}) {
-			print FILE " $_ $$r_hash{$key}{$_}";
+		next if ($key =~ /^#/);
+		my %seen;
+		my @connections;
+		foreach my $dest (sort keys %{$$r_hash{$key}}) {
+			next if ($dest =~ /^#/);
+			next if ($seen{$dest}++);
+			push @connections, "$dest $$r_hash{$key}{$dest}";
 		}
-		print FILE "\n";
+		next unless @connections;
+		print FILE $key, ' ', join(' ', @connections), "\n";
 	}
 	close FILE;
 }
