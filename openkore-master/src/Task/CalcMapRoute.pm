@@ -371,10 +371,14 @@ sub searchStep {
 			}
 		}
 
+
 		# get all children of each openlist.
 		# explore connected portals and NPC warps
-		foreach my $child (keys %{$portals_los{$dest}}) {
-			next unless $portals_los{$dest}{$child}; # next if no child
+		my $neighboring_portals = $self->get_portal_connections($dest);
+		next unless %{$neighboring_portals};
+		foreach my $child (keys %{$neighboring_portals}) {
+			my $los_cost = $neighboring_portals->{$child};
+			next unless $los_cost; # next if no child
 			# iterates through the child's/portals that have connection to destination
 			foreach my $subchild (grep { $portals_lut{$child}{dest}{$_}{enabled} } keys %{$portals_lut{$child}{dest}}) {
 				my $destID = $subchild;
@@ -382,20 +386,21 @@ sub searchStep {
 				#############################################################
 				my $penalty = int($routeWeights{lc($mapName)}) +
 					int(($portals_lut{$child}{dest}{$subchild}{steps} ne '') ? $routeWeights{NPC} : $routeWeights{PORTAL}); # get node/child penalty based on routeWeights
-				my $thisWalk = $penalty + $closelist->{$parent}{walk} + $portals_los{$dest}{$child}; # calculate the final node/child penalty routeWeights + walk distance + accumulated cost
-				if (!exists $closelist->{"$child=$subchild"}) { # check if node is already explorated
-					if ( !exists $openlist->{"$child=$subchild"} || $openlist->{"$child=$subchild"}{walk} > $thisWalk ) { # check the current node cost less
-						debug "[CalcMapRoute - searchStep - Add] from '$parent' to '$child=$subchild' cost '$thisWalk'\n", "calc_map_route", 2;
-						$openlist->{"$child=$subchild"}{parent} = $parent;
-						$openlist->{"$child=$subchild"}{walk} = $thisWalk;
-						$openlist->{"$child=$subchild"}{zeny} = $closelist->{$parent}{zeny} + $portals_lut{$child}{dest}{$subchild}{cost};
-						$openlist->{"$child=$subchild"}{allow_ticket} = $portals_lut{$child}{dest}{$subchild}{allow_ticket};
-						if ($openlist->{"$child=$subchild"}{allow_ticket} && $self->{tickets_amount} > $openlist->{"$child=$subchild"}{amount_of_tickets_used}) { # checks if route allow use ticket and how many we spent so far
-							$openlist->{"$child=$subchild"}{zeny_covered_by_tickets} = $closelist->{$parent}{zeny_covered_by_tickets} + $openlist->{"$child=$subchild"}{zeny};
-							$openlist->{"$child=$subchild"}{amount_of_tickets_used} = $closelist->{$parent}{amount_of_tickets_used} + 1;
+				my $thisWalk = $penalty + $closelist->{$parent}{walk} + $los_cost; # calculate the final node/child penalty routeWeights + walk distance + accumulated cost
+				if (!exists $closelist{"$child=$subchild"}) { # check if node is already explorated
+					if ( !exists $openlist{"$child=$subchild"} || $openlist{"$child=$subchild"}{walk} > $thisWalk ) { # check the current node cost less
+						debug "[CalcMapRoute - searchStep - Add] from '$parent' to '$child=$subchild' cost '$thisWalk\n'
+", "calc_map_route", 2;
+						$openlist{"$child=$subchild"}{parent} = $parent;
+						$openlist{"$child=$subchild"}{walk} = $thisWalk;
+						$openlist{"$child=$subchild"}{zeny} = $closelist->{$parent}{zeny} + $portals_lut{$child}{dest}{$subchild}{cost};
+						$openlist{"$child=$subchild"}{allow_ticket} = $portals_lut{$child}{dest}{$subchild}{allow_ticket};
+						if ($openlist{"$child=$subchild"}{allow_ticket} && $self->{tickets_amount} > $openlist{"$child=$subchild"}{amount_of_tickets_used}) { # checks if route allow use ticket and how many we spent so far
+							$openlist{"$child=$subchild"}{zeny_covered_by_tickets} = $closelist->{$parent}{zeny_covered_by_tickets} + $openlist{"$child=$subchild"}{zeny};
+							$openlist{"$child=$subchild"}{amount_of_tickets_used} = $closelist->{$parent}{amount_of_tickets_used} + 1;
 						} else {
-							$openlist->{"$child=$subchild"}{zeny_covered_by_tickets} = $closelist->{$parent}{zeny_covered_by_tickets};
-							$openlist->{"$child=$subchild"}{amount_of_tickets_used} = $closelist->{$parent}{amount_of_tickets_used};
+							$openlist{"$child=$subchild"}{zeny_covered_by_tickets} = $closelist->{$parent}{zeny_covered_by_tickets};
+							$openlist{"$child=$subchild"}{amount_of_tickets_used} = $closelist->{$parent}{amount_of_tickets_used};
 						}
 					}
 				}
@@ -408,19 +413,18 @@ sub searchStep {
 				my $mapName = $portals_airships{$child}{source}{map};
 				#############################################################
 				my $penalty = int($routeWeights{lc($mapName)}) + $routeWeights{AIRSHIP}; # get node/child penalty based on routeWeights
-				my $thisWalk = $penalty + $closelist->{$parent}{walk} + $portals_los{$dest}{$child}; # calculate the final node/child penalty routeWeights + walk distance + accumulated cost
-				if (!exists $closelist->{"$child=$subchild"}) { # check if node is already explorated
-					if ( !exists $openlist->{"$child=$subchild"} || $openlist->{"$child=$subchild"}{walk} > $thisWalk ) { # check the current node cost less
-						$openlist->{"$child=$subchild"}{parent} = $parent;
-						$openlist->{"$child=$subchild"}{walk} = $thisWalk;
-						$openlist->{"$child=$subchild"}{zeny} = $closelist->{$parent}{zeny};
-						$openlist->{"$child=$subchild"}{airship_message} = $portals_airships{$child}{dest}{$subchild}{message};
-						$openlist->{"$child=$subchild"}{is_airship} = 1;
+				my $thisWalk = $penalty + $closelist->{$parent}{walk} + $los_cost; # calculate the final node/child penalty routeWeights + walk distance + accumulated cost
+				if (!exists $closelist{"$child=$subchild"}) { # check if node is already explorated
+					if ( !exists $openlist{"$child=$subchild"} || $openlist{"$child=$subchild"}{walk} > $thisWalk ) { # check the current node cost less
+						$openlist{"$child=$subchild"}{parent} = $parent;
+						$openlist{"$child=$subchild"}{walk} = $thisWalk;
+						$openlist{"$child=$subchild"}{zeny} = $closelist->{$parent}{zeny};
+						$openlist{"$child=$subchild"}{airship_message} = $portals_airships{$child}{dest}{$subchild}{message};
+						$openlist{"$child=$subchild"}{is_airship} = 1;
 					}
 				}
 			}
 		}
-}
 
 # Add @go commands to openlist
 sub populateOpenListWithGoCommands {
@@ -491,24 +495,45 @@ sub isSaveMapSetAndValid {
 }
 
 sub getSaveMapDestination {
-        my $dest_map = hashSafeGetValue(\%config, 'saveMap');
-        return unless defined $dest_map && $dest_map ne '';
+	my $dest_map = hashSafeGetValue(\%config, 'saveMap');
+	return unless defined $dest_map && $dest_map ne '';
 
-        my @candidates;
-        my $dest_x = hashSafeGetValue(\%config, 'saveMap_x');
-        my $dest_y = hashSafeGetValue(\%config, 'saveMap_y');
-        if (defined $dest_x && $dest_x ne '' && defined $dest_y && $dest_y ne '') {
-                push @candidates, "$dest_map $dest_x $dest_y";
-        }
-        push @candidates, grep { /^$dest_map\b/ } keys %portals_spawns;
+	my @candidates;
+	my $dest_x = hashSafeGetValue(\%config, 'saveMap_x');
+	my $dest_y = hashSafeGetValue(\%config, 'saveMap_y');
+	if (defined $dest_x && $dest_x ne '' && defined $dest_y && $dest_y ne '') {
+		push @candidates, "$dest_map $dest_x $dest_y";
+	}
+	push @candidates, grep { /^$dest_map\b/ } keys %portals_spawns;
 
-        foreach my $dest (@candidates) {
-                next unless hashSafeGetValue(\%portals_spawns, $dest, 'dest', $dest);
-                my ($map, $x, $y) = split / /, $dest;
-                return ($map, $x, $y, $dest);
-        }
+	foreach my $dest (@candidates) {
+		next unless hashSafeGetValue(\%portals_spawns, $dest, 'dest', $dest);
+		my ($map, $x, $y) = split / /, $dest;
+		return ($map, $x, $y, $dest);
+	}
 
-        return;
+	return;
+}
+
+sub get_portal_connections {
+	my ($self, $portal_key) = @_;
+
+	return $portals_los{$portal_key} if exists $portals_los{$portal_key};
+
+	my ($map, $x, $y) = split / /, $portal_key;
+	return {} unless defined $map && defined $x && defined $y;
+
+	my %neighbors;
+	foreach my $candidate (keys %portals_lut, keys %portals_airships) {
+	next if $candidate eq $portal_key;
+	my ($candidate_map, $candidate_x, $candidate_y) = split / /, $candidate;
+	next unless defined $candidate_map && defined $candidate_x && defined $candidate_y;
+	next unless $candidate_map eq $map;
+
+	$neighbors{$candidate} = abs($x - $candidate_x) + abs($y - $candidate_y);
+}
+
+return \%neighbors;
 }
 
 

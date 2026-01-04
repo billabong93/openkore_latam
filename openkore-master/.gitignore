@@ -43,6 +43,8 @@ tables/iRO/*-custom.txt
 # Auto-generated files.
 tables/**/portalsLOS.txt
 tables/pserver/**/portalsLOS.txt
+# Keep ROla portalsLOS under version control to ship Morocc routes.
+!tables/ROla/portalsLOS.txt
 tables/**/npcs.txt
 tables/**/monsters.txt
 *.xpm
