@@ -244,7 +244,6 @@ sub iterate {
 
                 # Teleport-induced reloads shouldn't be treated as portal completions.
                 if ($teleported) {
-                        $self->{lastTeleportAt} = $self->{teleportTime} || time;
                         delete $self->{sentTeleport};
                         delete $self->{teleportTime};
                         delete $self->{teleportFrom};
@@ -395,13 +394,8 @@ sub iterate {
                               return;
                           }
 
-                      } elsif (defined $self->{lastTeleportAt} && !timeOut($self->{lastTeleportAt}, 4)) {
-                          debug "Waiting for previous teleport attempt to cool down.\n", "route";
-                          return;
-
                       } elsif ($self->{sentTeleport}) {
                           if ($self->{teleportFrom} && ($self->{teleportFrom}{x} != $self->{actor}{pos_to}{x} || $self->{teleportFrom}{y} != $self->{actor}{pos_to}{y})) {
-                              $self->{lastTeleportAt} = $self->{teleportTime} || time;
                               delete $self->{sentTeleport};
                               delete $self->{teleportTime};
                               delete $self->{teleportFrom};
@@ -414,7 +408,6 @@ sub iterate {
                                       $self->{teleport} = 0;
                               } else {
                                       debug "Teleport attempt timed out without movement; retrying.\n", "route";
-                                      $self->{lastTeleportAt} = $self->{teleportTime} || time;
                                       delete $self->{sentTeleport};
                                       delete $self->{teleportTime};
                                       delete $self->{teleportFrom};
@@ -455,7 +448,6 @@ sub iterate {
                                               ai_useTeleport(1);
                                               $self->{sentTeleport} = 1;
                                               $self->{teleportTime} = time;
-                                              $self->{lastTeleportAt} = $self->{teleportTime};
                                               $self->{teleportFrom} = {%{$self->{actor}{pos_to}}};
                                               $self->{teleportTries}++;
                                               return;
