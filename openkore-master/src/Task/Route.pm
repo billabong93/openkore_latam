@@ -228,7 +228,9 @@ sub iterate {
                 # Wait until the map load event clears, otherwise we may recalc using
                 # pre-warp coordinates and incorrectly aim back at the portal entrance.
                 if ($self->{mapLoadPending}) {
-                        if (timeOut($self->{mapLoadPending}, 5)) {
+                        if ($field && $self->{dest}{map} && $field->baseName eq $self->{dest}{map}->baseName) {
+                                delete $self->{mapLoadPending};
+                        } elsif (timeOut($self->{mapLoadPending}, 5)) {
                                 delete $self->{mapLoadPending};
                         } else {
                                 debug "Waiting for map to finish loading before recalculating.\n", "route";
@@ -387,7 +389,9 @@ sub iterate {
                       }
 
                       if ($self->{mapLoadPending}) {
-                          if (timeOut($self->{mapLoadPending}, 5)) {
+                          if ($field && $self->{dest}{map} && $field->baseName eq $self->{dest}{map}->baseName) {
+                              delete $self->{mapLoadPending};
+                          } elsif (timeOut($self->{mapLoadPending}, 5)) {
                               delete $self->{mapLoadPending};
                           } else {
                               debug "Waiting for map to finish loading before teleporting.\n", "route";

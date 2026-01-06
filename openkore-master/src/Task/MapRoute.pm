@@ -685,7 +685,9 @@ sub iterate {
                                 }
 
                                 if ($self->{mapLoadPending}) {
-                                        if (timeOut($self->{mapLoadPending}, 5)) {
+                                        if ($field && $self->{mapSolution}[0]{map} && $field->baseName eq $self->{mapSolution}[0]{map}) {
+                                                delete $self->{mapLoadPending};
+                                        } elsif (timeOut($self->{mapLoadPending}, 5)) {
                                                 delete $self->{mapLoadPending};
                                         } else {
                                                 debug "Waiting for map to finish loading before teleporting.\n", "map_route";
