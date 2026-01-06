@@ -244,6 +244,7 @@ sub iterate {
 
                 # Teleport-induced reloads shouldn't be treated as portal completions.
                 if ($teleported) {
+                        $self->{lastTeleportAt} = $self->{teleportTime} || time;
                         delete $self->{sentTeleport};
                         delete $self->{teleportTime};
                         delete $self->{teleportFrom};
@@ -341,21 +342,25 @@ sub iterate {
 			splice(@{$solution}, 1 + $self->{maxDistance});
 		}
 
-		undef $self->{mapChanged};
-		undef $self->{step_index};
-		undef $self->{decreasing_step_index};
-		#undef $self->{last_pos};
-		#undef $self->{last_pos_to};
-		#undef $self->{start};
-		#undef $self->{confirmed_correct_vector};
-		undef $self->{last_best_pos_step};
-		undef $self->{last_best_pos_to_step};
-		undef $self->{next_pos};
-		undef $self->{time_step};
-		$self->{teleportTries} = 0;
-		delete $self->{sentTeleport};
-		delete $self->{teleportTime};
-		delete $self->{teleportFrom};
+                undef $self->{mapChanged};
+                undef $self->{step_index};
+                undef $self->{decreasing_step_index};
+                #undef $self->{last_pos};
+                #undef $self->{last_pos_to};
+                #undef $self->{start};
+                #undef $self->{confirmed_correct_vector};
+                undef $self->{last_best_pos_step};
+                undef $self->{last_best_pos_to_step};
+                undef $self->{next_pos};
+                undef $self->{time_step};
+                if ($self->{preserveTeleportTries}) {
+                        delete $self->{preserveTeleportTries};
+                } else {
+                        $self->{teleportTries} = 0;
+                }
+                delete $self->{sentTeleport};
+                delete $self->{teleportTime};
+                delete $self->{teleportFrom};
 
                 $self->{stage} = WALK_ROUTE_SOLUTION;
 
@@ -390,8 +395,13 @@ sub iterate {
                               return;
                           }
 
+                      } elsif (defined $self->{lastTeleportAt} && !timeOut($self->{lastTeleportAt}, 4)) {
+                          debug "Waiting for previous teleport attempt to cool down.\n", "route";
+                          return;
+
                       } elsif ($self->{sentTeleport}) {
                           if ($self->{teleportFrom} && ($self->{teleportFrom}{x} != $self->{actor}{pos_to}{x} || $self->{teleportFrom}{y} != $self->{actor}{pos_to}{y})) {
+                              $self->{lastTeleportAt} = $self->{teleportTime} || time;
                               delete $self->{sentTeleport};
                               delete $self->{teleportTime};
                               delete $self->{teleportFrom};
@@ -404,6 +414,7 @@ sub iterate {
                                       $self->{teleport} = 0;
                               } else {
                                       debug "Teleport attempt timed out without movement; retrying.\n", "route";
+                                      $self->{lastTeleportAt} = $self->{teleportTime} || time;
                                       delete $self->{sentTeleport};
                                       delete $self->{teleportTime};
                                       delete $self->{teleportFrom};
@@ -444,6 +455,7 @@ sub iterate {
                                               ai_useTeleport(1);
                                               $self->{sentTeleport} = 1;
                                               $self->{teleportTime} = time;
+                                              $self->{lastTeleportAt} = $self->{teleportTime};
                                               $self->{teleportFrom} = {%{$self->{actor}{pos_to}}};
                                               $self->{teleportTries}++;
                                               return;
@@ -844,6 +856,7 @@ sub resetRoute {
         my ($self, $preserveTeleportTries) = @_;
         $self->{solution} = [];
         $self->{stage} = CALCULATE_ROUTE;
+        $self->{preserveTeleportTries} = 1 if $preserveTeleportTries;
         $self->{teleportTries} = 0 unless $preserveTeleportTries;
 }
 
