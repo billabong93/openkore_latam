@@ -26,6 +26,8 @@ use Exporter;
 use Carp::Assert;
 use Data::Dumper;
 use Compress::Zlib;
+use File::Basename;
+use File::Spec;
 use base qw(Exporter);
 use utf8;
 use Math::Trig;
@@ -4298,9 +4300,13 @@ sub compilePortals {
 	}
 	return 0 if $checkOnly;
 
-	# Write new portalsLOS.txt
-	writePortalsLOS(Settings::getTableFilename("portalsLOS.txt"), \%portals_los);
-	message TF("Wrote portals Line of Sight table to '%s'\n", Settings::getTableFilename("portalsLOS.txt")), "system";
+	# Write new portalsLOS.txt in the same tables folder as the active portals.txt
+	my $portals_file = Settings::getTableFilename("portals.txt");
+	my $portals_dir = $portals_file ? File::Basename::dirname($portals_file) : undef;
+	my $portals_los_path = $portals_dir ? File::Spec->catfile($portals_dir, "portalsLOS.txt")
+										: Settings::getTableFilename("portalsLOS.txt");
+	writePortalsLOS($portals_los_path, \%portals_los);
+	message TF("Wrote portals Line of Sight table to '%s'\n", $portals_los_path), "system";
 
 	# Print warning for missing fields
 	if (%missingMap) {

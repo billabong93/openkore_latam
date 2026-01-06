@@ -172,13 +172,30 @@ sub iterate {
 	} elsif (@{$self->{mapSolution}} == 0) {
 		$self->setDone();
 		debug "Map Router has finished traversing the map solution\n", "map_route";
+	} elsif ($self->{mapChanged} && $self->{mapSolution}[0]{portal}) {
+		# We reloaded the map while following a portal leg. If the warp already
+		# placed us near the portal's destination, advance to the next hop instead
+		# of recalculating back to the entrance we just used.
+		my ($from, $to) = split /=/, $self->{mapSolution}[0]{portal};
+		my $dest = $self->{mapSolution}[0]{dest_pos}
+		        || $portals_lut{$from}{dest}{$to}
+		        || ($portals_lut{$to} && $portals_lut{$to}{source});
 
+		if ($dest && $dest->{map} eq $field->baseName) {
+			my $pos = $self->{actor}{pos};
+			my $dist = blockDistance($pos, $dest);
+			if ($dist <= 5) {
+				debug TF("Route %s - intra-map portal completed on reload; skipping to next step.\n", $self->{actor}), "route";
+				delete $self->{mapChanged};
+				shift @{$self->{mapSolution}};
+				return;
+			}
+		}
 	} elsif ( $field->baseName ne $self->{mapSolution}[0]{map}
 	     || ( $self->{mapChanged} && !$self->{teleport} ) ) {
 		# Solution Map does not match current map
 		debug "Current map " . $field->baseName . " does not match solution [ $self->{mapSolution}[0]{portal} ].\n", "map_route";
 		delete $self->{substage};
-		delete $self->{timeout};
 		delete $self->{mapChanged};
 		delete $self->{missing_portal};
 		delete $self->{guess_portal};
