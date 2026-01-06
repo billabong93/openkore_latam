@@ -29,7 +29,7 @@ use Log qw(message debug warning error);
 use Network;
 use Plugins;
 use Misc qw(canUseTeleport portalExists);
-use Utils qw(timeOut blockDistance existsInList calcPosFromPathfinding);
+use Utils qw(timeOut blockDistance adjustedBlockDistance existsInList calcPosFromPathfinding);
 use Utils::PathFinding;
 use Utils::Exceptions;
 use AI qw(ai_useTeleport);
@@ -691,21 +691,23 @@ sub iterate {
                                         undef $self->{mapChanged};
                                 }
 
-                                if ($self->{mapLoadPending}) {
-                                        if ($field && $self->{mapSolution}[0]{map} && $field->baseName eq $self->{mapSolution}[0]{map}) {
-                                                delete $self->{mapLoadPending};
-                                                delete $self->{teleportTime};
-                                                delete $self->{sentTeleport};
-                                        } elsif (timeOut($self->{mapLoadPending}, 5)) {
-                                                delete $self->{mapLoadPending};
-                                                delete $self->{teleportTime};
-                                                delete $self->{sentTeleport};
-                                        } else {
-                                                debug "Waiting for map to finish loading before teleporting.\n", "map_route";
-                                                return;
-                                        }
+                if ($self->{mapLoadPending}) {
+                        if ($field && $self->{mapSolution}[0]{map} && $field->baseName eq $self->{mapSolution}[0]{map}) {
+                                delete $self->{mapLoadPending};
+                                delete $self->{teleportTime};
+                                delete $self->{sentTeleport};
+                        } elsif (timeOut($self->{mapLoadPending}, 5)) {
+                                delete $self->{mapLoadPending};
+                                delete $self->{teleportTime};
+                                delete $self->{sentTeleport};
+                        } else {
+                                debug "Waiting for map to finish loading before teleporting.\n", "map_route";
+                                return unless $field; # Keep waiting until at least one field packet arrives.
+                        }
 
-                                } elsif (!$self->{sentTeleport}) {
+                }
+
+                if (!$self->{sentTeleport}) {
 					# Find first inter-map portal
 					my $portal;
 					for my $x (@{$self->{mapSolution}}) {
@@ -784,17 +786,37 @@ sub iterate {
 }
 
 sub setNpcTalk {
-	my ($self) = @_;
+        my ($self) = @_;
 
-	if (%talk) {
-		warning "[mapRoute] [setNpcTalk] % talk is defined for some reason.\n", "ai_npcTalk";
-	}
+        my $npcPos = $self->{mapSolution}[0]{pos};
+        my $currentPos = $self->{actor}{pos_to};
+        my $minApproach = $config{npc_talk_route_distance} // 4;
+
+        if ($currentPos && $npcPos && adjustedBlockDistance($currentPos, $npcPos) > $minApproach) {
+                my $task = new Task::Route(
+                        actor => $self->{actor},
+                        x => $npcPos->{x},
+                        y => $npcPos->{y},
+                        field => $field,
+                        avoidWalls => $self->{avoidWalls},
+                        randomFactor => $self->{randomFactor},
+                        useManhattan => $self->{useManhattan},
+                );
+                $task->{$_} = $self->{$_} for qw(targetNpcPos attackID sendAttackWithMove attackOnRoute noSitAuto LOSSubRoute meetingSubRoute isRandomWalk isFollow isIdleWalk isSlaveRescue isMoveNearSlave isEscape isItemTake isItemGather isDeath isToLockMap runFromTarget);
+                $self->{pendingNpcTalkWalk} = 1;
+                $self->setSubtask($task);
+                return;
+        }
+
+        if (%talk) {
+                warning "[mapRoute] [setNpcTalk] % talk is defined for some reason.\n", "ai_npcTalk";
+        }
 	
-	$self->{substage} = 'Waiting for Warp';
-	@{$self}{qw(old_x old_y)} = @{$self->{actor}{pos}}{qw(x y)};
-	$self->{old_map} = $field->baseName;
-	my $task = new Task::TalkNPC(
-		type => 'talknpc',
+        $self->{substage} = 'Waiting for Warp';
+        @{$self}{qw(old_x old_y)} = @{$self->{actor}{pos}}{qw(x y)};
+        $self->{old_map} = $field->baseName;
+        my $task = new Task::TalkNPC(
+                type => 'talknpc',
 		x => $self->{mapSolution}[0]{pos}{x},
 		y => $self->{mapSolution}[0]{pos}{y},
 		sequence => $self->{mapSolution}[0]{steps});
@@ -818,8 +840,8 @@ sub initMapCalculator {
 }
 
 sub subtaskDone {
-	my ($self, $task) = @_;
-	if ($task->isa('Task::CalcMapRoute')) {
+        my ($self, $task) = @_;
+        if ($task->isa('Task::CalcMapRoute')) {
 		my $error = $task->getError();
 		if ($error) {
 			my $code;
@@ -887,11 +909,20 @@ sub subtaskDone {
 			}
 			$self->{mapSolution}[0]{retry}++;
 			$self->{mapSolution}[0]{error} = $error->{message};
-		}
+                }
 
-	} elsif (my $error = $task->getError()) {
-		$self->setError(UNKNOWN_ERROR, $error->{message});
-	}
+        } elsif ($task->isa('Task::Route') && delete $self->{pendingNpcTalkWalk}) {
+                # Walked up to the NPC before starting the conversation.
+                if (my $error = $task->getError()) {
+                        $self->setError(UNKNOWN_ERROR, $error->{message});
+                } else {
+                        $self->setNpcTalk();
+                }
+                return;
+
+        } elsif (my $error = $task->getError()) {
+                $self->setError(UNKNOWN_ERROR, $error->{message});
+        }
 }
 
 sub mapChanged {
