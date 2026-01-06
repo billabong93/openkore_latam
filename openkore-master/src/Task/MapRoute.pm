@@ -159,7 +159,6 @@ sub iterate {
 	# If the Route task bails out with an error then our subtaskDone() method will set
 	# an error in this task too. In that case we don't want to continue.
 	return if ($self->getSubtask() || $self->getStatus() != Task::RUNNING);
-	
 	my %hookArgs;
 	$hookArgs{args} = $self;
 	Plugins::callHook("MapRoute_iterate_start", \%hookArgs);
@@ -173,12 +172,35 @@ sub iterate {
 		$self->setDone();
 		debug "Map Router has finished traversing the map solution\n", "map_route";
 
-	} elsif ( $field->baseName ne $self->{mapSolution}[0]{map}
-	     || ( $self->{mapChanged} && !$self->{teleport} ) ) {
-		# Solution Map does not match current map
-		debug "Current map " . $field->baseName . " does not match solution [ $self->{mapSolution}[0]{portal} ].\n", "map_route";
+        } elsif ($self->{mapChanged} && $self->{mapSolution}[0]{portal}) {
+                # We reloaded the map while following a portal leg. If the warp already
+                # placed us near the portal's destination, advance to the next hop instead
+                # of recalculating back to the entrance we just used.
+                my ($from, $to) = split /=/, $self->{mapSolution}[0]{portal};
+                my $dest = $self->{mapSolution}[0]{dest_pos}
+                        || $portals_lut{$from}{dest}{$to}
+                        || ($portals_lut{$to} && $portals_lut{$to}{source});
+
+                if ($dest && $dest->{map} eq $field->baseName) {
+                        my $pos = $self->{actor}{pos};
+                        my $dist = blockDistance($pos, $dest);
+                        if ($dist <= 5) {
+                                debug TF("Route %s - intra-map portal completed on reload; skipping to next step.\n", $self->{actor}), "route";
+                                delete $self->{mapChanged};
+                                shift @{$self->{mapSolution}};
+                                return;
+                        }
+                }
+
+                # If the reload dropped us elsewhere on the same map, clear the flag so
+                # normal traversal logic can continue with fresh distance checks.
+                delete $self->{mapChanged};
+
+        } elsif ( $field->baseName ne $self->{mapSolution}[0]{map}
+             || ( $self->{mapChanged} && !$self->{teleport} ) ) {
+                # Solution Map does not match current map
+                debug "Current map " . $field->baseName . " does not match solution [ $self->{mapSolution}[0]{portal} ].\n", "map_route";
 		delete $self->{substage};
-		delete $self->{timeout};
 		delete $self->{mapChanged};
 		delete $self->{missing_portal};
 		delete $self->{guess_portal};

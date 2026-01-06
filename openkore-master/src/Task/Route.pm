@@ -223,11 +223,47 @@ sub iterate {
 		debug "Map changed: " . $self->{dest}{map}->baseName . " -> " . $field->baseName . "\n", "route";
 		$self->setDone();
 
-	} elsif ($self->{mapChanged}) {
-		debug "Map reloaded; recalculating route.\n", "route";
-		undef $self->{mapChanged};
-		$self->resetRoute(1);
-	} elsif ($self->{stage} == CALCULATE_ROUTE) {
+        } elsif ($self->{mapChanged}) {
+                debug "Map reloaded; recalculating route.\n", "route";
+                # Wait until the map load event clears, otherwise we may recalc using
+                # pre-warp coordinates and incorrectly aim back at the portal entrance.
+                if ($self->{mapLoadPending}) {
+                        if (timeOut($self->{mapLoadPending}, 5)) {
+                                delete $self->{mapLoadPending};
+                        } else {
+                                debug "Waiting for map to finish loading before recalculating.\n", "route";
+                                return;
+                        }
+                }
+
+                undef $self->{mapChanged};
+
+                my $teleported = $self->{sentTeleport} || $self->{teleportFrom};
+                my $sameMapWarp = $self->{dest}{map}->baseName eq $field->baseName
+                 && adjustedBlockDistance($self->{actor}{pos_to}, $self->{dest}{pos}) > 5;
+
+                # Teleport-induced reloads shouldn't be treated as portal completions.
+                if ($teleported) {
+                        delete $self->{sentTeleport};
+                        delete $self->{teleportTime};
+                        delete $self->{teleportFrom};
+                        $self->{route_out_time} = time;
+                } elsif ($sameMapWarp) {
+                        # If we were walking toward a portal within the same map, and the warp
+                        # already moved us far away from that portal, treat this leg as complete
+                        # so MapRoute can plan the next hop instead of recalculating back to the
+                        # portal entrance we just used.
+                        debug "Route $self->{actor} - intra-map warp detected; finishing current leg.\n", "route";
+                        $self->setDone();
+                        return;
+                }
+
+                # The map_changed hook fires even for intra-map portals, which reload the
+                # field object. Rebind the destination map to the current field instance to
+                # avoid reusing a stale map reference that cannot produce a path.
+                $self->{dest}{map} = $field if ($self->{dest}{map}->baseName eq $field->baseName);
+                $self->resetRoute(1);
+        } elsif ($self->{stage} == CALCULATE_ROUTE) {
 		my $pos = $self->{actor}{pos};
 		my $pos_to = $self->{actor}{pos_to};
 		

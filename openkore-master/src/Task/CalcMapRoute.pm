@@ -332,18 +332,25 @@ sub searchStep {
 			}
 
 			# Reconstructs the solution path by traversing the parents backwards, stacking the portals used in the final route.
-			if ( $self->{found} ) {
-				$self->{done} = 1;
-				$self->{mapSolution} = [];
-				$self->{target} = $target;
-				$self->{target}->{pos}->{x} = $self->{target}->{x};
-				$self->{target}->{pos}->{y} = $self->{target}->{y};
-				my $this = $self->{found};
-				while ($this) {
-					my %arg;
-					$arg{portal} = $this;
+if ( $self->{found} ) {
+$self->{done} = 1;
+$self->{mapSolution} = [];
+$self->{target} = $target;
+$self->{target}->{pos}->{x} = $self->{target}->{x};
+$self->{target}->{pos}->{y} = $self->{target}->{y};
+my $this = $self->{found};
+while ($this) {
+my %arg;
+$arg{portal} = $this;
 					my ($from, $to) = split /=/, $this;
 					($arg{map}, $arg{pos}{x}, $arg{pos}{y}) = split / /, $from;
+					if (my $dest = $portals_lut{$from}{dest}{$to}) {
+						$arg{dest_pos} = {
+							map => $dest->{map},
+							x   => $dest->{x},
+							y   => $dest->{y},
+						};
+					}
 					$arg{walk} = $closelist->{$this}{walk};
 					$arg{zeny} = $closelist->{$this}{zeny};
 					$arg{allow_ticket} = $closelist->{$this}{allow_ticket};
