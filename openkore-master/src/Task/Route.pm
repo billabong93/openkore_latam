@@ -241,7 +241,8 @@ sub iterate {
                 undef $self->{mapChanged};
 
                 my $teleported = $self->{sentTeleport} || $self->{teleportFrom};
-                my $sameMapWarp = $self->{dest}{map}->baseName eq $field->baseName
+                my $sameMapWarp = !$self->{teleport}
+                 && $self->{dest}{map}->baseName eq $field->baseName
                  && adjustedBlockDistance($self->{actor}{pos_to}, $self->{dest}{pos}) > 5;
 
                 # Teleport-induced reloads shouldn't be treated as portal completions.
@@ -391,8 +392,14 @@ sub iterate {
                       if ($self->{mapLoadPending}) {
                           if ($field && $self->{dest}{map} && $field->baseName eq $self->{dest}{map}->baseName) {
                               delete $self->{mapLoadPending};
+                              delete $self->{teleportTime};
+                              delete $self->{teleportFrom};
+                              delete $self->{sentTeleport};
                           } elsif (timeOut($self->{mapLoadPending}, 5)) {
                               delete $self->{mapLoadPending};
+                              delete $self->{teleportTime};
+                              delete $self->{teleportFrom};
+                              delete $self->{sentTeleport};
                           } else {
                               debug "Waiting for map to finish loading before teleporting.\n", "route";
                               return;

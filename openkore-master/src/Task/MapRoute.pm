@@ -187,6 +187,9 @@ sub iterate {
                         if ($dist <= 5) {
                                 debug TF("Route %s - intra-map portal completed on reload; skipping to next step.\n", $self->{actor}), "route";
                                 delete $self->{mapChanged};
+                                delete $self->{mapLoadPending};
+                                delete $self->{teleportTime};
+                                delete $self->{sentTeleport};
                                 shift @{$self->{mapSolution}};
                                 return;
                         }
@@ -195,6 +198,10 @@ sub iterate {
                 # If the reload dropped us elsewhere on the same map, clear the flag so
                 # normal traversal logic can continue with fresh distance checks.
                 delete $self->{mapChanged};
+                delete $self->{mapLoadPending};
+                delete $self->{teleportTime};
+                delete $self->{sentTeleport};
+                return;
 
         } elsif ( $field->baseName ne $self->{mapSolution}[0]{map}
              || ( $self->{mapChanged} && !$self->{teleport} ) ) {
@@ -687,8 +694,12 @@ sub iterate {
                                 if ($self->{mapLoadPending}) {
                                         if ($field && $self->{mapSolution}[0]{map} && $field->baseName eq $self->{mapSolution}[0]{map}) {
                                                 delete $self->{mapLoadPending};
+                                                delete $self->{teleportTime};
+                                                delete $self->{sentTeleport};
                                         } elsif (timeOut($self->{mapLoadPending}, 5)) {
                                                 delete $self->{mapLoadPending};
+                                                delete $self->{teleportTime};
+                                                delete $self->{sentTeleport};
                                         } else {
                                                 debug "Waiting for map to finish loading before teleporting.\n", "map_route";
                                                 return;
@@ -895,6 +906,8 @@ sub mapLoaded {
         my (undef, undef, $holder) = @_;
         my $self = $holder->[0];
         delete $self->{mapLoadPending};
+        delete $self->{sentTeleport};
+        delete $self->{teleportTime};
 }
 
 sub localBroadcast {
