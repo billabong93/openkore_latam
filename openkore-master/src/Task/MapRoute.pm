@@ -424,10 +424,17 @@ sub iterate {
 		}
 
 		# If current solution has conversation steps specified
-		if ( $self->{substage} eq 'Waiting for Warp' ) {
-			$self->{timeout} = time unless $self->{timeout};
+                if ( $self->{substage} eq 'Waiting for Warp' ) {
+                        if ($dist_to_npc > $max_npc_dist) {
+                                delete $self->{substage};
+                                delete $self->{timeout};
+                                $self->setNpcTalk();
+                                return;
+                        }
 
-			if (exists $self->{mapSolution}[0]{error} || timeOut($self->{timeout}, $timeout{ai_route_npcTalk}{timeout} || 10)) {
+                        $self->{timeout} = time unless $self->{timeout};
+
+                        if (exists $self->{mapSolution}[0]{error} || timeOut($self->{timeout}, $timeout{ai_route_npcTalk}{timeout} || 10)) {
 				delete $self->{substage};
 				delete $self->{timeout};
 
@@ -850,10 +857,19 @@ sub initMapCalculator {
 
 sub subtaskDone {
         my ($self, $task) = @_;
-        if ($task->isa('Task::CalcMapRoute')) {
-		my $error = $task->getError();
-		if ($error) {
-			my $code;
+        if ($task->isa('Task::Route') && delete $self->{pendingNpcTalkWalk}) {
+                # Walked up to the NPC before starting the conversation.
+                if (my $error = $task->getError()) {
+                        $self->setError(UNKNOWN_ERROR, $error->{message});
+                } else {
+                        $self->setNpcTalk();
+                }
+                return;
+
+        } elsif ($task->isa('Task::CalcMapRoute')) {
+                my $error = $task->getError();
+                if ($error) {
+                        my $code;
 			if ($error->{code} == Task::CalcMapRoute::CANNOT_LOAD_FIELD) {
 				$code = CANNOT_LOAD_FIELD;
 			} elsif ($error->{code} == Task::CalcMapRoute::CANNOT_CALCULATE_ROUTE) {
@@ -885,10 +901,10 @@ sub subtaskDone {
 			}
 		}
 
-	} elsif ($task->isa('Task::Route')) {
-		my $error = $task->getError();
-		if ($error) {
-			my $code;
+        } elsif ($task->isa('Task::Route')) {
+                my $error = $task->getError();
+                if ($error) {
+                        my $code;
 			if ($error->{code} == Task::Route::TOO_MUCH_TIME) {
 				$code = TOO_MUCH_TIME;
 			} elsif ($error->{code} == Task::Route::CANNOT_CALCULATE_ROUTE) {
@@ -901,7 +917,7 @@ sub subtaskDone {
 			$self->setError($code, $error->{message});
 		}
 
-	} elsif ($task->isa('Task::TalkNPC')) {
+        } elsif ($task->isa('Task::TalkNPC')) {
 		my $error = $task->getError();
 		if ($error) {
 			my $code;
