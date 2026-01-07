@@ -13,7 +13,6 @@
 #   - poseidonServer: IP ou hostname (ex: 172.65.175.75)
 #   - poseidonPort: porta TCP do Poseidon (ex: 24390,24391,24392)
 #   - XKore_proxyPublicIp:  IP ou hostname (ex: 172.65.175.75)
-attackAuto_steal 1
 
 XKore 0
 XKore_port 6901
@@ -99,6 +98,7 @@ allowedMaps
 allowedMaps_reaction 1
 
 attackAuto 2
+attackAuto_steal 1
 attackAuto_party 1
 attackAuto_onlyWhenSafe 0
 attackAuto_followTarget 1
@@ -255,6 +255,7 @@ route_avoidWalls 1
 route_randomWalk 1
 route_randomWalk_inTown 0
 route_randomWalk_maxRouteTime 75
+route_minNpcDistance 8
 route_maxWarpFee
 route_maxNpcTries 5
 route_teleport 0
