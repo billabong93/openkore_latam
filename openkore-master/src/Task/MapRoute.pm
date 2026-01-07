@@ -829,13 +829,14 @@ sub iterate {
 }
 
 sub setNpcTalk {
-        my ($self) = @_;
+        my ($self, %args) = @_;
 
         my $npcPos = $self->{mapSolution}[0]{pos};
         my $currentPos = calcPosFromPathfinding($field, $self->{actor});
         my $minApproach = $config{route_minNpcDistance} // 6;
 
-        if ($currentPos && $npcPos && adjustedBlockDistance($currentPos, $npcPos) > $minApproach
+        if (!$args{force}
+			&& $currentPos && $npcPos && adjustedBlockDistance($currentPos, $npcPos) > $minApproach
 			&& canAttack($field, $currentPos, $npcPos, 0, $config{clientSight} || 15, $config{clientSight} || 15) != 1) {
                 my $task = new Task::Route(
                         actor => $self->{actor},
@@ -892,7 +893,7 @@ sub subtaskDone {
                 if (my $error = $task->getError()) {
                         $self->setError(UNKNOWN_ERROR, $error->{message});
                 } else {
-                        $self->setNpcTalk();
+                        $self->setNpcTalk(force => 1);
                 }
                 return;
 
