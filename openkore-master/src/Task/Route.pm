@@ -275,7 +275,14 @@ sub iterate {
 		
 		my $begin = time;
 
-		if (!$self->{meetingSubRoute} && !$self->{LOSSubRoute} && $pos_to->{x} == $self->{dest}{pos}{x} && $pos_to->{y} == $self->{dest}{pos}{y}) {
+		if (
+			!$self->{meetingSubRoute}
+			&& !$self->{LOSSubRoute}
+			&& !$self->{distFromGoal}
+			&& !$self->{pyDistFromGoal}
+			&& $pos_to->{x} == $self->{dest}{pos}{x}
+			&& $pos_to->{y} == $self->{dest}{pos}{y}
+		) {
 			debug "Route $self->{actor}: Current position and destination are the same.\n", "route";
 			$self->setDone();
 		
