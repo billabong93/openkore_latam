@@ -1,5 +1,5 @@
 # Plugin author: Rubim
-# Plugin modified by: UnknownXD, richardkomarcheski, billabon93
+# Plugin modified by: UnknownXD, richardkomarcheski, billabong93
 
 package mapNormalizer;
 
