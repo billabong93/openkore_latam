@@ -270,11 +270,10 @@ sub iterate {
 			$self->{timeout} = time;
 			
                 my $min_npc_dist = $config{npc_talk_route_distance} // 6;
-                my $max_npc_dist = $min_npc_dist + 2;
 			my $realPos = calcPosFromPathfinding($field, $self->{actor});
 			my $dist_to_npc = blockDistance($realPos, $self->{mapSolution}[0]{pos});
 
-			if ( $self->{mapSolution}[0]{steps} && $dist_to_npc > $max_npc_dist) {
+			if ( $self->{mapSolution}[0]{steps} && $dist_to_npc > $min_npc_dist) {
 				if (!exists $self->{mapSolution}[0]{retry} || !defined $self->{mapSolution}[0]{retry}) {
 					$self->{mapSolution}[0]{retry} = 0;
 				}
@@ -288,7 +287,7 @@ sub iterate {
 					# NPC is reachable from current position
 					# >> Then "route" to it
 
-					debug "Walking towards the Airship NPC, min_npc_dist $min_npc_dist, max_npc_dist $max_npc_dist, current dist_to_npc $dist_to_npc\n", "map_route";
+					debug "Walking towards the Airship NPC, min_npc_dist $min_npc_dist, current dist_to_npc $dist_to_npc\n", "map_route";
 					my $task = new Task::Route(
 						actor => $self->{actor},
 						x => $self->{mapSolution}[0]{pos}{x},
@@ -427,7 +426,6 @@ sub iterate {
 
 	} elsif ( $self->{mapSolution}[0]{steps} ) {
                 my $min_npc_dist = $config{npc_talk_route_distance} // 6;
-                my $max_npc_dist = $min_npc_dist + 2;
 		my $realPos = calcPosFromPathfinding($field, $self->{actor});
 		my $dist_to_npc = blockDistance($realPos, $self->{mapSolution}[0]{pos});
 		
@@ -437,7 +435,7 @@ sub iterate {
 
 		# If current solution has conversation steps specified
                 if ( $self->{substage} eq 'Waiting for Warp' ) {
-                        if ($dist_to_npc > $max_npc_dist) {
+                        if ($dist_to_npc > $min_npc_dist) {
                                 delete $self->{substage};
                                 delete $self->{timeout};
                                 $self->setNpcTalk();
@@ -497,7 +495,7 @@ sub iterate {
 				}
 			}
 
-		} elsif ($dist_to_npc <= $max_npc_dist) {
+		} elsif ($dist_to_npc <= $min_npc_dist) {
 			my ($from,$to) = split /=/, $self->{mapSolution}[0]{portal};
 			if (($self->{actor}{zeny} >= $portals_lut{$from}{dest}{$to}{cost}) || ($char->inventory->getByNameID(7060) && $portals_lut{$from}{dest}{$to}{allow_ticket})) {
 				debug TF("[mapRoute] Calling setNpcTalk to teleport using NPC at %s (%s,%s) - dest (%s %s,%s).\n", $field->baseName, $self->{mapSolution}[0]{pos}{x}, $self->{mapSolution}[0]{pos}{y}, $self->{dest}{map}, $self->{dest}{pos}{x}, $self->{dest}{pos}{y}), "route";
@@ -523,7 +521,7 @@ sub iterate {
 			# NPC is reachable from current position
 			# >> Then "route" to it
 
-			debug "Walking towards the NPC, min_npc_dist $min_npc_dist, max_npc_dist $max_npc_dist, current dist_to_npc $dist_to_npc\n", "map_route";
+			debug "Walking towards the NPC, min_npc_dist $min_npc_dist, current dist_to_npc $dist_to_npc\n", "map_route";
 			my $task = new Task::Route(
 				actor => $self->{actor},
 				x => $self->{mapSolution}[0]{pos}{x},
