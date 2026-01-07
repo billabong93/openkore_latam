@@ -177,9 +177,21 @@ sub iterate {
                 # placed us near the portal's destination, advance to the next hop instead
                 # of recalculating back to the entrance we just used.
                 my ($from, $to) = split /=/, $self->{mapSolution}[0]{portal};
+                my ($from_map) = split / /, $from;
+                my ($to_map) = split / /, $to;
                 my $dest = $self->{mapSolution}[0]{dest_pos}
                         || $portals_lut{$from}{dest}{$to}
                         || ($portals_lut{$to} && $portals_lut{$to}{source});
+
+                if ($from_map && $to_map && $from_map eq $to_map && $from_map eq $field->baseName) {
+                        debug TF("Route %s - intra-map portal completed on reload; skipping to next step.\n", $self->{actor}), "route";
+                        delete $self->{mapChanged};
+                        delete $self->{mapLoadPending};
+                        delete $self->{teleportTime};
+                        delete $self->{sentTeleport};
+                        shift @{$self->{mapSolution}};
+                        return;
+                }
 
                 if ($dest && $dest->{map} eq $field->baseName) {
                         my $pos = $self->{actor}{pos};
