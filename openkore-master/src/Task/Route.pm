@@ -241,8 +241,7 @@ sub iterate {
                 undef $self->{mapChanged};
 
                 my $teleported = $self->{sentTeleport} || $self->{teleportFrom};
-                my $sameMapWarp = !$self->{teleport}
-                 && $self->{dest}{map}->baseName eq $field->baseName
+                my $sameMapWarp = $self->{dest}{map}->baseName eq $field->baseName
                  && adjustedBlockDistance($self->{actor}{pos_to}, $self->{dest}{pos}) > 5;
 
                 # Teleport-induced reloads shouldn't be treated as portal completions.
