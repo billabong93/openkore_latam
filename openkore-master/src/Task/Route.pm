@@ -786,7 +786,7 @@ sub iterate {
 					}
 					
 				} elsif ($self->{pyDistFromGoal} || $self->{distFromGoal}) {
-					if ($self->{distFromGoal} && blockDistance($self->{dest}{pos}, $current_calc_pos) <= $self->{distFromGoal}) {
+					if ($self->{distFromGoal} && blockDistance($self->{dest}{pos}, $current_pos) <= $self->{distFromGoal}) {
 						debug "[Route] [distFromGoal] Target cell is already close enough, ending movement.\n", "route";
 						$self->setDone();
 						return;
