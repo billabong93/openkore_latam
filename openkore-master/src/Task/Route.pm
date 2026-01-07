@@ -772,6 +772,17 @@ sub iterate {
 							$self->setDone();
 							return;
 						}
+					} elsif ($self->{pyDistFromGoal} || $self->{distFromGoal}) {
+						if ($self->{distFromGoal} && blockDistance($self->{dest}{pos}, $current_calc_pos) <= $self->{distFromGoal}) {
+							debug "[Route] [targetNpcPos] [distFromGoal] Target npc is close enough, ending movement.\n", "route";
+							$self->setDone();
+							return;
+
+						} elsif ($self->{pyDistFromGoal} && distance($self->{dest}{pos}, $current_calc_pos) <= $self->{pyDistFromGoal}) {
+							debug "[Route] [targetNpcPos] [pyDistFromGoal] Target npc is close enough, ending movement.\n", "route";
+							$self->setDone();
+							return;
+						}
 					}
 					
 				} elsif ($self->{pyDistFromGoal} || $self->{distFromGoal}) {
