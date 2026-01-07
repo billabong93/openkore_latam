@@ -276,7 +276,7 @@ sub iterate {
 		}
 
 	} elsif ( $self->{mapSolution}[0]{is_airship} ) {
-		my $has_steps = defined $self->{mapSolution}[0]{steps} && length $self->{mapSolution}[0]{steps};
+		my $has_steps = defined $self->{mapSolution}[0]{steps};
 		if (!$self->{timeout} || timeOut($self->{timeout}, 0.5)) {
 			$self->{timeout} = time;
 			
