@@ -34,10 +34,10 @@ COMMAND 20
 
 # Use teleport lv 2 or butterfly wing. This can be used to avoid/prefer going to the destination
 # by using a teleport lv 2 or butterfly wing. Only change this, if you exactly know what you're doing!
-WARPTOSAVEMAP 200
+WARPTOSAVEMAP 500
 
 # Use airship
-AIRSHIP 500
+AIRSHIP 600
 
 # Maps where you can exit to the same place you came from,
 # which confuses routing if added to portals thoughtlessly.

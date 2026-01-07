@@ -270,7 +270,7 @@ route_reAddMissingPortals 1
 route_randomFactor 0
 route_saveMapWarp 0
 route_humanize 0
-route_humanize_chance 10
+route_humanize_chance 5
 route_humanize_deviation 1
 
 runFromTarget 0
