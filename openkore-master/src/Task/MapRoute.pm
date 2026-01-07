@@ -172,9 +172,19 @@ sub iterate {
 		$self->setDone();
 		debug "Map Router has finished traversing the map solution\n", "map_route";
 
-        } elsif ($self->{mapChanged} && $self->{mapSolution}[0]{portal}) {
-                # We reloaded the map while following a portal leg. If the warp already
-                # placed us near the portal's destination, advance to the next hop instead
+	} elsif ($self->{mapChanged} && $self->{mapSolution}[0]{is_teleportToSaveMap}) {
+		# Recalculate from the actual warp position to pick the closest NPC route.
+		debug TF("MapRoute - recalculating route after teleportToSaveMap on %s.\n", $field->baseName), "map_route";
+		delete $self->{substage};
+		delete $self->{mapChanged};
+		delete $self->{mapLoadPending};
+		$self->{mapSolution} = undef;
+		$self->initMapCalculator();
+		return;
+
+	} elsif ($self->{mapChanged} && $self->{mapSolution}[0]{portal}) {
+		# We reloaded the map while following a portal leg. If the warp already
+		# placed us near the portal's destination, advance to the next hop instead
                 # of recalculating back to the entrance we just used.
                 my ($from, $to) = split /=/, $self->{mapSolution}[0]{portal};
                 my ($from_map) = split / /, $from;
@@ -266,6 +276,7 @@ sub iterate {
 		}
 
 	} elsif ( $self->{mapSolution}[0]{is_airship} ) {
+		my $has_steps = defined $self->{mapSolution}[0]{steps} && length $self->{mapSolution}[0]{steps};
 		if (!$self->{timeout} || timeOut($self->{timeout}, 0.5)) {
 			$self->{timeout} = time;
 			
@@ -273,7 +284,7 @@ sub iterate {
 			my $realPos = calcPosFromPathfinding($field, $self->{actor});
 			my $dist_to_npc = blockDistance($realPos, $self->{mapSolution}[0]{pos});
 
-			if ( $self->{mapSolution}[0]{steps} && $dist_to_npc > $min_npc_dist) {
+			if ( $has_steps && $dist_to_npc > $min_npc_dist) {
 				if (!exists $self->{mapSolution}[0]{retry} || !defined $self->{mapSolution}[0]{retry}) {
 					$self->{mapSolution}[0]{retry} = 0;
 				}
@@ -321,7 +332,7 @@ sub iterate {
 			} else {
 				debug "MapRoute - last broadcast '".($self->{localBroadcast})."' matches expected message '".($self->{mapSolution}[0]{airship_message})."'\n", "route";
 				
-				if ( $self->{mapSolution}[0]{steps}) {
+				if ( $has_steps) {
 
                 if ( $self->{substage} eq 'Waiting for Warp' ) {
                         my $minApproach = $config{route_minNpcDistance} // 6;
@@ -425,9 +436,9 @@ sub iterate {
 			}
 		}
 
-	} elsif ( $self->{mapSolution}[0]{steps} ) {
+	} elsif ( defined $self->{mapSolution}[0]{steps} && length $self->{mapSolution}[0]{steps} ) {
                 my $min_npc_dist = $config{route_minNpcDistance} // 6;
-		my $realPos = $self->{actor}{pos};
+		my $realPos = calcPosFromPathfinding($field, $self->{actor});
 		my $dist_to_npc = blockDistance($realPos, $self->{mapSolution}[0]{pos});
 		
 		if (!exists $self->{mapSolution}[0]{retry} || !defined $self->{mapSolution}[0]{retry}) {
@@ -821,7 +832,7 @@ sub setNpcTalk {
         my ($self) = @_;
 
         my $npcPos = $self->{mapSolution}[0]{pos};
-        my $currentPos = $self->{actor}{pos};
+        my $currentPos = calcPosFromPathfinding($field, $self->{actor});
         my $minApproach = $config{route_minNpcDistance} // 6;
 
         if ($currentPos && $npcPos && adjustedBlockDistance($currentPos, $npcPos) > $minApproach
