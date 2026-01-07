@@ -989,6 +989,8 @@ sub mapChanged {
         $self->{mapChanged} = 1;
         $self->{mapLoadPending} = { time => time, timeout => 5 };
         undef $self->{localBroadcast};
+        undef %talk;
+        delete $ai_v{'npc_talk'};
 }
 
 sub mapLoaded {
