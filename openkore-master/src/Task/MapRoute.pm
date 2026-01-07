@@ -288,20 +288,21 @@ sub iterate {
 					# >> Then "route" to it
 
 					debug "Walking towards the Airship NPC, min_npc_dist $min_npc_dist, current dist_to_npc $dist_to_npc\n", "map_route";
-					my $task = new Task::Route(
-						actor => $self->{actor},
-						x => $self->{mapSolution}[0]{pos}{x},
-						y => $self->{mapSolution}[0]{pos}{y},
-						field => $field,
-						maxTime => $self->{maxTime},
-						distFromGoal => $min_npc_dist,
-						avoidWalls => $self->{avoidWalls},
-						randomFactor => $self->{randomFactor},
-						useManhattan => $self->{useManhattan},
-						targetNpcPos => 1,
-						solution => \@solution
-					);
-					$self->setSubtask($task);
+						my $task = new Task::Route(
+							actor => $self->{actor},
+							x => $self->{mapSolution}[0]{pos}{x},
+							y => $self->{mapSolution}[0]{pos}{y},
+							field => $field,
+							maxTime => $self->{maxTime},
+							distFromGoal => $min_npc_dist,
+							avoidWalls => $self->{avoidWalls},
+							randomFactor => $self->{randomFactor},
+							useManhattan => $self->{useManhattan},
+							targetNpcPos => 1,
+							solution => \@solution
+						);
+						$self->{pendingNpcTalkWalk} = 1;
+						$self->setSubtask($task);
 
 				} else {
 					# Error, NPC is not reachable from current pos
@@ -538,6 +539,7 @@ sub iterate {
 				targetNpcPos => 1,
 				solution => \@solution
 			);
+			$self->{pendingNpcTalkWalk} = 1;
 			$self->setSubtask($task);
 
 		} else {
