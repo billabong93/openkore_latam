@@ -757,12 +757,12 @@ sub iterate {
 					if ($found) {
 						debug "[Route] [targetNpcPos] Found target npc.\n", "route";
 						if ($self->{pyDistFromGoal} || $self->{distFromGoal}) {
-							if ($self->{distFromGoal} && blockDistance($self->{dest}{pos}, $current_calc_pos) <= $self->{distFromGoal}) {
+							if ($self->{distFromGoal} && blockDistance($self->{dest}{pos}, $current_pos) <= $self->{distFromGoal}) {
 								debug "[Route] [targetNpcPos] [distFromGoal] Target npc is already close enough, ending movement.\n", "route";
 								$self->setDone();
 								return;
-								
-							} elsif ($self->{pyDistFromGoal} && distance($self->{dest}{pos}, $current_calc_pos) <= $self->{pyDistFromGoal}) {
+
+							} elsif ($self->{pyDistFromGoal} && distance($self->{dest}{pos}, $current_pos) <= $self->{pyDistFromGoal}) {
 								debug "[Route] [targetNpcPos] [pyDistFromGoal] Target npc is already close enough, ending movement.\n", "route";
 								$self->setDone();
 								return;
@@ -773,12 +773,12 @@ sub iterate {
 							return;
 						}
 					} elsif ($self->{pyDistFromGoal} || $self->{distFromGoal}) {
-						if ($self->{distFromGoal} && blockDistance($self->{dest}{pos}, $current_calc_pos) <= $self->{distFromGoal}) {
+						if ($self->{distFromGoal} && blockDistance($self->{dest}{pos}, $current_pos) <= $self->{distFromGoal}) {
 							debug "[Route] [targetNpcPos] [distFromGoal] Target npc is close enough, ending movement.\n", "route";
 							$self->setDone();
 							return;
 
-						} elsif ($self->{pyDistFromGoal} && distance($self->{dest}{pos}, $current_calc_pos) <= $self->{pyDistFromGoal}) {
+						} elsif ($self->{pyDistFromGoal} && distance($self->{dest}{pos}, $current_pos) <= $self->{pyDistFromGoal}) {
 							debug "[Route] [targetNpcPos] [pyDistFromGoal] Target npc is close enough, ending movement.\n", "route";
 							$self->setDone();
 							return;

@@ -535,6 +535,7 @@ sub iterate {
 				avoidWalls => $self->{avoidWalls},
 				randomFactor => $self->{randomFactor},
 				useManhattan => $self->{useManhattan},
+				targetNpcPos => 1,
 				solution => \@solution
 			);
 			$self->setSubtask($task);
