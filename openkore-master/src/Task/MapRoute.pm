@@ -29,7 +29,7 @@ use Log qw(message debug warning error);
 use Network;
 use Plugins;
 use Misc qw(canUseTeleport portalExists);
-use Utils qw(timeOut blockDistance existsInList calcPosFromPathfinding);
+use Utils qw(timeOut blockDistance adjustedBlockDistance existsInList calcPosFromPathfinding canAttack);
 use Utils::PathFinding;
 use Utils::Exceptions;
 use AI qw(ai_useTeleport);
@@ -159,7 +159,6 @@ sub iterate {
 	# If the Route task bails out with an error then our subtaskDone() method will set
 	# an error in this task too. In that case we don't want to continue.
 	return if ($self->getSubtask() || $self->getStatus() != Task::RUNNING);
-	
 	my %hookArgs;
 	$hookArgs{args} = $self;
 	Plugins::callHook("MapRoute_iterate_start", \%hookArgs);
@@ -173,12 +172,64 @@ sub iterate {
 		$self->setDone();
 		debug "Map Router has finished traversing the map solution\n", "map_route";
 
-	} elsif ( $field->baseName ne $self->{mapSolution}[0]{map}
-	     || ( $self->{mapChanged} && !$self->{teleport} ) ) {
-		# Solution Map does not match current map
-		debug "Current map " . $field->baseName . " does not match solution [ $self->{mapSolution}[0]{portal} ].\n", "map_route";
+	} elsif ($self->{mapChanged} && $self->{mapSolution}[0]{is_teleportToSaveMap}) {
+		# Recalculate from the actual warp position to pick the closest NPC route.
+		debug TF("MapRoute - recalculating route after teleportToSaveMap on %s.\n", $field->baseName), "map_route";
 		delete $self->{substage};
-		delete $self->{timeout};
+		delete $self->{mapChanged};
+		delete $self->{mapLoadPending};
+		$self->{mapSolution} = undef;
+		$self->initMapCalculator();
+		return;
+
+	} elsif ($self->{mapChanged} && $self->{mapSolution}[0]{portal}) {
+		# We reloaded the map while following a portal leg. If the warp already
+		# placed us near the portal's destination, advance to the next hop instead
+                # of recalculating back to the entrance we just used.
+                my ($from, $to) = split /=/, $self->{mapSolution}[0]{portal};
+                my ($from_map) = split / /, $from;
+                my ($to_map) = split / /, $to;
+                my $dest = $self->{mapSolution}[0]{dest_pos}
+                        || $portals_lut{$from}{dest}{$to}
+                        || ($portals_lut{$to} && $portals_lut{$to}{source});
+
+                if ($from_map && $to_map && $from_map eq $to_map && $from_map eq $field->baseName) {
+                        debug TF("Route %s - intra-map portal completed on reload; skipping to next step.\n", $self->{actor}), "route";
+                        delete $self->{mapChanged};
+                        delete $self->{mapLoadPending};
+                        delete $self->{teleportTime};
+                        delete $self->{sentTeleport};
+                        shift @{$self->{mapSolution}};
+                        return;
+                }
+
+                if ($dest && $dest->{map} eq $field->baseName) {
+                        my $pos = $self->{actor}{pos};
+                        my $dist = blockDistance($pos, $dest);
+                        if ($dist <= 5) {
+                                debug TF("Route %s - intra-map portal completed on reload; skipping to next step.\n", $self->{actor}), "route";
+                                delete $self->{mapChanged};
+                                delete $self->{mapLoadPending};
+                                delete $self->{teleportTime};
+                                delete $self->{sentTeleport};
+                                shift @{$self->{mapSolution}};
+                                return;
+                        }
+                }
+
+                # If the reload dropped us elsewhere on the same map, clear the flag so
+                # normal traversal logic can continue with fresh distance checks.
+                delete $self->{mapChanged};
+                delete $self->{mapLoadPending};
+                delete $self->{teleportTime};
+                delete $self->{sentTeleport};
+                return;
+
+        } elsif ( $field->baseName ne $self->{mapSolution}[0]{map}
+             || ( $self->{mapChanged} && !$self->{teleport} ) ) {
+                # Solution Map does not match current map
+                debug "Current map " . $field->baseName . " does not match solution [ $self->{mapSolution}[0]{portal} ].\n", "map_route";
+		delete $self->{substage};
 		delete $self->{mapChanged};
 		delete $self->{missing_portal};
 		delete $self->{guess_portal};
@@ -225,15 +276,19 @@ sub iterate {
 		}
 
 	} elsif ( $self->{mapSolution}[0]{is_airship} ) {
+		my $has_steps = defined $self->{mapSolution}[0]{steps};
+		if (!defined $self->{airshipBroadcastResetFor} || $self->{airshipBroadcastResetFor} ne $self->{mapSolution}[0]{portal}) {
+			undef $self->{localBroadcast};
+			$self->{airshipBroadcastResetFor} = $self->{mapSolution}[0]{portal};
+		}
 		if (!$self->{timeout} || timeOut($self->{timeout}, 0.5)) {
 			$self->{timeout} = time;
 			
-			my $min_npc_dist = 8;
-			my $max_npc_dist = 10;
+                my $min_npc_dist = $config{route_minNpcDistance} // 6;
 			my $realPos = calcPosFromPathfinding($field, $self->{actor});
 			my $dist_to_npc = blockDistance($realPos, $self->{mapSolution}[0]{pos});
 
-			if ( $self->{mapSolution}[0]{steps} && $dist_to_npc > $max_npc_dist) {
+			if ( $has_steps && $dist_to_npc > $min_npc_dist) {
 				if (!exists $self->{mapSolution}[0]{retry} || !defined $self->{mapSolution}[0]{retry}) {
 					$self->{mapSolution}[0]{retry} = 0;
 				}
@@ -247,21 +302,22 @@ sub iterate {
 					# NPC is reachable from current position
 					# >> Then "route" to it
 
-					debug "Walking towards the Airship NPC, min_npc_dist $min_npc_dist, max_npc_dist $max_npc_dist, current dist_to_npc $dist_to_npc\n", "map_route";
-					my $task = new Task::Route(
-						actor => $self->{actor},
-						x => $self->{mapSolution}[0]{pos}{x},
-						y => $self->{mapSolution}[0]{pos}{y},
-						field => $field,
-						maxTime => $self->{maxTime},
-						distFromGoal => $min_npc_dist,
-						avoidWalls => $self->{avoidWalls},
-						randomFactor => $self->{randomFactor},
-						useManhattan => $self->{useManhattan},
-						targetNpcPos => 1,
-						solution => \@solution
-					);
-					$self->setSubtask($task);
+					debug "Walking towards the Airship NPC, min_npc_dist $min_npc_dist, current dist_to_npc $dist_to_npc\n", "map_route";
+						my $task = new Task::Route(
+							actor => $self->{actor},
+							x => $self->{mapSolution}[0]{pos}{x},
+							y => $self->{mapSolution}[0]{pos}{y},
+							field => $field,
+							maxTime => $self->{maxTime},
+							distFromGoal => $min_npc_dist,
+							avoidWalls => $self->{avoidWalls},
+							randomFactor => $self->{randomFactor},
+							useManhattan => $self->{useManhattan},
+							targetNpcPos => 1,
+							solution => \@solution
+						);
+						$self->{pendingNpcTalkWalk} = 1;
+						$self->setSubtask($task);
 
 				} else {
 					# Error, NPC is not reachable from current pos
@@ -280,12 +336,27 @@ sub iterate {
 			} else {
 				debug "MapRoute - last broadcast '".($self->{localBroadcast})."' matches expected message '".($self->{mapSolution}[0]{airship_message})."'\n", "route";
 				
-				if ( $self->{mapSolution}[0]{steps}) {
+					if ( $has_steps) {
 
-						if ( $self->{substage} eq 'Waiting for Warp' ) {
-							$self->{timeout} = time unless $self->{timeout};
+                if ( $self->{substage} eq 'Waiting for Airship' ) {
+                        delete $self->{substage};
+                        delete $self->{timeout};
+                        $self->setNpcTalk(force => 1);
+                        return;
 
-							if (exists $self->{mapSolution}[0]{error} || timeOut($self->{timeout}, $timeout{ai_route_npcTalk}{timeout} || 10)) {
+                } elsif ( $self->{substage} eq 'Waiting for Warp' ) {
+                        my $minApproach = $config{route_minNpcDistance} // 6;
+
+                        if ($dist_to_npc > $minApproach) {
+                                delete $self->{substage};
+                                delete $self->{timeout};
+                                $self->setNpcTalk();
+                                return;
+                        }
+
+                        $self->{timeout} = time unless $self->{timeout};
+
+                        if (exists $self->{mapSolution}[0]{error} || timeOut($self->{timeout}, $timeout{ai_route_npcTalk}{timeout} || 10)) {
 								delete $self->{substage};
 								delete $self->{timeout};
 
@@ -375,9 +446,8 @@ sub iterate {
 			}
 		}
 
-	} elsif ( $self->{mapSolution}[0]{steps} ) {
-		my $min_npc_dist = 8;
-		my $max_npc_dist = 10;
+	} elsif ( defined $self->{mapSolution}[0]{steps} && length $self->{mapSolution}[0]{steps} ) {
+                my $min_npc_dist = $config{route_minNpcDistance} // 6;
 		my $realPos = calcPosFromPathfinding($field, $self->{actor});
 		my $dist_to_npc = blockDistance($realPos, $self->{mapSolution}[0]{pos});
 		
@@ -386,10 +456,17 @@ sub iterate {
 		}
 
 		# If current solution has conversation steps specified
-		if ( $self->{substage} eq 'Waiting for Warp' ) {
-			$self->{timeout} = time unless $self->{timeout};
+                if ( $self->{substage} eq 'Waiting for Warp' ) {
+                        if ($dist_to_npc > $min_npc_dist) {
+                                delete $self->{substage};
+                                delete $self->{timeout};
+                                $self->setNpcTalk();
+                                return;
+                        }
 
-			if (exists $self->{mapSolution}[0]{error} || timeOut($self->{timeout}, $timeout{ai_route_npcTalk}{timeout} || 10)) {
+                        $self->{timeout} = time unless $self->{timeout};
+
+                        if (exists $self->{mapSolution}[0]{error} || timeOut($self->{timeout}, $timeout{ai_route_npcTalk}{timeout} || 10)) {
 				delete $self->{substage};
 				delete $self->{timeout};
 
@@ -440,7 +517,10 @@ sub iterate {
 				}
 			}
 
-		} elsif ($dist_to_npc <= $max_npc_dist) {
+		} elsif (
+			$dist_to_npc <= $min_npc_dist
+			|| canAttack($field, $realPos, $self->{mapSolution}[0]{pos}, 0, $config{clientSight} || 15, $config{clientSight} || 15) == 1
+		) {
 			my ($from,$to) = split /=/, $self->{mapSolution}[0]{portal};
 			if (($self->{actor}{zeny} >= $portals_lut{$from}{dest}{$to}{cost}) || ($char->inventory->getByNameID(7060) && $portals_lut{$from}{dest}{$to}{allow_ticket})) {
 				debug TF("[mapRoute] Calling setNpcTalk to teleport using NPC at %s (%s,%s) - dest (%s %s,%s).\n", $field->baseName, $self->{mapSolution}[0]{pos}{x}, $self->{mapSolution}[0]{pos}{y}, $self->{dest}{map}, $self->{dest}{pos}{x}, $self->{dest}{pos}{y}), "route";
@@ -466,7 +546,7 @@ sub iterate {
 			# NPC is reachable from current position
 			# >> Then "route" to it
 
-			debug "Walking towards the NPC, min_npc_dist $min_npc_dist, max_npc_dist $max_npc_dist, current dist_to_npc $dist_to_npc\n", "map_route";
+			debug "Walking towards the NPC, min_npc_dist $min_npc_dist, current dist_to_npc $dist_to_npc\n", "map_route";
 			my $task = new Task::Route(
 				actor => $self->{actor},
 				x => $self->{mapSolution}[0]{pos}{x},
@@ -477,8 +557,10 @@ sub iterate {
 				avoidWalls => $self->{avoidWalls},
 				randomFactor => $self->{randomFactor},
 				useManhattan => $self->{useManhattan},
+				targetNpcPos => 1,
 				solution => \@solution
 			);
+			$self->{pendingNpcTalkWalk} = 1;
 			$self->setSubtask($task);
 
 		} else {
@@ -662,15 +744,23 @@ sub iterate {
                                         undef $self->{mapChanged};
                                 }
 
-                                if ($self->{mapLoadPending}) {
-                                        if (timeOut($self->{mapLoadPending}, 5)) {
-                                                delete $self->{mapLoadPending};
-                                        } else {
-                                                debug "Waiting for map to finish loading before teleporting.\n", "map_route";
-                                                return;
-                                        }
+                if ($self->{mapLoadPending}) {
+                        if ($field && $self->{mapSolution}[0]{map} && $field->baseName eq $self->{mapSolution}[0]{map}) {
+                                delete $self->{mapLoadPending};
+                                delete $self->{teleportTime};
+                                delete $self->{sentTeleport};
+                        } elsif (timeOut($self->{mapLoadPending}, 5)) {
+                                delete $self->{mapLoadPending};
+                                delete $self->{teleportTime};
+                                delete $self->{sentTeleport};
+                        } else {
+                                debug "Waiting for map to finish loading before teleporting.\n", "map_route";
+                                return unless $field; # Keep waiting until at least one field packet arrives.
+                        }
 
-                                } elsif (!$self->{sentTeleport}) {
+                }
+
+                if (!$self->{sentTeleport}) {
 					# Find first inter-map portal
 					my $portal;
 					for my $x (@{$self->{mapSolution}}) {
@@ -732,6 +822,8 @@ sub iterate {
 						useManhattan => $self->{useManhattan},
 						solution => \@solution
 					);
+					$task->{teleport} = 0;
+					$task->{teleportTries} = 0;
 					$task->{$_} = $self->{$_} for qw(targetNpcPos attackID sendAttackWithMove attackOnRoute noSitAuto LOSSubRoute meetingSubRoute isRandomWalk isFollow isIdleWalk isSlaveRescue isMoveNearSlave isEscape isItemTake isItemGather isDeath isToLockMap runFromTarget);
 					$self->setSubtask($task);
 
@@ -749,17 +841,41 @@ sub iterate {
 }
 
 sub setNpcTalk {
-	my ($self) = @_;
+        my ($self, %args) = @_;
 
-	if (%talk) {
-		warning "[mapRoute] [setNpcTalk] % talk is defined for some reason.\n", "ai_npcTalk";
-	}
+        my $npcPos = $self->{mapSolution}[0]{pos};
+        my $currentPos = calcPosFromPathfinding($field, $self->{actor});
+        my $minApproach = $config{route_minNpcDistance} // 6;
+
+        if (!$args{force}
+			&& $currentPos && $npcPos && adjustedBlockDistance($currentPos, $npcPos) > $minApproach
+			&& canAttack($field, $currentPos, $npcPos, 0, $config{clientSight} || 15, $config{clientSight} || 15) != 1) {
+                my $task = new Task::Route(
+                        actor => $self->{actor},
+                        x => $npcPos->{x},
+                        y => $npcPos->{y},
+                        field => $field,
+                        distFromGoal => $minApproach,
+                        avoidWalls => $self->{avoidWalls},
+                        randomFactor => $self->{randomFactor},
+                        useManhattan => $self->{useManhattan},
+                        targetNpcPos => 1,
+                );
+                $task->{$_} = $self->{$_} for qw(targetNpcPos attackID sendAttackWithMove attackOnRoute noSitAuto LOSSubRoute meetingSubRoute isRandomWalk isFollow isIdleWalk isSlaveRescue isMoveNearSlave isEscape isItemTake isItemGather isDeath isToLockMap runFromTarget);
+                $self->{pendingNpcTalkWalk} = 1;
+                $self->setSubtask($task);
+                return;
+        }
+
+        if (%talk) {
+                warning "[mapRoute] [setNpcTalk] % talk is defined for some reason.\n", "ai_npcTalk";
+        }
 	
-	$self->{substage} = 'Waiting for Warp';
-	@{$self}{qw(old_x old_y)} = @{$self->{actor}{pos}}{qw(x y)};
-	$self->{old_map} = $field->baseName;
-	my $task = new Task::TalkNPC(
-		type => 'talknpc',
+        $self->{substage} = 'Waiting for Warp';
+        @{$self}{qw(old_x old_y)} = @{$self->{actor}{pos}}{qw(x y)};
+        $self->{old_map} = $field->baseName;
+        my $task = new Task::TalkNPC(
+                type => 'talknpc',
 		x => $self->{mapSolution}[0]{pos}{x},
 		y => $self->{mapSolution}[0]{pos}{y},
 		sequence => $self->{mapSolution}[0]{steps});
@@ -783,11 +899,29 @@ sub initMapCalculator {
 }
 
 sub subtaskDone {
-	my ($self, $task) = @_;
-	if ($task->isa('Task::CalcMapRoute')) {
-		my $error = $task->getError();
-		if ($error) {
-			my $code;
+        my ($self, $task) = @_;
+        if ($task->isa('Task::Route') && delete $self->{pendingNpcTalkWalk}) {
+                # Walked up to the NPC before starting the conversation.
+                if (my $error = $task->getError()) {
+                        $self->setError(UNKNOWN_ERROR, $error->{message});
+                } else {
+                        if ($self->{mapSolution}[0]{is_airship} && defined $self->{mapSolution}[0]{airship_message}) {
+                                if (defined $self->{localBroadcast}
+                                        && $self->{localBroadcast} =~ /$self->{mapSolution}[0]{airship_message}/) {
+                                        $self->setNpcTalk(force => 1);
+                                } else {
+                                        $self->{substage} = 'Waiting for Airship';
+                                }
+                        } else {
+                                $self->setNpcTalk(force => 1);
+                        }
+                }
+                return;
+
+        } elsif ($task->isa('Task::CalcMapRoute')) {
+                my $error = $task->getError();
+                if ($error) {
+                        my $code;
 			if ($error->{code} == Task::CalcMapRoute::CANNOT_LOAD_FIELD) {
 				$code = CANNOT_LOAD_FIELD;
 			} elsif ($error->{code} == Task::CalcMapRoute::CANNOT_CALCULATE_ROUTE) {
@@ -819,10 +953,10 @@ sub subtaskDone {
 			}
 		}
 
-	} elsif ($task->isa('Task::Route')) {
-		my $error = $task->getError();
-		if ($error) {
-			my $code;
+        } elsif ($task->isa('Task::Route')) {
+                my $error = $task->getError();
+                if ($error) {
+                        my $code;
 			if ($error->{code} == Task::Route::TOO_MUCH_TIME) {
 				$code = TOO_MUCH_TIME;
 			} elsif ($error->{code} == Task::Route::CANNOT_CALCULATE_ROUTE) {
@@ -835,7 +969,7 @@ sub subtaskDone {
 			$self->setError($code, $error->{message});
 		}
 
-	} elsif ($task->isa('Task::TalkNPC')) {
+        } elsif ($task->isa('Task::TalkNPC')) {
 		my $error = $task->getError();
 		if ($error) {
 			my $code;
@@ -852,11 +986,20 @@ sub subtaskDone {
 			}
 			$self->{mapSolution}[0]{retry}++;
 			$self->{mapSolution}[0]{error} = $error->{message};
-		}
+                }
 
-	} elsif (my $error = $task->getError()) {
-		$self->setError(UNKNOWN_ERROR, $error->{message});
-	}
+        } elsif ($task->isa('Task::Route') && delete $self->{pendingNpcTalkWalk}) {
+                # Walked up to the NPC before starting the conversation.
+                if (my $error = $task->getError()) {
+                        $self->setError(UNKNOWN_ERROR, $error->{message});
+                } else {
+                        $self->setNpcTalk();
+                }
+                return;
+
+        } elsif (my $error = $task->getError()) {
+                $self->setError(UNKNOWN_ERROR, $error->{message});
+        }
 }
 
 sub mapChanged {
@@ -865,12 +1008,16 @@ sub mapChanged {
         $self->{mapChanged} = 1;
         $self->{mapLoadPending} = { time => time, timeout => 5 };
         undef $self->{localBroadcast};
+        undef %talk;
+        delete $ai_v{'npc_talk'};
 }
 
 sub mapLoaded {
         my (undef, undef, $holder) = @_;
         my $self = $holder->[0];
         delete $self->{mapLoadPending};
+        delete $self->{sentTeleport};
+        delete $self->{teleportTime};
 }
 
 sub localBroadcast {

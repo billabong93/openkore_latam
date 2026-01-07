@@ -223,11 +223,49 @@ sub iterate {
 		debug "Map changed: " . $self->{dest}{map}->baseName . " -> " . $field->baseName . "\n", "route";
 		$self->setDone();
 
-	} elsif ($self->{mapChanged}) {
-		debug "Map reloaded; recalculating route.\n", "route";
-		undef $self->{mapChanged};
-		$self->resetRoute(1);
-	} elsif ($self->{stage} == CALCULATE_ROUTE) {
+        } elsif ($self->{mapChanged}) {
+                debug "Map reloaded; recalculating route.\n", "route";
+                # Wait until the map load event clears, otherwise we may recalc using
+                # pre-warp coordinates and incorrectly aim back at the portal entrance.
+                if ($self->{mapLoadPending}) {
+                        if ($field && $self->{dest}{map} && $field->baseName eq $self->{dest}{map}->baseName) {
+                                delete $self->{mapLoadPending};
+                        } elsif (timeOut($self->{mapLoadPending}, 5)) {
+                                delete $self->{mapLoadPending};
+                        } else {
+                                debug "Waiting for map to finish loading before recalculating.\n", "route";
+                                return;
+                        }
+                }
+
+                undef $self->{mapChanged};
+
+                my $teleported = $self->{sentTeleport} || $self->{teleportFrom};
+                my $sameMapWarp = $self->{dest}{map}->baseName eq $field->baseName
+                 && adjustedBlockDistance($self->{actor}{pos_to}, $self->{dest}{pos}) > 5;
+
+                # Teleport-induced reloads shouldn't be treated as portal completions.
+                if ($teleported) {
+                        delete $self->{sentTeleport};
+                        delete $self->{teleportTime};
+                        delete $self->{teleportFrom};
+                        $self->{route_out_time} = time;
+                } elsif ($sameMapWarp) {
+                        # If we were walking toward a portal within the same map, and the warp
+                        # already moved us far away from that portal, treat this leg as complete
+                        # so MapRoute can plan the next hop instead of recalculating back to the
+                        # portal entrance we just used.
+                        debug "Route $self->{actor} - intra-map warp detected; finishing current leg.\n", "route";
+                        $self->setDone();
+                        return;
+                }
+
+                # The map_changed hook fires even for intra-map portals, which reload the
+                # field object. Rebind the destination map to the current field instance to
+                # avoid reusing a stale map reference that cannot produce a path.
+                $self->{dest}{map} = $field if ($self->{dest}{map}->baseName eq $field->baseName);
+                $self->resetRoute(1);
+        } elsif ($self->{stage} == CALCULATE_ROUTE) {
 		my $pos = $self->{actor}{pos};
 		my $pos_to = $self->{actor}{pos_to};
 		
@@ -237,7 +275,14 @@ sub iterate {
 		
 		my $begin = time;
 
-		if (!$self->{meetingSubRoute} && !$self->{LOSSubRoute} && $pos_to->{x} == $self->{dest}{pos}{x} && $pos_to->{y} == $self->{dest}{pos}{y}) {
+		if (
+			!$self->{meetingSubRoute}
+			&& !$self->{LOSSubRoute}
+			&& !$self->{distFromGoal}
+			&& !$self->{pyDistFromGoal}
+			&& $pos_to->{x} == $self->{dest}{pos}{x}
+			&& $pos_to->{y} == $self->{dest}{pos}{y}
+		) {
 			debug "Route $self->{actor}: Current position and destination are the same.\n", "route";
 			$self->setDone();
 		
@@ -305,21 +350,25 @@ sub iterate {
 			splice(@{$solution}, 1 + $self->{maxDistance});
 		}
 
-		undef $self->{mapChanged};
-		undef $self->{step_index};
-		undef $self->{decreasing_step_index};
-		#undef $self->{last_pos};
-		#undef $self->{last_pos_to};
-		#undef $self->{start};
-		#undef $self->{confirmed_correct_vector};
-		undef $self->{last_best_pos_step};
-		undef $self->{last_best_pos_to_step};
-		undef $self->{next_pos};
-		undef $self->{time_step};
-		$self->{teleportTries} = 0;
-		delete $self->{sentTeleport};
-		delete $self->{teleportTime};
-		delete $self->{teleportFrom};
+                undef $self->{mapChanged};
+                undef $self->{step_index};
+                undef $self->{decreasing_step_index};
+                #undef $self->{last_pos};
+                #undef $self->{last_pos_to};
+                #undef $self->{start};
+                #undef $self->{confirmed_correct_vector};
+                undef $self->{last_best_pos_step};
+                undef $self->{last_best_pos_to_step};
+                undef $self->{next_pos};
+                undef $self->{time_step};
+                if ($self->{preserveTeleportTries}) {
+                        delete $self->{preserveTeleportTries};
+                } else {
+                        $self->{teleportTries} = 0;
+                }
+                delete $self->{sentTeleport};
+                delete $self->{teleportTime};
+                delete $self->{teleportFrom};
 
                 $self->{stage} = WALK_ROUTE_SOLUTION;
 
@@ -347,8 +396,16 @@ sub iterate {
                       }
 
                       if ($self->{mapLoadPending}) {
-                          if (timeOut($self->{mapLoadPending}, 5)) {
+                          if ($field && $self->{dest}{map} && $field->baseName eq $self->{dest}{map}->baseName) {
                               delete $self->{mapLoadPending};
+                              delete $self->{teleportTime};
+                              delete $self->{teleportFrom};
+                              delete $self->{sentTeleport};
+                          } elsif (timeOut($self->{mapLoadPending}, 5)) {
+                              delete $self->{mapLoadPending};
+                              delete $self->{teleportTime};
+                              delete $self->{teleportFrom};
+                              delete $self->{sentTeleport};
                           } else {
                               debug "Waiting for map to finish loading before teleporting.\n", "route";
                               return;
@@ -707,12 +764,12 @@ sub iterate {
 					if ($found) {
 						debug "[Route] [targetNpcPos] Found target npc.\n", "route";
 						if ($self->{pyDistFromGoal} || $self->{distFromGoal}) {
-							if ($self->{distFromGoal} && blockDistance($self->{dest}{pos}, $current_calc_pos) <= $self->{distFromGoal}) {
+							if ($self->{distFromGoal} && blockDistance($self->{dest}{pos}, $current_pos) <= $self->{distFromGoal}) {
 								debug "[Route] [targetNpcPos] [distFromGoal] Target npc is already close enough, ending movement.\n", "route";
 								$self->setDone();
 								return;
-								
-							} elsif ($self->{pyDistFromGoal} && distance($self->{dest}{pos}, $current_calc_pos) <= $self->{pyDistFromGoal}) {
+
+							} elsif ($self->{pyDistFromGoal} && distance($self->{dest}{pos}, $current_pos) <= $self->{pyDistFromGoal}) {
 								debug "[Route] [targetNpcPos] [pyDistFromGoal] Target npc is already close enough, ending movement.\n", "route";
 								$self->setDone();
 								return;
@@ -722,10 +779,21 @@ sub iterate {
 							$self->setDone();
 							return;
 						}
+					} elsif ($self->{pyDistFromGoal} || $self->{distFromGoal}) {
+						if ($self->{distFromGoal} && blockDistance($self->{dest}{pos}, $current_pos) <= $self->{distFromGoal}) {
+							debug "[Route] [targetNpcPos] [distFromGoal] Target npc is close enough, ending movement.\n", "route";
+							$self->setDone();
+							return;
+
+						} elsif ($self->{pyDistFromGoal} && distance($self->{dest}{pos}, $current_pos) <= $self->{pyDistFromGoal}) {
+							debug "[Route] [targetNpcPos] [pyDistFromGoal] Target npc is close enough, ending movement.\n", "route";
+							$self->setDone();
+							return;
+						}
 					}
 					
 				} elsif ($self->{pyDistFromGoal} || $self->{distFromGoal}) {
-					if ($self->{distFromGoal} && blockDistance($self->{dest}{pos}, $current_calc_pos) <= $self->{distFromGoal}) {
+					if ($self->{distFromGoal} && blockDistance($self->{dest}{pos}, $current_pos) <= $self->{distFromGoal}) {
 						debug "[Route] [distFromGoal] Target cell is already close enough, ending movement.\n", "route";
 						$self->setDone();
 						return;
@@ -745,6 +813,15 @@ sub iterate {
 				
 				if (!$self->{start} && $current_pos_to->{x} == $self->{next_pos}{x} && $current_pos_to->{y} == $self->{next_pos}{y}) {
 					debug "[Route] Not sending next step ($self->{next_pos}{x}, $self->{next_pos}{y}) because our pos_to is the same as it.\n", "route";
+					if ($current_calc_pos->{x} == $self->{next_pos}{x} && $current_calc_pos->{y} == $self->{next_pos}{y}) {
+						if ($self->{step_index} < $#{$solution}) {
+							$self->{step_index}++;
+							$self->{start} = 1;
+						} else {
+							Plugins::callHook('route', {status => 'success'});
+							$self->setDone();
+						}
+					}
 					if ($self->{lastStep} == 1 && !$self->{sendAttackWithMove} && $self->{meetingSubRoute}) {
 						debug "[Route] Also ending task now ang giving back control to AI::Attack.\n", "route";
 						Plugins::callHook('route', {status => 'success'});
@@ -808,6 +885,7 @@ sub resetRoute {
         my ($self, $preserveTeleportTries) = @_;
         $self->{solution} = [];
         $self->{stage} = CALCULATE_ROUTE;
+        $self->{preserveTeleportTries} = 1 if $preserveTeleportTries;
         $self->{teleportTries} = 0 unless $preserveTeleportTries;
 }
 
