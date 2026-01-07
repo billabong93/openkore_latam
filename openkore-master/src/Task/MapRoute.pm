@@ -169,51 +169,61 @@ sub iterate {
 		$self->initMapCalculator();
 
 	} elsif (@{$self->{mapSolution}} == 0) {
-		$self->setDone();
-		debug "Map Router has finished traversing the map solution\n", "map_route";
+			$self->setDone();
+			debug "Map Router has finished traversing the map solution\n", "map_route";
 
-        } elsif ($self->{mapChanged} && $self->{mapSolution}[0]{portal}) {
-                # We reloaded the map while following a portal leg. If the warp already
-                # placed us near the portal's destination, advance to the next hop instead
-                # of recalculating back to the entrance we just used.
-                my ($from, $to) = split /=/, $self->{mapSolution}[0]{portal};
-                my ($from_map) = split / /, $from;
-                my ($to_map) = split / /, $to;
-                my $dest = $self->{mapSolution}[0]{dest_pos}
-                        || $portals_lut{$from}{dest}{$to}
-                        || ($portals_lut{$to} && $portals_lut{$to}{source});
+	} elsif ($self->{mapChanged} && $self->{mapSolution}[0]{is_teleportToSaveMap}) {
+			# Recalculate from the actual warp position to pick the closest NPC route.
+			debug TF("MapRoute - recalculating route after teleportToSaveMap on %s.\n", $field->baseName), "map_route";
+			delete $self->{substage};
+			delete $self->{mapChanged};
+			delete $self->{mapLoadPending};
+			$self->{mapSolution} = undef;
+			$self->initMapCalculator();
+			return;
 
-                if ($from_map && $to_map && $from_map eq $to_map && $from_map eq $field->baseName) {
-                        debug TF("Route %s - intra-map portal completed on reload; skipping to next step.\n", $self->{actor}), "route";
-                        delete $self->{mapChanged};
-                        delete $self->{mapLoadPending};
-                        delete $self->{teleportTime};
-                        delete $self->{sentTeleport};
-                        shift @{$self->{mapSolution}};
-                        return;
-                }
+	} elsif ($self->{mapChanged} && $self->{mapSolution}[0]{portal}) {
+			# We reloaded the map while following a portal leg. If the warp already
+			# placed us near the portal's destination, advance to the next hop instead
+			# of recalculating back to the entrance we just used.
+			my ($from, $to) = split /=/, $self->{mapSolution}[0]{portal};
+			my ($from_map) = split / /, $from;
+			my ($to_map) = split / /, $to;
+			my $dest = $self->{mapSolution}[0]{dest_pos}
+					|| $portals_lut{$from}{dest}{$to}
+					|| ($portals_lut{$to} && $portals_lut{$to}{source});
 
-                if ($dest && $dest->{map} eq $field->baseName) {
-                        my $pos = $self->{actor}{pos};
-                        my $dist = blockDistance($pos, $dest);
-                        if ($dist <= 5) {
-                                debug TF("Route %s - intra-map portal completed on reload; skipping to next step.\n", $self->{actor}), "route";
-                                delete $self->{mapChanged};
-                                delete $self->{mapLoadPending};
-                                delete $self->{teleportTime};
-                                delete $self->{sentTeleport};
-                                shift @{$self->{mapSolution}};
-                                return;
-                        }
-                }
+			if ($from_map && $to_map && $from_map eq $to_map && $from_map eq $field->baseName) {
+					debug TF("Route %s - intra-map portal completed on reload; skipping to next step.\n", $self->{actor}), "route";
+					delete $self->{mapChanged};
+					delete $self->{mapLoadPending};
+					delete $self->{teleportTime};
+					delete $self->{sentTeleport};
+					shift @{$self->{mapSolution}};
+					return;
+			}
 
-                # If the reload dropped us elsewhere on the same map, clear the flag so
-                # normal traversal logic can continue with fresh distance checks.
-                delete $self->{mapChanged};
-                delete $self->{mapLoadPending};
-                delete $self->{teleportTime};
-                delete $self->{sentTeleport};
-                return;
+			if ($dest && $dest->{map} eq $field->baseName) {
+					my $pos = $self->{actor}{pos};
+					my $dist = blockDistance($pos, $dest);
+					if ($dist <= 5) {
+							debug TF("Route %s - intra-map portal completed on reload; skipping to next step.\n", $self->{actor}), "route";
+							delete $self->{mapChanged};
+							delete $self->{mapLoadPending};
+							delete $self->{teleportTime};
+							delete $self->{sentTeleport};
+							shift @{$self->{mapSolution}};
+							return;
+					}
+			}
+
+			# If the reload dropped us elsewhere on the same map, clear the flag so
+			# normal traversal logic can continue with fresh distance checks.
+			delete $self->{mapChanged};
+			delete $self->{mapLoadPending};
+			delete $self->{teleportTime};
+			delete $self->{sentTeleport};
+			return;
 
         } elsif ( $field->baseName ne $self->{mapSolution}[0]{map}
              || ( $self->{mapChanged} && !$self->{teleport} ) ) {
