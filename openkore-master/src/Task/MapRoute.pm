@@ -269,7 +269,7 @@ sub iterate {
 		if (!$self->{timeout} || timeOut($self->{timeout}, 0.5)) {
 			$self->{timeout} = time;
 			
-                my $min_npc_dist = $config{npc_talk_route_distance} // 6;
+                my $min_npc_dist = $config{route_minNpcDistance} // 6;
 			my $realPos = calcPosFromPathfinding($field, $self->{actor});
 			my $dist_to_npc = blockDistance($realPos, $self->{mapSolution}[0]{pos});
 
@@ -323,7 +323,7 @@ sub iterate {
 				if ( $self->{mapSolution}[0]{steps}) {
 
                 if ( $self->{substage} eq 'Waiting for Warp' ) {
-                        my $minApproach = $config{npc_talk_route_distance} // 6;
+                        my $minApproach = $config{route_minNpcDistance} // 6;
 
                         if ($dist_to_npc > $minApproach) {
                                 delete $self->{substage};
@@ -425,7 +425,7 @@ sub iterate {
 		}
 
 	} elsif ( $self->{mapSolution}[0]{steps} ) {
-                my $min_npc_dist = $config{npc_talk_route_distance} // 6;
+                my $min_npc_dist = $config{route_minNpcDistance} // 6;
 		my $realPos = calcPosFromPathfinding($field, $self->{actor});
 		my $dist_to_npc = blockDistance($realPos, $self->{mapSolution}[0]{pos});
 		
@@ -816,7 +816,7 @@ sub setNpcTalk {
 
         my $npcPos = $self->{mapSolution}[0]{pos};
         my $currentPos = $self->{actor}{pos_to} || calcPosFromPathfinding($field, $self->{actor});
-        my $minApproach = $config{npc_talk_route_distance} // 6;
+        my $minApproach = $config{route_minNpcDistance} // 6;
 
         if ($currentPos && $npcPos && adjustedBlockDistance($currentPos, $npcPos) > $minApproach) {
                 my $task = new Task::Route(
