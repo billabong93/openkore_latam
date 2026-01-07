@@ -135,7 +135,7 @@ sub processChatCommand {
 			sendMessage($messageSender, $type, getResponse("confF2"), $user) if $config{verbose};
 
 		} elsif ($args[1] eq "") {
-			if (lc($args[0]) eq "username" || lc($args[0] eq "password")) {
+			if (lc($args[0]) eq "username" || lc($args[0]) eq "password") {
 				sendMessage($messageSender, $type, getResponse("confF3"), $user) if $config{verbose};
 			} else {
 				$vars->{key} = $args[0];
