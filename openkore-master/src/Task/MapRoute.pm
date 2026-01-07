@@ -29,7 +29,7 @@ use Log qw(message debug warning error);
 use Network;
 use Plugins;
 use Misc qw(canUseTeleport portalExists);
-use Utils qw(timeOut blockDistance adjustedBlockDistance existsInList calcPosFromPathfinding);
+use Utils qw(timeOut blockDistance adjustedBlockDistance existsInList calcPosFromPathfinding canAttack);
 use Utils::PathFinding;
 use Utils::Exceptions;
 use AI qw(ai_useTeleport);
@@ -495,7 +495,10 @@ sub iterate {
 				}
 			}
 
-		} elsif ($dist_to_npc <= $min_npc_dist || $field->checkLOS($realPos, $self->{mapSolution}[0]{pos})) {
+		} elsif (
+			$dist_to_npc <= $min_npc_dist
+			|| canAttack($field, $realPos, $self->{mapSolution}[0]{pos}, 0, $config{clientSight} || 15, $config{clientSight} || 15) == 1
+		) {
 			my ($from,$to) = split /=/, $self->{mapSolution}[0]{portal};
 			if (($self->{actor}{zeny} >= $portals_lut{$from}{dest}{$to}{cost}) || ($char->inventory->getByNameID(7060) && $portals_lut{$from}{dest}{$to}{allow_ticket})) {
 				debug TF("[mapRoute] Calling setNpcTalk to teleport using NPC at %s (%s,%s) - dest (%s %s,%s).\n", $field->baseName, $self->{mapSolution}[0]{pos}{x}, $self->{mapSolution}[0]{pos}{y}, $self->{dest}{map}, $self->{dest}{pos}{x}, $self->{dest}{pos}{y}), "route";
@@ -819,7 +822,7 @@ sub setNpcTalk {
         my $minApproach = $config{route_minNpcDistance} // 6;
 
         if ($currentPos && $npcPos && adjustedBlockDistance($currentPos, $npcPos) > $minApproach
-			&& !$field->checkLOS($currentPos, $npcPos)) {
+			&& canAttack($field, $currentPos, $npcPos, 0, $config{clientSight} || 15, $config{clientSight} || 15) != 1) {
                 my $task = new Task::Route(
                         actor => $self->{actor},
                         x => $npcPos->{x},
