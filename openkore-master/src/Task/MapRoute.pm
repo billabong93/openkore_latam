@@ -277,6 +277,10 @@ sub iterate {
 
 	} elsif ( $self->{mapSolution}[0]{is_airship} ) {
 		my $has_steps = defined $self->{mapSolution}[0]{steps};
+		if (!defined $self->{airshipBroadcastResetFor} || $self->{airshipBroadcastResetFor} ne $self->{mapSolution}[0]{portal}) {
+			undef $self->{localBroadcast};
+			$self->{airshipBroadcastResetFor} = $self->{mapSolution}[0]{portal};
+		}
 		if (!$self->{timeout} || timeOut($self->{timeout}, 0.5)) {
 			$self->{timeout} = time;
 			
@@ -332,9 +336,15 @@ sub iterate {
 			} else {
 				debug "MapRoute - last broadcast '".($self->{localBroadcast})."' matches expected message '".($self->{mapSolution}[0]{airship_message})."'\n", "route";
 				
-				if ( $has_steps) {
+					if ( $has_steps) {
 
-                if ( $self->{substage} eq 'Waiting for Warp' ) {
+                if ( $self->{substage} eq 'Waiting for Airship' ) {
+                        delete $self->{substage};
+                        delete $self->{timeout};
+                        $self->setNpcTalk(force => 1);
+                        return;
+
+                } elsif ( $self->{substage} eq 'Waiting for Warp' ) {
                         my $minApproach = $config{route_minNpcDistance} // 6;
 
                         if ($dist_to_npc > $minApproach) {
@@ -895,7 +905,16 @@ sub subtaskDone {
                 if (my $error = $task->getError()) {
                         $self->setError(UNKNOWN_ERROR, $error->{message});
                 } else {
-                        $self->setNpcTalk(force => 1);
+                        if ($self->{mapSolution}[0]{is_airship} && defined $self->{mapSolution}[0]{airship_message}) {
+                                if (defined $self->{localBroadcast}
+                                        && $self->{localBroadcast} =~ /$self->{mapSolution}[0]{airship_message}/) {
+                                        $self->setNpcTalk(force => 1);
+                                } else {
+                                        $self->{substage} = 'Waiting for Airship';
+                                }
+                        } else {
+                                $self->setNpcTalk(force => 1);
+                        }
                 }
                 return;
 
