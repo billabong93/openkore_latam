@@ -818,7 +818,8 @@ sub setNpcTalk {
         my $currentPos = $self->{actor}{pos_to} || calcPosFromPathfinding($field, $self->{actor});
         my $minApproach = $config{route_minNpcDistance} // 6;
 
-        if ($currentPos && $npcPos && adjustedBlockDistance($currentPos, $npcPos) > $minApproach) {
+        if ($currentPos && $npcPos && adjustedBlockDistance($currentPos, $npcPos) > $minApproach
+			&& !$field->checkLOS($currentPos, $npcPos)) {
                 my $task = new Task::Route(
                         actor => $self->{actor},
                         x => $npcPos->{x},
