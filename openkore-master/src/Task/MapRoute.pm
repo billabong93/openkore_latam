@@ -824,9 +824,11 @@ sub setNpcTalk {
                         x => $npcPos->{x},
                         y => $npcPos->{y},
                         field => $field,
+                        distFromGoal => $minApproach,
                         avoidWalls => $self->{avoidWalls},
                         randomFactor => $self->{randomFactor},
                         useManhattan => $self->{useManhattan},
+                        targetNpcPos => 1,
                 );
                 $task->{$_} = $self->{$_} for qw(targetNpcPos attackID sendAttackWithMove attackOnRoute noSitAuto LOSSubRoute meetingSubRoute isRandomWalk isFollow isIdleWalk isSlaveRescue isMoveNearSlave isEscape isItemTake isItemGather isDeath isToLockMap runFromTarget);
                 $self->{pendingNpcTalkWalk} = 1;
