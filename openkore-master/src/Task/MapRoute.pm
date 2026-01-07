@@ -812,6 +812,8 @@ sub iterate {
 						useManhattan => $self->{useManhattan},
 						solution => \@solution
 					);
+					$task->{teleport} = 0;
+					$task->{teleportTries} = 0;
 					$task->{$_} = $self->{$_} for qw(targetNpcPos attackID sendAttackWithMove attackOnRoute noSitAuto LOSSubRoute meetingSubRoute isRandomWalk isFollow isIdleWalk isSlaveRescue isMoveNearSlave isEscape isItemTake isItemGather isDeath isToLockMap runFromTarget);
 					$self->setSubtask($task);
 
