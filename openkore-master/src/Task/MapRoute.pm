@@ -426,7 +426,7 @@ sub iterate {
 
 	} elsif ( $self->{mapSolution}[0]{steps} ) {
                 my $min_npc_dist = $config{route_minNpcDistance} // 6;
-		my $realPos = calcPosFromPathfinding($field, $self->{actor});
+		my $realPos = $self->{actor}{pos};
 		my $dist_to_npc = blockDistance($realPos, $self->{mapSolution}[0]{pos});
 		
 		if (!exists $self->{mapSolution}[0]{retry} || !defined $self->{mapSolution}[0]{retry}) {
@@ -818,7 +818,7 @@ sub setNpcTalk {
         my ($self) = @_;
 
         my $npcPos = $self->{mapSolution}[0]{pos};
-        my $currentPos = $self->{actor}{pos_to} || calcPosFromPathfinding($field, $self->{actor});
+        my $currentPos = $self->{actor}{pos};
         my $minApproach = $config{route_minNpcDistance} // 6;
 
         if ($currentPos && $npcPos && adjustedBlockDistance($currentPos, $npcPos) > $minApproach
