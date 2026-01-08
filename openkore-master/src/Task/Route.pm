@@ -416,6 +416,7 @@ sub iterate {
                               delete $self->{sentTeleport};
                               delete $self->{teleportTime};
                               delete $self->{teleportFrom};
+							  delete $self->{teleportFailTimeout};
                               $self->{route_out_time} = time;
                               $self->resetRoute(1);
                               return;
@@ -425,6 +426,7 @@ sub iterate {
                                       $self->{teleport} = 0;
                               } else {
                                       debug "Teleport attempt timed out without movement; retrying.\n", "route";
+									  $self->{teleportFailTimeout} = 1;
                                       delete $self->{sentTeleport};
                                       delete $self->{teleportTime};
                                       delete $self->{teleportFrom};
@@ -665,7 +667,9 @@ sub iterate {
 			# recalculate again
 			debug "We are out of our route for a long time, recalculating...\n", "route";
 			$self->{route_out_time} = time;
-			$self->resetRoute();
+			my $preserve_teleport = ($self->{teleportFailTimeout} || $self->{teleportTries}) ? 1 : 0;
+			delete $self->{teleportFailTimeout} if $preserve_teleport;
+			$self->resetRoute($preserve_teleport);
 		} elsif (!$self->{start} && $pos_changed == 0 && defined $self->{time_step} && timeOut($self->{time_step}, $timeout{ai_route_unstuck}{timeout})) {
 			# We tried to move for 3 seconds, but we are still on the same spot, decrease step size.
 			# However, if $self->{step_index} was already 0, then that means we were almost at the destination (only 1 more step is needed).
