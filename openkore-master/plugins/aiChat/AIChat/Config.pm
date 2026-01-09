@@ -17,6 +17,7 @@ use constant {
     DEFAULT_MAX_TOKENS => 150,
     DEFAULT_TEMPERATURE => 0.6,
     DEFAULT_TYPING_SPEED => 20, # Caracteres por segundo (para simular digitação)
+    DEFAULT_SPLIT_CHANCE => 0.2, # Chance de dividir resposta em duas mensagens
 };
 
 # Use a lexically scoped variable for the package's internal config
@@ -30,6 +31,7 @@ my %_file_key_map = (
     aiChat_max_tokens => 'max_tokens',
     aiChat_temperature => 'temperature',
     aiChat_typing_speed => 'typing_speed',
+    aiChat_split_chance => 'split_chance',
 );
 
 sub _configFilePath {
@@ -47,6 +49,7 @@ sub _loadFromConfigHash {
         'aiChat_max_tokens',
         'aiChat_temperature',
         'aiChat_typing_speed',
+        'aiChat_split_chance',
     );
 
     for my $file_key (@load_order) {
@@ -74,6 +77,9 @@ sub _applyValue {
         return unless $value =~ /^\d+$/;
     } elsif ($key eq 'temperature') {
         return unless $value =~ /^-?\d+(?:\.\d+)?$/;
+    } elsif ($key eq 'split_chance') {
+        return unless $value =~ /^-?\d+(?:\.\d+)?$/;
+        return if $value < 0 || $value > 1;
     }
 
     $_aiChatConfig{$key} = $value;
@@ -90,6 +96,7 @@ BEGIN {
         max_tokens => DEFAULT_MAX_TOKENS,
         temperature => DEFAULT_TEMPERATURE,
         typing_speed => DEFAULT_TYPING_SPEED,
+        split_chance => DEFAULT_SPLIT_CHANCE,
     );
 }
 
@@ -124,6 +131,7 @@ sub save {
     print $fh "aiChat_max_tokens $_aiChatConfig{max_tokens}\n";
     print $fh "aiChat_temperature $_aiChatConfig{temperature}\n";
     print $fh "aiChat_typing_speed $_aiChatConfig{typing_speed}\n";
+    print $fh "aiChat_split_chance $_aiChatConfig{split_chance}\n";
     close $fh or warning "[aiChat] Não foi possível fechar $config_file: $!\n", "plugin";
 }
 

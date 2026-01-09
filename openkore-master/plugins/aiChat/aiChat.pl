@@ -146,6 +146,7 @@ sub onCommand {
         message "Prompt: " . AIChat::Config::get('prompt'), "list";
         message "Max Tokens: " . AIChat::Config::get('max_tokens'), "list";
         message "Temperatura: " . AIChat::Config::get('temperature'), "list";
+        message "Chance de dividir resposta: " . AIChat::Config::get('split_chance'), "list";
     } elsif ($arg =~ /^provider\s+(openai|deepseek)$/) {
         if (AIChat::Config::set('provider', $1)) {
             message $translator->translatef("%s Provedor alterado para %s\n", PLUGIN_PREFIX, $1), "list";

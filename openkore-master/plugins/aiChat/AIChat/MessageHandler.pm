@@ -60,7 +60,8 @@ sub getCharacterInfo {
 sub _splitResponse {
     my ($response) = @_;
     my @parts;
-    my $split_chance = 0.2;
+    my $split_chance = AIChat::Config::get('split_chance');
+    $split_chance = 0.2 unless defined $split_chance;
 
     if ($response =~ /\|\|/) {
         @parts = split /\s*\|\|\s*/, $response;
@@ -70,16 +71,33 @@ sub _splitResponse {
             my ($first, $second);
             if ($response =~ /(.+?[.!?])\s+(.+)/s) {
                 ($first, $second) = ($1, $2);
-            } elsif ($response =~ /(.+?,\s*[^,]+?)\s+(e\s+.+)/i) {
+            } elsif ($response =~ /(.+?,)\s+(.+)/s) {
                 ($first, $second) = ($1, $2);
-            } elsif ($response =~ /(.+?)\s+(e\s+.+)/i) {
-                ($first, $second) = ($1, $2);
+            } else {
+                my $best_split;
+                my $middle = length($response) / 2;
+                while ($response =~ /\s+(e|mas|pq|porque|entao|então|so|da[ií])\s+/gi) {
+                    my $split_start = $-[0];
+                    my $candidate = substr($response, 0, $split_start);
+                    my $remainder = substr($response, $split_start + 1);
+                    next unless _wordCount($candidate) >= 2 && _wordCount($remainder) >= 2;
+                    my $distance = abs($split_start - $middle);
+                    if (!$best_split || $distance < $best_split->{distance}) {
+                        $best_split = {
+                            first => $candidate,
+                            second => $remainder,
+                            distance => $distance,
+                        };
+                    }
+                }
+
+                if ($best_split) {
+                    ($first, $second) = @{$best_split}{qw(first second)};
+                }
             }
 
             if (defined $first && defined $second) {
-                my $first_words = scalar grep { length } split /\s+/, $first;
-                my $second_words = scalar grep { length } split /\s+/, $second;
-                if ($first_words >= 2 && $second_words >= 2) {
+                if (_wordCount($first) >= 2 && _wordCount($second) >= 2) {
                     @parts = ($first, $second);
                 }
             }
@@ -104,6 +122,13 @@ sub _splitResponse {
 
     return \@parts if @parts;
     return [$response];
+}
+
+sub _wordCount {
+    my ($text) = @_;
+    return 0 unless defined $text;
+    my @words = grep { length } split /\s+/, $text;
+    return scalar @words;
 }
 
 sub processMessage {
