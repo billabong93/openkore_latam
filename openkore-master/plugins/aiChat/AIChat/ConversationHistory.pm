@@ -25,7 +25,7 @@ my %conversation_history;
 use constant MAX_HISTORY => 10;
 
 sub addMessage {
-    my ($player, $role, $content) = @_;
+    my ($player, $role, $content, $type) = @_;
     
     # Inicializa o histórico do jogador se não existir
     my $key = _historyKey($player);
@@ -34,10 +34,12 @@ sub addMessage {
     }
     
     # Adiciona a nova mensagem
-    push @{$conversation_history{$key}}, {
+    my $entry = {
         role => $role,
-        content => $content
+        content => $content,
     };
+    $entry->{type} = $type if defined $type;
+    push @{$conversation_history{$key}}, $entry;
     
     # Mantém apenas as últimas MAX_HISTORY mensagens
     if (scalar @{$conversation_history{$key}} > MAX_HISTORY) {

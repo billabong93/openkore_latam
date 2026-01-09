@@ -167,10 +167,6 @@ sub processMessages {
     return undef unless defined $response && length $response > 0;
 
     my $parts = _splitResponse($response);
-    for my $part (@$parts) {
-        AIChat::ConversationHistory::addMessage($sender, "assistant", $part);
-    }
-
     return $parts;
 }
 

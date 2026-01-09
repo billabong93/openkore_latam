@@ -17,6 +17,7 @@ use lib $Plugins::current_plugin_folder;
 use AIChat::Config;
 use AIChat::APIClient;
 use AIChat::MessageHandler;
+use AIChat::ConversationHistory;
 use AIChat::HookManager;
 
 use constant {
@@ -71,7 +72,10 @@ sub _enqueueMessage {
     my $buffer_delay = AIChat::Config::get('buffer_delay');
     $buffer_delay = 2 unless defined $buffer_delay;
     $state->{buffer_deadline} = time() + $buffer_delay;
-    $state->{response_queue} = [] if @{$state->{response_queue}};
+    if (@{$state->{response_queue}}) {
+        $state->{response_queue} = [];
+        $state->{typing_until} = 0;
+    }
 
     if ($state->{typing_until} && $state->{typing_until} < $state->{buffer_deadline}) {
         $state->{typing_until} = $state->{buffer_deadline};
@@ -97,7 +101,19 @@ sub _sendQueuedResponse {
     return unless @{$state->{response_queue}};
     return if $state->{buffer_deadline} && time() < $state->{buffer_deadline};
 
-    my $response = shift @{$state->{response_queue}};
+    my $response = $state->{response_queue}[0];
+    if (!$state->{typing_until}) {
+        my $typing_speed = AIChat::Config::get('typing_speed');
+        my $delay = 0;
+        if ($typing_speed && $typing_speed > 0) {
+            $delay = length($response) / $typing_speed;
+        }
+        $state->{typing_until} = time() + $delay;
+    }
+
+    return if $state->{typing_until} && time() < $state->{typing_until};
+
+    $response = shift @{$state->{response_queue}};
     my $context = $state->{context} || {};
     if ($context->{type} && $context->{type} eq 'public') {
         $messageSender->sendChat($response);
@@ -105,13 +121,8 @@ sub _sendQueuedResponse {
         $messageSender->sendPrivateMsg($sender, $response);
     }
 
-    my $typing_speed = AIChat::Config::get('typing_speed');
-    if ($typing_speed && $typing_speed > 0) {
-        my $delay = length($response) / $typing_speed;
-        $state->{typing_until} = time() + $delay;
-    } else {
-        $state->{typing_until} = time();
-    }
+    AIChat::ConversationHistory::addMessage($sender, "assistant", $response);
+    $state->{typing_until} = 0;
 }
 
 sub onTick {
