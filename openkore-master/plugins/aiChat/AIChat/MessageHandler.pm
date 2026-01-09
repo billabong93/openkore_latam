@@ -60,16 +60,28 @@ sub getCharacterInfo {
 sub _splitResponse {
     my ($response) = @_;
     my @parts;
+    my $split_chance = 0.2;
 
     if ($response =~ /\|\|/) {
         @parts = split /\s*\|\|\s*/, $response;
     } else {
         $response =~ s/\s*\r?\n\s*/ /g;
-        if (rand() < 0.2) {
-            if ($response =~ /(.+?)\s*(?:,| e )\s+(.+)/i) {
-                @parts = ($1, $2);
-            } elsif (length($response) >= 40 && $response =~ /(.+?[.!?])\s+(.+)/s) {
-                @parts = ($1, $2);
+        if (rand() < $split_chance) {
+            my ($first, $second);
+            if ($response =~ /(.+?[.!?])\s+(.+)/s) {
+                ($first, $second) = ($1, $2);
+            } elsif ($response =~ /(.+?,\s*[^,]+?)\s+(e\s+.+)/i) {
+                ($first, $second) = ($1, $2);
+            } elsif ($response =~ /(.+?)\s+(e\s+.+)/i) {
+                ($first, $second) = ($1, $2);
+            }
+
+            if (defined $first && defined $second) {
+                my $first_words = scalar grep { length } split /\s+/, $first;
+                my $second_words = scalar grep { length } split /\s+/, $second;
+                if ($first_words >= 2 && $second_words >= 2) {
+                    @parts = ($first, $second);
+                }
             }
         }
     }
