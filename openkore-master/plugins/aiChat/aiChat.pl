@@ -259,6 +259,7 @@ sub onCommand {
         message "Temperatura: " . AIChat::Config::get('temperature'), "list";
         message "Chance de dividir resposta: " . AIChat::Config::get('split_chance'), "list";
         message "Delay do buffer: " . AIChat::Config::get('buffer_delay'), "list";
+        message "Responder no chat publico no lockMap: " . AIChat::Config::get('public_on_lockmap'), "list";
     } elsif ($arg =~ /^provider\s+(openai|deepseek)$/) {
         if (AIChat::Config::set('provider', $1)) {
             message $translator->translatef("%s Provedor alterado para %s\n", PLUGIN_PREFIX, $1), "list";
@@ -288,6 +289,9 @@ sub onPrivateMessage {
 sub onPublicMessage {
     my (undef, $args) = @_;
     return unless defined $field && ($field->baseName // '') eq 'sec_pri';
+    if ($config{lockMap} && !AIChat::Config::get('public_on_lockmap')) {
+        return;
+    }
 
     my $sender = bytesToString($args->{pubMsgUser} || $args->{MsgUser});
     my $message = bytesToString($args->{pubMsg} || $args->{Msg});
