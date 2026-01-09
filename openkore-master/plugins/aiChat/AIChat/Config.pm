@@ -3,9 +3,10 @@ package AIChat::Config;
 use strict;
 use warnings;
 
-use Globals qw(%config);
-use Settings qw(%sys);
 use Log qw(warning message debug);
+use File::Spec;
+use FileParsers;
+use Plugins ();
 
 use constant {
     DEFAULT_API_KEY => "",
@@ -19,6 +20,43 @@ use constant {
 
 # Use a lexically scoped variable for the package's internal config
 my %_aiChatConfig;
+my %_file_key_map = (
+    aiChat_provider => 'provider',
+    aiChat_api_key => 'api_key',
+    aiChat_model => 'model',
+    aiChat_prompt => 'prompt',
+    aiChat_max_tokens => 'max_tokens',
+    aiChat_temperature => 'temperature',
+    aiChat_typing_speed => 'typing_speed',
+);
+
+sub _configFilePath {
+    my $base = $Plugins::current_plugin_folder || File::Spec->catdir("plugins", "aiChat");
+    return File::Spec->catfile($base, "config.txt");
+}
+
+sub _applyValue {
+    my ($key, $value) = @_;
+    return unless exists $_aiChatConfig{$key};
+
+    if ($key eq 'provider') {
+        return unless $value =~ /^(openai|deepseek)$/;
+        if ($value eq 'openai') {
+            $_aiChatConfig{model} = 'gpt-3.5-turbo';
+        } else {
+            $_aiChatConfig{model} = 'deepseek-chat';
+        }
+    } elsif ($key eq 'typing_speed') {
+        return unless $value =~ /^\d+$/;
+    } elsif ($key eq 'max_tokens') {
+        return unless $value =~ /^\d+$/;
+    } elsif ($key eq 'temperature') {
+        return unless $value =~ /^-?\d+(?:\.\d+)?$/;
+    }
+
+    $_aiChatConfig{$key} = $value;
+    return 1;
+}
 
 # Initialize internal config with defaults
 BEGIN {
@@ -34,43 +72,45 @@ BEGIN {
 }
 
 sub load {
-    # Carrega configurações do arquivo de configuração do OpenKore
-    # Read from global %config into our internal %_aiChatConfig
-    if (exists $config{aiChat_provider} && defined $config{aiChat_provider}) {
-        $_aiChatConfig{provider} = $config{aiChat_provider};
-    }
-    if (exists $config{aiChat_api_key} && defined $config{aiChat_api_key}) {
-        $_aiChatConfig{api_key} = $config{aiChat_api_key};
-    }
-    if (exists $config{aiChat_model} && defined $config{aiChat_model}) {
-        $_aiChatConfig{model} = $config{aiChat_model};
-    }
-    if (exists $config{aiChat_prompt} && defined $config{aiChat_prompt}) {
-        $_aiChatConfig{prompt} = $config{aiChat_prompt};
-    }
-    if (exists $config{aiChat_max_tokens} && defined $config{aiChat_max_tokens}) {
-        $_aiChatConfig{max_tokens} = $config{aiChat_max_tokens};
-    }
-    if (exists $config{aiChat_temperature} && defined $config{aiChat_temperature}) {
-        $_aiChatConfig{temperature} = $config{aiChat_temperature};
-    }
-    if (exists $config{aiChat_typing_speed} && defined $config{aiChat_typing_speed}) {
-        $_aiChatConfig{typing_speed} = $config{aiChat_typing_speed};
+    my $config_file = _configFilePath();
+    return unless -f $config_file;
+
+    my %file_config;
+    return unless FileParsers::parseConfigFile($config_file, \%file_config, 1);
+
+    my @load_order = (
+        'aiChat_provider',
+        'aiChat_model',
+        'aiChat_api_key',
+        'aiChat_prompt',
+        'aiChat_max_tokens',
+        'aiChat_temperature',
+        'aiChat_typing_speed',
+    );
+
+    for my $file_key (@load_order) {
+        next unless exists $file_config{$file_key};
+        my $internal_key = $_file_key_map{$file_key};
+        next unless $internal_key;
+        _applyValue($internal_key, $file_config{$file_key});
     }
 }
 
 sub save {
-    # Salva configurações no arquivo de configuração do OpenKore
-    # Write from our internal %_aiChatConfig to global %config
-    $config{aiChat_provider} = $_aiChatConfig{provider};
-    $config{aiChat_api_key} = $_aiChatConfig{api_key};
-    $config{aiChat_model} = $_aiChatConfig{model};
-    $config{aiChat_prompt} = $_aiChatConfig{prompt};
-    $config{aiChat_max_tokens} = $_aiChatConfig{max_tokens};
-    $config{aiChat_temperature} = $_aiChatConfig{temperature};
-    $config{aiChat_typing_speed} = $_aiChatConfig{typing_speed};
-    # Salva as configurações no arquivo
-    Settings::writeFile();
+    my $config_file = _configFilePath();
+    open my $fh, '>', $config_file or do {
+        warning "[aiChat] Não foi possível salvar $config_file: $!\n", "plugin";
+        return;
+    };
+
+    print $fh "aiChat_provider $_aiChatConfig{provider}\n";
+    print $fh "aiChat_api_key $_aiChatConfig{api_key}\n";
+    print $fh "aiChat_model $_aiChatConfig{model}\n";
+    print $fh "aiChat_prompt $_aiChatConfig{prompt}\n";
+    print $fh "aiChat_max_tokens $_aiChatConfig{max_tokens}\n";
+    print $fh "aiChat_temperature $_aiChatConfig{temperature}\n";
+    print $fh "aiChat_typing_speed $_aiChatConfig{typing_speed}\n";
+    close $fh or warning "[aiChat] Não foi possível fechar $config_file: $!\n", "plugin";
 }
 
 sub get {
@@ -80,22 +120,7 @@ sub get {
 
 sub set {
     my ($key, $value) = @_;
-    return unless exists $_aiChatConfig{$key};
-    
-    # Validação específica para provider
-    if ($key eq 'provider') {
-        return unless $value =~ /^(openai|deepseek)$/;
-        # Atualiza o modelo padrão baseado no provider
-        if ($value eq 'openai') {
-            $_aiChatConfig{model} = 'gpt-3.5-turbo';
-        } else {
-            $_aiChatConfig{model} = 'deepseek-chat';
-        }
-    } elsif ($key eq 'typing_speed') {
-        return unless $value =~ /^\d+$/; # Deve ser um número inteiro
-    }
-    
-    $_aiChatConfig{$key} = $value;
+    return unless _applyValue($key, $value);
     save();
     return 1; # Indicate success
 }
