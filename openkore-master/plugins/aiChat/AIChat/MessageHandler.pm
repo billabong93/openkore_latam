@@ -61,12 +61,14 @@ sub _splitResponse {
     my ($response) = @_;
     my @parts;
 
-    if ($response =~ /(?:\r?\n|\|\|)/) {
-        @parts = split /\s*(?:\r?\n|\|\|)\s*/, $response;
+    if ($response =~ /\|\|/) {
+        @parts = split /\s*\|\|\s*/, $response;
     } else {
         my $min_length = 60;
         if (length($response) >= $min_length && rand() < 0.1 && $response =~ /(.+?[.!?])\s+(.+)/s) {
             @parts = ($1, $2);
+        } else {
+            $response =~ s/\s*\r?\n\s*/ /g;
         }
     }
 
