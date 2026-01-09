@@ -9,6 +9,7 @@ use Settings qw(%sys);
 use I18N qw(bytesToString);
 use Log qw(warning message debug);
 use Plugins;
+use AI;
 use Utils qw(getHex timeOut);
 use Cwd 'abs_path';
 use Time::HiRes qw(time);
@@ -96,6 +97,11 @@ sub _flushBufferedMessages {
     }
 }
 
+sub _hasAggressiveMonsters {
+    my $aggressive_count = AI::ai_getAggressives(1, 1);
+    return $aggressive_count && $aggressive_count > 0;
+}
+
 sub _sendQueuedResponse {
     my ($sender, $state) = @_;
     return unless @{$state->{response_queue}};
@@ -130,6 +136,16 @@ sub onTick {
     for my $sender (keys %message_buffers) {
         my $state = $message_buffers{$sender};
         next unless $state;
+
+        if (_hasAggressiveMonsters()) {
+            if (@{$state->{messages}} && $state->{buffer_deadline} && $now >= $state->{buffer_deadline}) {
+                $state->{buffer_deadline} = $now + 1;
+            }
+            if (@{$state->{response_queue}}) {
+                $state->{typing_until} = 0;
+            }
+            next;
+        }
 
         if (@{$state->{messages}} && $state->{buffer_deadline} && $now >= $state->{buffer_deadline}) {
             _flushBufferedMessages($sender, $state);
