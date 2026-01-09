@@ -11,11 +11,10 @@ use constant {
     DEFAULT_API_KEY => "",
     DEFAULT_PROVIDER => "deepseek", # openai ou deepseek
     DEFAULT_MODEL => "deepseek-chat", # gpt-3.5-turbo ou deepseek-chat
-    DEFAULT_PROMPT => "voce é um assistente se passando por um jogador dentro do ragnarok online no servidor ROLA (ragnarok latam) sempre responde como se fosse um player mesmo simples direto curto sem enrolar nao escreve certo demais nem usa acento nem pontuacao escreve igual a galera da net evita texto longo responde sempre curto e na lata pode ser seco se a pessoa ficar insistindo ou enchendo o saco saudacoes tipo oi e ae vc responde so com oi e ae tb sem enrolar nao faz piada boba nem tenta ser engraçado usa o historico da conversa pra parecer que vc ta ali jogando mesmo parece jogador de verdade falando no chat do jogo, verifique as Informações do personagem para responder de acordo, então analise o level e classe para por exemplo falar onde upar etc",
+    DEFAULT_PROMPT => "voce é um assistente se passando por um jogador dentro do ragnarok online no servidor ROLA (ragnarok latam) sempre responde como se fosse um player mesmo simples direto curto sem enrolar nao escreve certo demais nem usa acento nem pontuacao escreve igual a galera da net evita texto longo responde sempre curto e na lata pode ser seco se a pessoa ficar insistindo ou enchendo o saco saudacoes tipo oi e ae vc responde so com oi e ae tb sem enrolar nao faz piada boba nem tenta ser engraçado usa o historico da conversa pra parecer que vc ta ali jogando mesmo parece jogador de verdade falando no chat do jogo, verifique as Informações do personagem para responder de acordo, então analise o level e classe para por exemplo falar onde upar etc as vezes responde em duas mensagens curtas separadas por quebra de linha quando fizer sentido",
     DEFAULT_MAX_TOKENS => 150,
     DEFAULT_TEMPERATURE => 0.6,
     DEFAULT_TYPING_SPEED => 20, # Caracteres por segundo (para simular digitação)
-    DEFAULT_PUBLIC_CHAT_ENABLED => 0, # Responder chat público somente em sec_pri
 };
 
 # Use a lexically scoped variable for the package's internal config
@@ -31,7 +30,6 @@ BEGIN {
         max_tokens => DEFAULT_MAX_TOKENS,
         temperature => DEFAULT_TEMPERATURE,
         typing_speed => DEFAULT_TYPING_SPEED,
-        public_chat_enabled => DEFAULT_PUBLIC_CHAT_ENABLED,
     );
 }
 
@@ -59,9 +57,6 @@ sub load {
     if (exists $config{aiChat_typing_speed} && defined $config{aiChat_typing_speed}) {
         $_aiChatConfig{typing_speed} = $config{aiChat_typing_speed};
     }
-    if (exists $config{aiChat_public_chat_enabled} && defined $config{aiChat_public_chat_enabled}) {
-        $_aiChatConfig{public_chat_enabled} = $config{aiChat_public_chat_enabled};
-    }
 }
 
 sub save {
@@ -74,8 +69,6 @@ sub save {
     $config{aiChat_max_tokens} = $_aiChatConfig{max_tokens};
     $config{aiChat_temperature} = $_aiChatConfig{temperature};
     $config{aiChat_typing_speed} = $_aiChatConfig{typing_speed};
-    $config{aiChat_public_chat_enabled} = $_aiChatConfig{public_chat_enabled};
-    
     # Salva as configurações no arquivo
     Settings::writeFile();
 }
@@ -100,8 +93,6 @@ sub set {
         }
     } elsif ($key eq 'typing_speed') {
         return unless $value =~ /^\d+$/; # Deve ser um número inteiro
-    } elsif ($key eq 'public_chat_enabled') {
-        return unless $value =~ /^(0|1)$/;
     }
     
     $_aiChatConfig{$key} = $value;
