@@ -288,9 +288,12 @@ sub onPrivateMessage {
 
 sub onPublicMessage {
     my (undef, $args) = @_;
-    return unless defined $field && ($field->baseName // '') eq 'sec_pri';
-    if ($config{lockMap} && !AIChat::Config::get('public_on_lockmap')) {
-        return;
+    return unless defined $field;
+    my $map_name = $field->baseName // '';
+    if ($map_name ne 'sec_pri') {
+        my $lock_map = $config{lockMap} // '';
+        return unless $lock_map && $map_name eq $lock_map;
+        return unless AIChat::Config::get('public_on_lockmap');
     }
 
     my $sender = bytesToString($args->{pubMsgUser} || $args->{MsgUser});
