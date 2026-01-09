@@ -344,6 +344,13 @@ sub searchStep {
 					$arg{portal} = $this;
 					my ($from, $to) = split /=/, $this;
 					($arg{map}, $arg{pos}{x}, $arg{pos}{y}) = split / /, $from;
+					if (my $dest = $portals_lut{$from}{dest}{$to}) {
+						$arg{dest_pos} = {
+							map => $dest->{map},
+							x   => $dest->{x},
+							y   => $dest->{y},
+						};
+					}
 					$arg{walk} = $closelist->{$this}{walk};
 					$arg{zeny} = $closelist->{$this}{zeny};
 					$arg{allow_ticket} = $closelist->{$this}{allow_ticket};

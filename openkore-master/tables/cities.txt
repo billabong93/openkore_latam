@@ -18,6 +18,7 @@ payon_in01.rsw#Inside Payon#
 payon_in02.rsw#Inside Payon#
 prontera.rsw#Prontera City#
 prt_in.rsw#Inside Prontera#
+prt_cas.rsw#Prontera Castle#
 prt_castle.rsw#Prontera Castle#
 prt_church.rsw#the Santuary#
 izlude.rsw#Izlude Town#
@@ -28,7 +29,9 @@ izlude_d.rsw#Satellite city Izlude#
 izlude_in.rsw#Inside Izlude#
 izlu2dun.rsw#Byalan Island#
 iz_int01.rsw#Intro#
+prt_monk.rsw#St. Capitolina Abbey#
 monk_in.rsw#Inside St.Abbey#
+monk_test.rsw#Saint Capitolina Abbey#
 prt_are_in.rsw#Waiting room#
 arena_room.rsw#Waiting room#
 prt_arena01.rsw#ARENA#
