@@ -5,4 +5,4 @@
     timeout /t 2 /nobreak >nul
     cd ..
     cd ..
-    start "" wxstart.exe
+    start "" "INICIAR OPENKORE (MODO SIMPLES E LEVE).bat"

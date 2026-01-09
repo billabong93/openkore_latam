@@ -57,6 +57,43 @@ sub getCharacterInfo {
     return $info;
 }
 
+sub _splitResponse {
+    my ($response) = @_;
+    my @parts;
+
+    if ($response =~ /\|\|/) {
+        @parts = split /\s*\|\|\s*/, $response;
+    } else {
+        $response =~ s/\s*\r?\n\s*/ /g;
+        if (rand() < 0.2) {
+            if ($response =~ /(.+?)\s*(?:,| e )\s+(.+)/i) {
+                @parts = ($1, $2);
+            } elsif (length($response) >= 40 && $response =~ /(.+?[.!?])\s+(.+)/s) {
+                @parts = ($1, $2);
+            }
+        }
+    }
+
+    @parts = map {
+        my $part = $_;
+        $part =~ s/^\s+//;
+        $part =~ s/\s+$//;
+        $part;
+    } grep { defined $_ && length $_ } @parts;
+
+    if (@parts == 2) {
+        @parts = () if length($parts[0]) < 3 || length($parts[1]) < 3;
+    }
+
+    if (@parts > 2) {
+        $parts[1] = join " ", @parts[1 .. $#parts];
+        @parts = @parts[0, 1];
+    }
+
+    return \@parts if @parts;
+    return [$response];
+}
+
 sub processMessage {
     my ($message, $sender) = @_;
 
@@ -77,14 +114,15 @@ sub processMessage {
         error "[aiChat] Erro ao chamar a API: $@\n", "plugin";
         return undef;
     }
-    
-    if (defined $response && length $response > 0) {
-        # Adiciona a resposta da IA ao histórico
-        AIChat::ConversationHistory::addMessage($sender, "assistant", $response);
-        return $response;
-    } else {
-        return undef;
+
+    return undef unless defined $response && length $response > 0;
+
+    my $parts = _splitResponse($response);
+    for my $part (@$parts) {
+        AIChat::ConversationHistory::addMessage($sender, "assistant", $part);
     }
+
+    return $parts;
 }
 
 1; 

@@ -146,7 +146,6 @@ sub onCommand {
         message "Prompt: " . AIChat::Config::get('prompt'), "list";
         message "Max Tokens: " . AIChat::Config::get('max_tokens'), "list";
         message "Temperatura: " . AIChat::Config::get('temperature'), "list";
-        message "Responder chat público em sec_pri: " . AIChat::Config::get('public_chat_enabled'), "list";
     } elsif ($arg =~ /^provider\s+(openai|deepseek)$/) {
         if (AIChat::Config::set('provider', $1)) {
             message $translator->translatef("%s Provedor alterado para %s\n", PLUGIN_PREFIX, $1), "list";
@@ -171,17 +170,19 @@ sub onPrivateMessage {
     my $message = bytesToString($args->{privMsg});
     
     # Process message and get AI response
-    my $response = AIChat::MessageHandler::processMessage($message, $sender);
-    
-    if ($response) {
+    my $responses = AIChat::MessageHandler::processMessage($message, $sender);
+
+    if ($responses && ref $responses eq 'ARRAY' && @$responses) {
         my $typing_speed = AIChat::Config::get('typing_speed');
-        if ($typing_speed > 0) {
-            my $delay = length($response) / $typing_speed;
-            message "[aiChat] Simulando digitação por $delay segundos...\n", "debug";
-            sleep($delay);
+        for my $response (@$responses) {
+            if ($typing_speed > 0) {
+                my $delay = length($response) / $typing_speed;
+                message "[aiChat] Simulando digitação por $delay segundos...\n", "debug";
+                sleep($delay);
+            }
+
+            $messageSender->sendPrivateMsg($sender, $response);
         }
-        
-        $messageSender->sendPrivateMsg($sender, $response);
     } else {
         debug "[aiChat] Nenhuma resposta da AI gerada para '$message'\n", "plugin";
     }
@@ -189,7 +190,6 @@ sub onPrivateMessage {
 
 sub onPublicMessage {
     my (undef, $args) = @_;
-    return unless AIChat::Config::get('public_chat_enabled');
     return unless defined $field && ($field->baseName // '') eq 'sec_pri';
 
     my $sender = bytesToString($args->{pubMsgUser} || $args->{MsgUser});
@@ -198,17 +198,19 @@ sub onPublicMessage {
     return unless defined $sender && defined $message;
     return if $char && defined $char->{name} && $sender eq $char->{name};
 
-    my $response = AIChat::MessageHandler::processMessage($message, $sender);
+    my $responses = AIChat::MessageHandler::processMessage($message, $sender);
 
-    if ($response) {
+    if ($responses && ref $responses eq 'ARRAY' && @$responses) {
         my $typing_speed = AIChat::Config::get('typing_speed');
-        if ($typing_speed > 0) {
-            my $delay = length($response) / $typing_speed;
-            message "[aiChat] Simulando digitação em chat público por $delay segundos...\n", "debug";
-            sleep($delay);
-        }
+        for my $response (@$responses) {
+            if ($typing_speed > 0) {
+                my $delay = length($response) / $typing_speed;
+                message "[aiChat] Simulando digitação em chat público por $delay segundos...\n", "debug";
+                sleep($delay);
+            }
 
-        $messageSender->sendChat($response);
+            $messageSender->sendChat($response);
+        }
     } else {
         debug "[aiChat] Nenhuma resposta pública gerada para '$message'\n", "plugin";
     }
