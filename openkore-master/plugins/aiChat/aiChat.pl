@@ -11,7 +11,7 @@ use Log qw(warning message debug);
 use Plugins;
 use Utils qw(getHex timeOut);
 use Cwd 'abs_path';
-use Time::HiRes qw(sleep time);
+use Time::HiRes qw(time);
 
 use lib $Plugins::current_plugin_folder;
 use AIChat::Config;
@@ -34,14 +34,14 @@ my %hooks = (
     init => new AIChat::HookManager("start3", \&onInitialized),
     in_game => new AIChat::HookManager("in_game", \&updateBotCharacterData),
     map_changed => new AIChat::HookManager("Network::Receive::map_changed", \&updateBotCharacterData),
-    ai_pre => new AIChat::HookManager("AI_pre", \&onTick),
+    main_loop_pre => new AIChat::HookManager("mainLoop_pre", \&onTick),
 );
 
 Plugins::register(PLUGIN_NAME, $translator->translate("AI Chat Integration for OpenKore"), \&onUnload, \&onReload);
 $hooks{init}->hook();
 $hooks{in_game}->hook();
 $hooks{map_changed}->hook();
-$hooks{ai_pre}->hook();
+$hooks{main_loop_pre}->hook();
 
 # Registrar o hook de mensagens privadas diretamente para debug
 my $privMsgHookID = Plugins::addHook('packet_privMsg', \&onPrivateMessage, undef);
@@ -71,6 +71,7 @@ sub _enqueueMessage {
     my $buffer_delay = AIChat::Config::get('buffer_delay');
     $buffer_delay = 2 unless defined $buffer_delay;
     $state->{buffer_deadline} = time() + $buffer_delay;
+    $state->{response_queue} = [] if @{$state->{response_queue}};
 
     if ($state->{typing_until} && $state->{typing_until} < $state->{buffer_deadline}) {
         $state->{typing_until} = $state->{buffer_deadline};
@@ -83,13 +84,11 @@ sub _flushBufferedMessages {
     $state->{messages} = [];
     $state->{buffer_deadline} = 0;
 
-    for my $message (@messages) {
-        my $responses = AIChat::MessageHandler::processMessage($message, $sender);
-        if ($responses && ref $responses eq 'ARRAY' && @$responses) {
-            push @{$state->{response_queue}}, @$responses;
-        } else {
-            debug "[aiChat] Nenhuma resposta da AI gerada para '$message'\n", "plugin";
-        }
+    my $responses = AIChat::MessageHandler::processMessages(\@messages, $sender);
+    if ($responses && ref $responses eq 'ARRAY' && @$responses) {
+        push @{$state->{response_queue}}, @$responses;
+    } else {
+        debug "[aiChat] Nenhuma resposta da AI gerada para mensagens de '$sender'\n", "plugin";
     }
 }
 
@@ -175,7 +174,7 @@ sub onUnload {
     $hooks{init}->unhook();
     $hooks{in_game}->unhook();
     $hooks{map_changed}->unhook();
-    $hooks{ai_pre}->unhook();
+    $hooks{main_loop_pre}->unhook();
     Plugins::delHook($hooks{packet_privMsg_direct}) if defined $hooks{packet_privMsg_direct};
     Plugins::delHook($hooks{packet_pubMsg_direct}) if defined $hooks{packet_pubMsg_direct};
     

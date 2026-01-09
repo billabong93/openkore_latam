@@ -131,21 +131,33 @@ sub _wordCount {
     return scalar @words;
 }
 
-sub processMessage {
-    my ($message, $sender) = @_;
-
-    # Check if it's the first message and add character info
+sub _ensureCharacterInfo {
+    my ($sender) = @_;
     my $char_info = getCharacterInfo($sender);
     if ($char_info) {
         AIChat::ConversationHistory::addMessage($sender, "system", $char_info, "character_info");
     }
+}
 
-    # Adiciona a mensagem do usuário ao histórico
-    AIChat::ConversationHistory::addMessage($sender, "user", $message);
+sub processMessage {
+    my ($message, $sender) = @_;
+    return processMessages([$message], $sender);
+}
 
+sub processMessages {
+    my ($messages, $sender) = @_;
+    return undef unless $messages && ref $messages eq 'ARRAY' && @$messages;
+
+    _ensureCharacterInfo($sender);
+
+    for my $message (@$messages) {
+        AIChat::ConversationHistory::addMessage($sender, "user", $message);
+    }
+
+    my $combined_message = join "\n", @$messages;
     my $response;
     eval {
-        $response = $api_client->callAPI($message, $sender);
+        $response = $api_client->callAPI($combined_message, $sender);
     };
     if ($@) {
         error "[aiChat] Erro ao chamar a API: $@\n", "plugin";
