@@ -61,6 +61,7 @@ sub _getBufferState {
         response_queue => [],
         buffer_deadline => 0,
         typing_until => 0,
+        response_started => 0,
         context => undef,
     };
 }
@@ -74,8 +75,10 @@ sub _enqueueMessage {
     $buffer_delay = 2 unless defined $buffer_delay;
     $state->{buffer_deadline} = time() + $buffer_delay;
     if (@{$state->{response_queue}}) {
-        $state->{response_queue} = [];
-        $state->{typing_until} = 0;
+        if (!$state->{response_started}) {
+            $state->{response_queue} = [];
+            $state->{typing_until} = 0;
+        }
     }
 
     if ($state->{typing_until} && $state->{typing_until} < $state->{buffer_deadline}) {
@@ -92,6 +95,7 @@ sub _flushBufferedMessages {
     my $responses = AIChat::MessageHandler::processMessages(\@messages, $sender);
     if ($responses && ref $responses eq 'ARRAY' && @$responses) {
         push @{$state->{response_queue}}, @$responses;
+        $state->{response_started} = 0;
     } else {
         debug "[aiChat] Nenhuma resposta da AI gerada para mensagens de '$sender'\n", "plugin";
     }
@@ -120,6 +124,7 @@ sub _sendQueuedResponse {
     return if $state->{typing_until} && time() < $state->{typing_until};
 
     $response = shift @{$state->{response_queue}};
+    $state->{response_started} = 1;
     my $context = $state->{context} || {};
     if ($context->{type} && $context->{type} eq 'public') {
         $messageSender->sendChat($response);
@@ -129,6 +134,7 @@ sub _sendQueuedResponse {
 
     AIChat::ConversationHistory::addMessage($sender, "assistant", $response);
     $state->{typing_until} = 0;
+    $state->{response_started} = 0 unless @{$state->{response_queue}};
 }
 
 sub onTick {
