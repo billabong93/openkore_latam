@@ -8,6 +8,7 @@ use File::Path qw(make_path);
 use File::Spec;
 use FileParsers;
 use Plugins ();
+use Settings qw(getControlFolders);
 
 use constant {
     DEFAULT_API_KEY => "",
@@ -22,6 +23,7 @@ use constant {
 # Use a lexically scoped variable for the package's internal config
 my %_aiChatConfig;
 my $config_loaded = 0;
+my $config_source_file;
 my %_file_key_map = (
     aiChat_provider => 'provider',
     aiChat_api_key => 'api_key',
@@ -35,6 +37,88 @@ my %_file_key_map = (
 sub _configFilePath {
     my $base = $Plugins::current_plugin_folder || File::Spec->catdir("plugins", "aiChat");
     return File::Spec->catfile($base, "config.txt");
+}
+
+sub _loadFromConfigHash {
+    my ($file_config) = @_;
+    my @load_order = (
+        'aiChat_provider',
+        'aiChat_model',
+        'aiChat_api_key',
+        'aiChat_prompt',
+        'aiChat_max_tokens',
+        'aiChat_temperature',
+        'aiChat_typing_speed',
+    );
+
+    for my $file_key (@load_order) {
+        next unless exists $file_config->{$file_key};
+        my $internal_key = $_file_key_map{$file_key};
+        next unless $internal_key;
+        _applyValue($internal_key, $file_config->{$file_key});
+    }
+}
+
+sub _findControlConfig {
+    for my $folder (getControlFolders()) {
+        my $path = File::Spec->catfile($folder, "config.txt");
+        next unless -f $path;
+
+        my %file_config;
+        next unless FileParsers::parseConfigFile($path, \%file_config, 1);
+        my $has_aiChat = 0;
+        for my $file_key (keys %_file_key_map) {
+            if (exists $file_config{$file_key}) {
+                $has_aiChat = 1;
+                last;
+            }
+        }
+        next unless $has_aiChat;
+        return ($path, \%file_config);
+    }
+
+    return;
+}
+
+sub _writeConfigFile {
+    my ($path) = @_;
+    my %values = map { $_ => $_aiChatConfig{$_file_key_map{$_}} } keys %_file_key_map;
+    my %seen;
+    my @lines;
+
+    if (-f $path) {
+        open my $fh, '<', $path or do {
+            warning "[aiChat] Não foi possível ler $path: $!\n", "plugin";
+            return;
+        };
+        while (my $line = <$fh>) {
+            for my $file_key (keys %_file_key_map) {
+                if ($line =~ /^\s*\Q$file_key\E\s+/) {
+                    $line = "$file_key $values{$file_key}\n";
+                    $seen{$file_key} = 1;
+                    last;
+                }
+            }
+            push @lines, $line;
+        }
+        close $fh or warning "[aiChat] Não foi possível fechar $path: $!\n", "plugin";
+    }
+
+    for my $file_key (sort keys %_file_key_map) {
+        next if $seen{$file_key};
+        push @lines, "$file_key $values{$file_key}\n";
+    }
+
+    my (undef, $dir, undef) = File::Spec->splitpath($path);
+    if ($dir && !-d $dir) {
+        make_path($dir);
+    }
+    open my $fh, '>', $path or do {
+        warning "[aiChat] Não foi possível salvar $path: $!\n", "plugin";
+        return;
+    };
+    print $fh @lines;
+    close $fh or warning "[aiChat] Não foi possível fechar $path: $!\n", "plugin";
 }
 
 sub _applyValue {
@@ -74,50 +158,31 @@ BEGIN {
 }
 
 sub load {
-    my $config_file = _configFilePath();
-    return unless -f $config_file;
-
-    my %file_config;
-    return unless FileParsers::parseConfigFile($config_file, \%file_config, 1);
-
-    my @load_order = (
-        'aiChat_provider',
-        'aiChat_model',
-        'aiChat_api_key',
-        'aiChat_prompt',
-        'aiChat_max_tokens',
-        'aiChat_temperature',
-        'aiChat_typing_speed',
-    );
-
-    for my $file_key (@load_order) {
-        next unless exists $file_config{$file_key};
-        my $internal_key = $_file_key_map{$file_key};
-        next unless $internal_key;
-        _applyValue($internal_key, $file_config{$file_key});
+    my ($control_path, $control_config) = _findControlConfig();
+    if ($control_path) {
+        _loadFromConfigHash($control_config);
+        $config_source_file = $control_path;
+        $config_loaded = 1;
+        return;
     }
+
+    my $config_file = _configFilePath();
+    if (-f $config_file) {
+        my %file_config;
+        return unless FileParsers::parseConfigFile($config_file, \%file_config, 1);
+        _loadFromConfigHash(\%file_config);
+        $config_source_file = $config_file;
+        $config_loaded = 1;
+        return;
+    }
+
+    $config_source_file = $config_file;
     $config_loaded = 1;
 }
 
 sub save {
-    my $config_file = _configFilePath();
-    my (undef, $dir, undef) = File::Spec->splitpath($config_file);
-    if ($dir && !-d $dir) {
-        make_path($dir);
-    }
-    open my $fh, '>', $config_file or do {
-        warning "[aiChat] Não foi possível salvar $config_file: $!\n", "plugin";
-        return;
-    };
-
-    print $fh "aiChat_provider $_aiChatConfig{provider}\n";
-    print $fh "aiChat_api_key $_aiChatConfig{api_key}\n";
-    print $fh "aiChat_model $_aiChatConfig{model}\n";
-    print $fh "aiChat_prompt $_aiChatConfig{prompt}\n";
-    print $fh "aiChat_max_tokens $_aiChatConfig{max_tokens}\n";
-    print $fh "aiChat_temperature $_aiChatConfig{temperature}\n";
-    print $fh "aiChat_typing_speed $_aiChatConfig{typing_speed}\n";
-    close $fh or warning "[aiChat] Não foi possível fechar $config_file: $!\n", "plugin";
+    my $config_file = $config_source_file || _configFilePath();
+    _writeConfigFile($config_file);
 }
 
 sub get {
