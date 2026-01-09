@@ -4,6 +4,7 @@ use strict;
 use warnings;
 
 use Log qw(warning message debug);
+use File::Path qw(make_path);
 use File::Spec;
 use FileParsers;
 use Plugins ();
@@ -20,6 +21,7 @@ use constant {
 
 # Use a lexically scoped variable for the package's internal config
 my %_aiChatConfig;
+my $config_loaded = 0;
 my %_file_key_map = (
     aiChat_provider => 'provider',
     aiChat_api_key => 'api_key',
@@ -94,10 +96,15 @@ sub load {
         next unless $internal_key;
         _applyValue($internal_key, $file_config{$file_key});
     }
+    $config_loaded = 1;
 }
 
 sub save {
     my $config_file = _configFilePath();
+    my (undef, $dir, undef) = File::Spec->splitpath($config_file);
+    if ($dir && !-d $dir) {
+        make_path($dir);
+    }
     open my $fh, '>', $config_file or do {
         warning "[aiChat] Não foi possível salvar $config_file: $!\n", "plugin";
         return;
@@ -120,6 +127,7 @@ sub get {
 
 sub set {
     my ($key, $value) = @_;
+    load() unless $config_loaded;
     return unless _applyValue($key, $value);
     save();
     return 1; # Indicate success

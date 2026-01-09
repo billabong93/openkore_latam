@@ -24,7 +24,7 @@ Para usar o plugin, você precisará:
 
 ### A. No plugin (`plugins/aiChat/config.txt` ou comandos `aichat set`)
 
-Configure as opções no `plugins/aiChat/config.txt` ou via console do OpenKore (`aichat set <chave> <valor>`):
+Configure as opções no `plugins/aiChat/config.txt` ou via console do OpenKore (`aichat set <chave> <valor>`). Os comandos `aichat set` atualizam o arquivo do plugin automaticamente:
 
 *   `aiChat_provider`: `openai` ou `deepseek` (padrão: `deepseek`)
 *   `aiChat_model`: `gpt-3.5-turbo` ou `deepseek-chat` (ajustado ao `provider`)
