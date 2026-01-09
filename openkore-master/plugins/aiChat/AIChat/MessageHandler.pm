@@ -65,9 +65,12 @@ sub _splitResponse {
         @parts = split /\s*\|\|\s*/, $response;
     } else {
         $response =~ s/\s*\r?\n\s*/ /g;
-        my $min_length = 40;
-        if (length($response) >= $min_length && rand() < 0.15 && $response =~ /(.+?[.!?])\s+(.+)/s) {
-            @parts = ($1, $2);
+        if (rand() < 0.2) {
+            if ($response =~ /(.+?)\s*(?:,| e )\s+(.+)/i) {
+                @parts = ($1, $2);
+            } elsif (length($response) >= 40 && $response =~ /(.+?[.!?])\s+(.+)/s) {
+                @parts = ($1, $2);
+            }
         }
     }
 
@@ -77,6 +80,10 @@ sub _splitResponse {
         $part =~ s/\s+$//;
         $part;
     } grep { defined $_ && length $_ } @parts;
+
+    if (@parts == 2) {
+        @parts = () if length($parts[0]) < 3 || length($parts[1]) < 3;
+    }
 
     if (@parts > 2) {
         $parts[1] = join " ", @parts[1 .. $#parts];
