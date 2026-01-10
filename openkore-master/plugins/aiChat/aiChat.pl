@@ -20,6 +20,7 @@ use AIChat::APIClient;
 use AIChat::MessageHandler;
 use AIChat::ConversationHistory;
 use AIChat::HookManager;
+use AIChat::Log;
 
 use constant {
     PLUGIN_PREFIX => "[aiChat]",
@@ -128,8 +129,20 @@ sub _sendQueuedResponse {
     my $context = $state->{context} || {};
     if ($context->{type} && $context->{type} eq 'public') {
         $messageSender->sendChat($response);
+        AIChat::Log::log_message(
+            direction => 'out',
+            visibility => 'public',
+            sender => 'Public',
+            message => $response,
+        );
     } else {
         $messageSender->sendPrivateMsg($sender, $response);
+        AIChat::Log::log_message(
+            direction => 'out',
+            visibility => 'private',
+            sender => $sender,
+            message => $response,
+        );
     }
 
     AIChat::ConversationHistory::addMessage($sender, "assistant", $response);
@@ -261,6 +274,7 @@ sub onCommand {
         message "Chave API: " . (AIChat::Config::get('api_key') ? "Configurada" : "Não configurada"), "list";
         message "Modelo: " . AIChat::Config::get('model'), "list";
         message "Prompt: " . AIChat::Config::get('prompt'), "list";
+        message "Prompt GM (sec_pri): " . AIChat::Config::get('prompt_gm'), "list";
         message "Max Tokens: " . AIChat::Config::get('max_tokens'), "list";
         message "Temperatura: " . AIChat::Config::get('temperature'), "list";
         message "Chance de dividir resposta: " . AIChat::Config::get('split_chance'), "list";
@@ -289,6 +303,12 @@ sub onPrivateMessage {
     my $sender = bytesToString($args->{privMsgUser});
     my $message = bytesToString($args->{privMsg});
 
+    AIChat::Log::log_message(
+        direction => 'in',
+        visibility => 'private',
+        sender => $sender,
+        message => $message,
+    );
     _enqueueMessage($sender, $message, { type => 'private' });
 }
 
@@ -308,6 +328,12 @@ sub onPublicMessage {
     return unless defined $sender && defined $message;
     return if $char && defined $char->{name} && $sender eq $char->{name};
 
+    AIChat::Log::log_message(
+        direction => 'in',
+        visibility => 'public',
+        sender => $sender,
+        message => $message,
+    );
     _enqueueMessage($sender, $message, { type => 'public' });
 }
 
