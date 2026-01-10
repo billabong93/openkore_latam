@@ -340,13 +340,6 @@ sub onPrivateMessage {
 sub onPublicMessage {
     my (undef, $args) = @_;
     return unless defined $field;
-    my $map_name = $field->baseName // '';
-    if ($map_name ne 'sec_pri') {
-        my $lock_map = $config{lockMap} // '';
-        return unless $lock_map && $map_name eq $lock_map;
-        return unless AIChat::Config::get('public_on_lockmap');
-    }
-
     my $sender = bytesToString($args->{pubMsgUser} || $args->{MsgUser});
     my $message = bytesToString($args->{pubMsg} || $args->{Msg});
 
@@ -358,6 +351,13 @@ sub onPublicMessage {
     if (_shouldEchoEmotion($sender, $message)) {
         _queueEmotionResponse($sender, $last_emotion_command, { type => 'public' });
         return;
+    }
+
+    my $map_name = $field->baseName // '';
+    if ($map_name ne 'sec_pri') {
+        my $lock_map = $config{lockMap} // '';
+        return unless $lock_map && $map_name eq $lock_map;
+        return unless AIChat::Config::get('public_on_lockmap');
     }
     AIChat::Log::log_message(
         direction => 'in',
