@@ -59,6 +59,7 @@ $hooks{packet_emotion_direct} = $emotionHookID;
 my %message_buffers;
 my $last_emotion_command;
 my $last_emotion_time;
+my %last_interaction_time;
 
 sub _getBufferState {
     my ($sender) = @_;
@@ -321,6 +322,8 @@ sub onPrivateMessage {
     my $sender = bytesToString($args->{privMsgUser});
     my $message = bytesToString($args->{privMsg});
 
+    $last_interaction_time{$sender} = time;
+
     if (_shouldEchoEmotion($sender, $message)) {
         _queueEmotionResponse($sender, $last_emotion_command, { type => 'private' });
         return;
@@ -349,6 +352,8 @@ sub onPublicMessage {
 
     return unless defined $sender && defined $message;
     return if $char && defined $char->{name} && $sender eq $char->{name};
+
+    $last_interaction_time{$sender} = time;
 
     if (_shouldEchoEmotion($sender, $message)) {
         _queueEmotionResponse($sender, $last_emotion_command, { type => 'public' });
@@ -399,8 +404,8 @@ sub _shouldEchoEmotion {
     return unless defined $sender;
     return unless defined $message;
     return unless $last_emotion_command;
-    return unless defined $last_emotion_time && (time - $last_emotion_time) <= 30;
-    return unless _hasConversationHistory($sender);
+    return unless defined $last_emotion_time && (time - $last_emotion_time) <= 120;
+    return unless _hasRecentInteraction($sender);
     return $message =~ /\b(reproduza|repete|repita|faz|execute|executa)\b.*\b(emoji|emote|emoticon)\b/i;
 }
 
@@ -419,6 +424,15 @@ sub _hasConversationHistory {
     my ($sender) = @_;
     my $history = AIChat::ConversationHistory::getHistory($sender);
     return $history && ref $history eq 'ARRAY' && @$history;
+}
+
+sub _hasRecentInteraction {
+    my ($sender) = @_;
+    return unless $sender;
+    return 1 if _hasConversationHistory($sender);
+    my $last_time = $last_interaction_time{$sender};
+    return unless $last_time;
+    return (time - $last_time) <= 300;
 }
 
 1; 
