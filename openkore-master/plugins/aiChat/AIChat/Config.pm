@@ -17,6 +17,9 @@ use constant {
     DEFAULT_MAX_TOKENS => 150,
     DEFAULT_TEMPERATURE => 0.6,
     DEFAULT_TYPING_SPEED => 20, # Caracteres por segundo (para simular digitação)
+    DEFAULT_SPLIT_CHANCE => 0.2, # Chance de dividir resposta em duas mensagens
+    DEFAULT_BUFFER_DELAY => 2, # Segundos para aguardar novas mensagens antes de responder
+    DEFAULT_PUBLIC_ON_LOCKMAP => 1, # Permitir respostas no chat publico quando estiver no lockMap
 };
 
 # Use a lexically scoped variable for the package's internal config
@@ -30,6 +33,9 @@ my %_file_key_map = (
     aiChat_max_tokens => 'max_tokens',
     aiChat_temperature => 'temperature',
     aiChat_typing_speed => 'typing_speed',
+    aiChat_split_chance => 'split_chance',
+    aiChat_buffer_delay => 'buffer_delay',
+    aiChat_public_on_lockmap => 'public_on_lockmap',
 );
 
 sub _configFilePath {
@@ -47,6 +53,9 @@ sub _loadFromConfigHash {
         'aiChat_max_tokens',
         'aiChat_temperature',
         'aiChat_typing_speed',
+        'aiChat_split_chance',
+        'aiChat_buffer_delay',
+        'aiChat_public_on_lockmap',
     );
 
     for my $file_key (@load_order) {
@@ -74,6 +83,13 @@ sub _applyValue {
         return unless $value =~ /^\d+$/;
     } elsif ($key eq 'temperature') {
         return unless $value =~ /^-?\d+(?:\.\d+)?$/;
+    } elsif ($key eq 'split_chance') {
+        return unless $value =~ /^-?\d+(?:\.\d+)?$/;
+        return if $value < 0 || $value > 1;
+    } elsif ($key eq 'buffer_delay') {
+        return unless $value =~ /^\d+(?:\.\d+)?$/;
+    } elsif ($key eq 'public_on_lockmap') {
+        return unless $value =~ /^(?:0|1)$/;
     }
 
     $_aiChatConfig{$key} = $value;
@@ -90,6 +106,9 @@ BEGIN {
         max_tokens => DEFAULT_MAX_TOKENS,
         temperature => DEFAULT_TEMPERATURE,
         typing_speed => DEFAULT_TYPING_SPEED,
+        split_chance => DEFAULT_SPLIT_CHANCE,
+        buffer_delay => DEFAULT_BUFFER_DELAY,
+        public_on_lockmap => DEFAULT_PUBLIC_ON_LOCKMAP,
     );
 }
 
@@ -124,6 +143,9 @@ sub save {
     print $fh "aiChat_max_tokens $_aiChatConfig{max_tokens}\n";
     print $fh "aiChat_temperature $_aiChatConfig{temperature}\n";
     print $fh "aiChat_typing_speed $_aiChatConfig{typing_speed}\n";
+    print $fh "aiChat_split_chance $_aiChatConfig{split_chance}\n";
+    print $fh "aiChat_buffer_delay $_aiChatConfig{buffer_delay}\n";
+    print $fh "aiChat_public_on_lockmap $_aiChatConfig{public_on_lockmap}\n";
     close $fh or warning "[aiChat] Não foi possível fechar $config_file: $!\n", "plugin";
 }
 

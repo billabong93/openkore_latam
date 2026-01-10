@@ -9,14 +9,16 @@ use Settings qw(%sys);
 use I18N qw(bytesToString);
 use Log qw(warning message debug);
 use Plugins;
+use AI;
 use Utils qw(getHex timeOut);
 use Cwd 'abs_path';
-use Time::HiRes qw(sleep);
+use Time::HiRes qw(time);
 
 use lib $Plugins::current_plugin_folder;
 use AIChat::Config;
 use AIChat::APIClient;
 use AIChat::MessageHandler;
+use AIChat::ConversationHistory;
 use AIChat::HookManager;
 
 use constant {
@@ -34,12 +36,14 @@ my %hooks = (
     init => new AIChat::HookManager("start3", \&onInitialized),
     in_game => new AIChat::HookManager("in_game", \&updateBotCharacterData),
     map_changed => new AIChat::HookManager("Network::Receive::map_changed", \&updateBotCharacterData),
+    main_loop_pre => new AIChat::HookManager("mainLoop_pre", \&onTick),
 );
 
 Plugins::register(PLUGIN_NAME, $translator->translate("AI Chat Integration for OpenKore"), \&onUnload, \&onReload);
 $hooks{init}->hook();
 $hooks{in_game}->hook();
 $hooks{map_changed}->hook();
+$hooks{main_loop_pre}->hook();
 
 # Registrar o hook de mensagens privadas diretamente para debug
 my $privMsgHookID = Plugins::addHook('packet_privMsg', \&onPrivateMessage, undef);
@@ -47,6 +51,118 @@ my $privMsgHookID = Plugins::addHook('packet_privMsg', \&onPrivateMessage, undef
 $hooks{packet_privMsg_direct} = $privMsgHookID;
 my $pubMsgHookID = Plugins::addHook('packet_pubMsg', \&onPublicMessage, undef);
 $hooks{packet_pubMsg_direct} = $pubMsgHookID;
+
+my %message_buffers;
+
+sub _getBufferState {
+    my ($sender) = @_;
+    return $message_buffers{$sender} ||= {
+        messages => [],
+        response_queue => [],
+        buffer_deadline => 0,
+        typing_until => 0,
+        response_started => 0,
+        context => undef,
+    };
+}
+
+sub _enqueueMessage {
+    my ($sender, $message, $context) = @_;
+    my $state = _getBufferState($sender);
+    push @{$state->{messages}}, $message;
+    $state->{context} = $context;
+    my $buffer_delay = AIChat::Config::get('buffer_delay');
+    $buffer_delay = 2 unless defined $buffer_delay;
+    $state->{buffer_deadline} = time() + $buffer_delay;
+    if (@{$state->{response_queue}}) {
+        if (!$state->{response_started}) {
+            $state->{response_queue} = [];
+            $state->{typing_until} = 0;
+        }
+    }
+
+    if ($state->{typing_until} && $state->{typing_until} < $state->{buffer_deadline}) {
+        $state->{typing_until} = $state->{buffer_deadline};
+    }
+}
+
+sub _flushBufferedMessages {
+    my ($sender, $state) = @_;
+    my @messages = @{$state->{messages}};
+    $state->{messages} = [];
+    $state->{buffer_deadline} = 0;
+
+    my $responses = AIChat::MessageHandler::processMessages(\@messages, $sender);
+    if ($responses && ref $responses eq 'ARRAY' && @$responses) {
+        push @{$state->{response_queue}}, @$responses;
+        $state->{response_started} = 0;
+    } else {
+        debug "[aiChat] Nenhuma resposta da AI gerada para mensagens de '$sender'\n", "plugin";
+    }
+}
+
+sub _hasAggressiveMonsters {
+    my $aggressive_count = AI::ai_getAggressives(1, 1);
+    return $aggressive_count && $aggressive_count > 0;
+}
+
+sub _sendQueuedResponse {
+    my ($sender, $state) = @_;
+    return unless @{$state->{response_queue}};
+    return if $state->{buffer_deadline} && time() < $state->{buffer_deadline};
+
+    my $response = $state->{response_queue}[0];
+    if (!$state->{typing_until}) {
+        my $typing_speed = AIChat::Config::get('typing_speed');
+        my $delay = 0;
+        if ($typing_speed && $typing_speed > 0) {
+            $delay = length($response) / $typing_speed;
+        }
+        $state->{typing_until} = time() + $delay;
+    }
+
+    return if $state->{typing_until} && time() < $state->{typing_until};
+
+    $response = shift @{$state->{response_queue}};
+    $state->{response_started} = 1;
+    my $context = $state->{context} || {};
+    if ($context->{type} && $context->{type} eq 'public') {
+        $messageSender->sendChat($response);
+    } else {
+        $messageSender->sendPrivateMsg($sender, $response);
+    }
+
+    AIChat::ConversationHistory::addMessage($sender, "assistant", $response);
+    $state->{typing_until} = 0;
+    $state->{response_started} = 0 unless @{$state->{response_queue}};
+}
+
+sub onTick {
+    my $now = time();
+    for my $sender (keys %message_buffers) {
+        my $state = $message_buffers{$sender};
+        next unless $state;
+
+        if (_hasAggressiveMonsters()) {
+            if (@{$state->{messages}} && $state->{buffer_deadline} && $now >= $state->{buffer_deadline}) {
+                $state->{buffer_deadline} = $now + 1;
+            }
+            if (@{$state->{response_queue}}) {
+                $state->{typing_until} = 0;
+            }
+            next;
+        }
+
+        if (@{$state->{messages}} && $state->{buffer_deadline} && $now >= $state->{buffer_deadline}) {
+            _flushBufferedMessages($sender, $state);
+        }
+
+        next if $state->{buffer_deadline} && $now < $state->{buffer_deadline};
+        next if $state->{typing_until} && $now < $state->{typing_until};
+
+        _sendQueuedResponse($sender, $state);
+    }
+}
 
 
 sub updateBotCharacterData {
@@ -91,6 +207,7 @@ sub onUnload {
     $hooks{init}->unhook();
     $hooks{in_game}->unhook();
     $hooks{map_changed}->unhook();
+    $hooks{main_loop_pre}->unhook();
     Plugins::delHook($hooks{packet_privMsg_direct}) if defined $hooks{packet_privMsg_direct};
     Plugins::delHook($hooks{packet_pubMsg_direct}) if defined $hooks{packet_pubMsg_direct};
     
@@ -146,6 +263,9 @@ sub onCommand {
         message "Prompt: " . AIChat::Config::get('prompt'), "list";
         message "Max Tokens: " . AIChat::Config::get('max_tokens'), "list";
         message "Temperatura: " . AIChat::Config::get('temperature'), "list";
+        message "Chance de dividir resposta: " . AIChat::Config::get('split_chance'), "list";
+        message "Delay do buffer: " . AIChat::Config::get('buffer_delay'), "list";
+        message "Responder no chat publico no lockMap: " . AIChat::Config::get('public_on_lockmap'), "list";
     } elsif ($arg =~ /^provider\s+(openai|deepseek)$/) {
         if (AIChat::Config::set('provider', $1)) {
             message $translator->translatef("%s Provedor alterado para %s\n", PLUGIN_PREFIX, $1), "list";
@@ -168,29 +288,19 @@ sub onPrivateMessage {
     my (undef, $args) = @_;
     my $sender = bytesToString($args->{privMsgUser});
     my $message = bytesToString($args->{privMsg});
-    
-    # Process message and get AI response
-    my $responses = AIChat::MessageHandler::processMessage($message, $sender);
 
-    if ($responses && ref $responses eq 'ARRAY' && @$responses) {
-        my $typing_speed = AIChat::Config::get('typing_speed');
-        for my $response (@$responses) {
-            if ($typing_speed > 0) {
-                my $delay = length($response) / $typing_speed;
-                message "[aiChat] Simulando digitação por $delay segundos...\n", "debug";
-                sleep($delay);
-            }
-
-            $messageSender->sendPrivateMsg($sender, $response);
-        }
-    } else {
-        debug "[aiChat] Nenhuma resposta da AI gerada para '$message'\n", "plugin";
-    }
+    _enqueueMessage($sender, $message, { type => 'private' });
 }
 
 sub onPublicMessage {
     my (undef, $args) = @_;
-    return unless defined $field && ($field->baseName // '') eq 'sec_pri';
+    return unless defined $field;
+    my $map_name = $field->baseName // '';
+    if ($map_name ne 'sec_pri') {
+        my $lock_map = $config{lockMap} // '';
+        return unless $lock_map && $map_name eq $lock_map;
+        return unless AIChat::Config::get('public_on_lockmap');
+    }
 
     my $sender = bytesToString($args->{pubMsgUser} || $args->{MsgUser});
     my $message = bytesToString($args->{pubMsg} || $args->{Msg});
@@ -198,22 +308,7 @@ sub onPublicMessage {
     return unless defined $sender && defined $message;
     return if $char && defined $char->{name} && $sender eq $char->{name};
 
-    my $responses = AIChat::MessageHandler::processMessage($message, $sender);
-
-    if ($responses && ref $responses eq 'ARRAY' && @$responses) {
-        my $typing_speed = AIChat::Config::get('typing_speed');
-        for my $response (@$responses) {
-            if ($typing_speed > 0) {
-                my $delay = length($response) / $typing_speed;
-                message "[aiChat] Simulando digitação em chat público por $delay segundos...\n", "debug";
-                sleep($delay);
-            }
-
-            $messageSender->sendChat($response);
-        }
-    } else {
-        debug "[aiChat] Nenhuma resposta pública gerada para '$message'\n", "plugin";
-    }
+    _enqueueMessage($sender, $message, { type => 'public' });
 }
 
 1; 

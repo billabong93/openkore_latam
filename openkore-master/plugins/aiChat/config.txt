@@ -20,4 +20,13 @@ aiChat_max_tokens 150
 aiChat_temperature 0.6
 
 # Velocidade de digitacao em caracteres/segundo
-aiChat_typing_speed 20
+aiChat_typing_speed 7
+
+# Chance da resposta ser dividida em mais mensagens (0.0 - 1.0)
+aiChat_split_chance 0.2
+
+# Delay para iniciar a digitação
+aiChat_buffer_delay 2
+
+# Habilita responder chat público no lockMap
+aiChat_public_on_lockmap 0
