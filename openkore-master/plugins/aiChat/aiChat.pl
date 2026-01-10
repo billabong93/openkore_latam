@@ -325,10 +325,11 @@ sub onPrivateMessage {
     my $sender = bytesToString($args->{privMsgUser});
     my $message = bytesToString($args->{privMsg});
 
-    $last_interaction_time{$sender} = time;
+    my $sender_key = _normalizeSenderKey($sender);
+    $last_interaction_time{$sender_key} = time;
 
-    if (my $emotion_command = _findRecentEmotionForSender($sender)) {
-        if (_shouldEchoEmotion($sender, $message, $emotion_command)) {
+    if (my $emotion_command = _findRecentEmotionForSender($sender_key)) {
+        if (_shouldEchoEmotion($sender_key, $message, $emotion_command)) {
             _queueEmotionResponse($sender, $emotion_command, { type => 'private' });
             return;
         }
@@ -351,10 +352,11 @@ sub onPublicMessage {
     return unless defined $sender && defined $message;
     return if $char && defined $char->{name} && $sender eq $char->{name};
 
-    $last_interaction_time{$sender} = time;
+    my $sender_key = _normalizeSenderKey($sender);
+    $last_interaction_time{$sender_key} = time;
 
-    if (my $emotion_command = _findRecentEmotionForSender($sender)) {
-        if (_shouldEchoEmotion($sender, $message, $emotion_command)) {
+    if (my $emotion_command = _findRecentEmotionForSender($sender_key)) {
+        if (_shouldEchoEmotion($sender_key, $message, $emotion_command)) {
             _queueEmotionResponse($sender, $emotion_command, { type => 'public' });
             return;
         }
@@ -386,11 +388,12 @@ sub onEmotion {
 
     my $actor = Actor::get($args->{ID});
     return unless $actor;
-    my $name = $actor->name;
+    my $name = bytesToString($actor->name);
     return unless defined $name && $name ne '';
+    my $sender_key = _normalizeSenderKey($name);
 
-    $last_emotion_command_by_sender{$name} = $command;
-    $last_emotion_time_by_sender{$name} = $last_emotion_time;
+    $last_emotion_command_by_sender{$sender_key} = $command;
+    $last_emotion_time_by_sender{$sender_key} = $last_emotion_time;
 }
 
 sub _getEmotionCommandByDisplay {
@@ -415,11 +418,11 @@ sub _extractEmotionCommand {
 }
 
 sub _shouldEchoEmotion {
-    my ($sender, $message, $emotion_command) = @_;
-    return unless defined $sender;
+    my ($sender_key, $message, $emotion_command) = @_;
+    return unless defined $sender_key;
     return unless defined $message;
     return unless $emotion_command;
-    return unless _hasRecentInteraction($sender);
+    return unless _hasRecentInteraction($sender_key);
     return $message =~ /\b(reproduza|repete|repita|faz|execute|executa)\b.*\b(emoji|emote|emoticon)\b/i;
 }
 
@@ -435,26 +438,26 @@ sub _queueEmotionResponse {
 }
 
 sub _hasConversationHistory {
-    my ($sender) = @_;
-    my $history = AIChat::ConversationHistory::getHistory($sender);
+    my ($sender_key) = @_;
+    my $history = AIChat::ConversationHistory::getHistory($sender_key);
     return $history && ref $history eq 'ARRAY' && @$history;
 }
 
 sub _hasRecentInteraction {
-    my ($sender) = @_;
-    return unless $sender;
-    return 1 if _hasConversationHistory($sender);
-    my $last_time = $last_interaction_time{$sender};
+    my ($sender_key) = @_;
+    return unless $sender_key;
+    return 1 if _hasConversationHistory($sender_key);
+    my $last_time = $last_interaction_time{$sender_key};
     return unless $last_time;
     return (time - $last_time) <= 300;
 }
 
 sub _findRecentEmotionForSender {
-    my ($sender) = @_;
-    return unless $sender;
+    my ($sender_key) = @_;
+    return unless $sender_key;
 
-    my $sender_command = $last_emotion_command_by_sender{$sender};
-    my $sender_time = $last_emotion_time_by_sender{$sender};
+    my $sender_command = $last_emotion_command_by_sender{$sender_key};
+    my $sender_time = $last_emotion_time_by_sender{$sender_key};
     if ($sender_command && $sender_time && (time - $sender_time) <= 120) {
         return $sender_command;
     }
@@ -462,6 +465,15 @@ sub _findRecentEmotionForSender {
     return unless $last_emotion_command;
     return unless defined $last_emotion_time && (time - $last_emotion_time) <= 120;
     return $last_emotion_command;
+}
+
+sub _normalizeSenderKey {
+    my ($sender) = @_;
+    return unless defined $sender;
+    my $key = $sender;
+    $key =~ s/^\s+//;
+    $key =~ s/\s+$//;
+    return lc $key;
 }
 
 1; 
