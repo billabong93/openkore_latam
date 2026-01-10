@@ -14,7 +14,6 @@ use Misc qw(getEmotionByCommand);
 use Utils qw(getHex timeOut);
 use Cwd 'abs_path';
 use Time::HiRes qw(time);
-use Actor ();
 
 use lib $Plugins::current_plugin_folder;
 use AIChat::Config;
@@ -58,7 +57,8 @@ my $emotionHookID = Plugins::addHook('packet_emotion', \&onEmotion, undef);
 $hooks{packet_emotion_direct} = $emotionHookID;
 
 my %message_buffers;
-my %last_emotion_command_by_sender;
+my $last_emotion_command;
+my $last_emotion_time;
 
 sub _getBufferState {
     my ($sender) = @_;
@@ -322,7 +322,7 @@ sub onPrivateMessage {
     my $message = bytesToString($args->{privMsg});
 
     if (_shouldEchoEmotion($sender, $message)) {
-        _queueEmotionResponse($sender, $last_emotion_command_by_sender{$sender}, { type => 'private' });
+        _queueEmotionResponse($sender, $last_emotion_command, { type => 'private' });
         return;
     }
     AIChat::Log::log_message(
@@ -351,7 +351,7 @@ sub onPublicMessage {
     return if $char && defined $char->{name} && $sender eq $char->{name};
 
     if (_shouldEchoEmotion($sender, $message)) {
-        _queueEmotionResponse($sender, $last_emotion_command_by_sender{$sender}, { type => 'public' });
+        _queueEmotionResponse($sender, $last_emotion_command, { type => 'public' });
         return;
     }
     AIChat::Log::log_message(
@@ -369,12 +369,8 @@ sub onEmotion {
     my $command = _getEmotionCommandByDisplay($args->{emotion});
     return unless $command;
 
-    my $actor = Actor::get($args->{ID});
-    return unless $actor;
-    my $name = $actor->name;
-    return unless defined $name && $name ne '';
-
-    $last_emotion_command_by_sender{$name} = $command;
+    $last_emotion_command = $command;
+    $last_emotion_time = time;
 }
 
 sub _getEmotionCommandByDisplay {
@@ -402,8 +398,8 @@ sub _shouldEchoEmotion {
     my ($sender, $message) = @_;
     return unless defined $sender;
     return unless defined $message;
-    my $last_emotion = $last_emotion_command_by_sender{$sender};
-    return unless $last_emotion;
+    return unless $last_emotion_command;
+    return unless defined $last_emotion_time && (time - $last_emotion_time) <= 30;
     return unless _hasConversationHistory($sender);
     return $message =~ /\b(reproduza|repete|repita|faz|execute|executa)\b.*\b(emoji|emote|emoticon)\b/i;
 }
