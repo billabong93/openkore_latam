@@ -14,6 +14,7 @@ use Misc qw(getEmotionByCommand);
 use Utils qw(getHex timeOut);
 use Cwd 'abs_path';
 use Time::HiRes qw(time);
+use Actor ();
 
 use lib $Plugins::current_plugin_folder;
 use AIChat::Config;
@@ -60,6 +61,8 @@ my %message_buffers;
 my $last_emotion_command;
 my $last_emotion_time;
 my %last_interaction_time;
+my %last_emotion_command_by_sender;
+my %last_emotion_time_by_sender;
 
 sub _getBufferState {
     my ($sender) = @_;
@@ -324,9 +327,11 @@ sub onPrivateMessage {
 
     $last_interaction_time{$sender} = time;
 
-    if (_shouldEchoEmotion($sender, $message)) {
-        _queueEmotionResponse($sender, $last_emotion_command, { type => 'private' });
-        return;
+    if (my $emotion_command = _findRecentEmotionForSender($sender)) {
+        if (_shouldEchoEmotion($sender, $message, $emotion_command)) {
+            _queueEmotionResponse($sender, $emotion_command, { type => 'private' });
+            return;
+        }
     }
     AIChat::Log::log_message(
         direction => 'in',
@@ -348,9 +353,11 @@ sub onPublicMessage {
 
     $last_interaction_time{$sender} = time;
 
-    if (_shouldEchoEmotion($sender, $message)) {
-        _queueEmotionResponse($sender, $last_emotion_command, { type => 'public' });
-        return;
+    if (my $emotion_command = _findRecentEmotionForSender($sender)) {
+        if (_shouldEchoEmotion($sender, $message, $emotion_command)) {
+            _queueEmotionResponse($sender, $emotion_command, { type => 'public' });
+            return;
+        }
     }
 
     my $map_name = $field->baseName // '';
@@ -376,6 +383,14 @@ sub onEmotion {
 
     $last_emotion_command = $command;
     $last_emotion_time = time;
+
+    my $actor = Actor::get($args->{ID});
+    return unless $actor;
+    my $name = $actor->name;
+    return unless defined $name && $name ne '';
+
+    $last_emotion_command_by_sender{$name} = $command;
+    $last_emotion_time_by_sender{$name} = $last_emotion_time;
 }
 
 sub _getEmotionCommandByDisplay {
@@ -400,11 +415,10 @@ sub _extractEmotionCommand {
 }
 
 sub _shouldEchoEmotion {
-    my ($sender, $message) = @_;
+    my ($sender, $message, $emotion_command) = @_;
     return unless defined $sender;
     return unless defined $message;
-    return unless $last_emotion_command;
-    return unless defined $last_emotion_time && (time - $last_emotion_time) <= 120;
+    return unless $emotion_command;
     return unless _hasRecentInteraction($sender);
     return $message =~ /\b(reproduza|repete|repita|faz|execute|executa)\b.*\b(emoji|emote|emoticon)\b/i;
 }
@@ -433,6 +447,21 @@ sub _hasRecentInteraction {
     my $last_time = $last_interaction_time{$sender};
     return unless $last_time;
     return (time - $last_time) <= 300;
+}
+
+sub _findRecentEmotionForSender {
+    my ($sender) = @_;
+    return unless $sender;
+
+    my $sender_command = $last_emotion_command_by_sender{$sender};
+    my $sender_time = $last_emotion_time_by_sender{$sender};
+    if ($sender_command && $sender_time && (time - $sender_time) <= 120) {
+        return $sender_command;
+    }
+
+    return unless $last_emotion_command;
+    return unless defined $last_emotion_time && (time - $last_emotion_time) <= 120;
+    return $last_emotion_command;
 }
 
 1; 
