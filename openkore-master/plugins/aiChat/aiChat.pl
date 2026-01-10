@@ -4,12 +4,13 @@ use strict;
 use warnings;
 
 use Commands;
-use Globals qw(%timeout $messageSender $net %config $char $field %jobs_lut);
+use Globals qw(%timeout $messageSender $net %config $char $field %jobs_lut %emotions_lut);
 use Settings qw(%sys);
 use I18N qw(bytesToString);
 use Log qw(warning message debug);
 use Plugins;
 use AI;
+use Misc qw(getEmotionByCommand);
 use Utils qw(getHex timeOut);
 use Cwd 'abs_path';
 use Time::HiRes qw(time);
@@ -52,8 +53,11 @@ my $privMsgHookID = Plugins::addHook('packet_privMsg', \&onPrivateMessage, undef
 $hooks{packet_privMsg_direct} = $privMsgHookID;
 my $pubMsgHookID = Plugins::addHook('packet_pubMsg', \&onPublicMessage, undef);
 $hooks{packet_pubMsg_direct} = $pubMsgHookID;
+my $emotionHookID = Plugins::addHook('packet_emotion', \&onEmotion, undef);
+$hooks{packet_emotion_direct} = $emotionHookID;
 
 my %message_buffers;
+my $last_emotion_command;
 
 sub _getBufferState {
     my ($sender) = @_;
@@ -113,11 +117,16 @@ sub _sendQueuedResponse {
     return if $state->{buffer_deadline} && time() < $state->{buffer_deadline};
 
     my $response = $state->{response_queue}[0];
+    my $emotion_command = _extractEmotionCommand($response);
     if (!$state->{typing_until}) {
-        my $typing_speed = AIChat::Config::get('typing_speed');
         my $delay = 0;
-        if ($typing_speed && $typing_speed > 0) {
-            $delay = length($response) / $typing_speed;
+        if ($emotion_command) {
+            $delay = 2 + rand(3);
+        } else {
+            my $typing_speed = AIChat::Config::get('typing_speed');
+            if ($typing_speed && $typing_speed > 0) {
+                $delay = length($response) / $typing_speed;
+            }
         }
         $state->{typing_until} = time() + $delay;
     }
@@ -127,7 +136,14 @@ sub _sendQueuedResponse {
     $response = shift @{$state->{response_queue}};
     $state->{response_started} = 1;
     my $context = $state->{context} || {};
-    if ($context->{type} && $context->{type} eq 'public') {
+    if ($emotion_command) {
+        my $emotion_id = getEmotionByCommand($emotion_command);
+        if (defined $emotion_id) {
+            $messageSender->sendEmotion($emotion_id);
+        } else {
+            $messageSender->sendChat($response);
+        }
+    } elsif ($context->{type} && $context->{type} eq 'public') {
         $messageSender->sendChat($response);
         AIChat::Log::log_message(
             direction => 'out',
@@ -223,6 +239,7 @@ sub onUnload {
     $hooks{main_loop_pre}->unhook();
     Plugins::delHook($hooks{packet_privMsg_direct}) if defined $hooks{packet_privMsg_direct};
     Plugins::delHook($hooks{packet_pubMsg_direct}) if defined $hooks{packet_pubMsg_direct};
+    Plugins::delHook($hooks{packet_emotion_direct}) if defined $hooks{packet_emotion_direct};
     
     # Tentar encerrar o servidor Node.js
     my $pid_file = "plugins/aiChat/proxy_pid.txt";
@@ -303,6 +320,10 @@ sub onPrivateMessage {
     my $sender = bytesToString($args->{privMsgUser});
     my $message = bytesToString($args->{privMsg});
 
+    if (_shouldEchoEmotion($message) && $last_emotion_command) {
+        _queueEmotionResponse($sender, $last_emotion_command, { type => 'private' });
+        return;
+    }
     AIChat::Log::log_message(
         direction => 'in',
         visibility => 'private',
@@ -328,6 +349,10 @@ sub onPublicMessage {
     return unless defined $sender && defined $message;
     return if $char && defined $char->{name} && $sender eq $char->{name};
 
+    if (_shouldEchoEmotion($message) && $last_emotion_command) {
+        _queueEmotionResponse($sender, $last_emotion_command, { type => 'public' });
+        return;
+    }
     AIChat::Log::log_message(
         direction => 'in',
         visibility => 'public',
@@ -335,6 +360,57 @@ sub onPublicMessage {
         message => $message,
     );
     _enqueueMessage($sender, $message, { type => 'public' });
+}
+
+sub onEmotion {
+    my (undef, $args) = @_;
+    return unless defined $field;
+    return unless ($field->baseName // '') eq 'sec_pri';
+
+    my $command = _getEmotionCommandByDisplay($args->{emotion});
+    return unless $command;
+
+    $last_emotion_command = $command;
+}
+
+sub _getEmotionCommandByDisplay {
+    my ($display) = @_;
+    return unless defined $display;
+    for my $emotion_id (keys %emotions_lut) {
+        next unless defined $emotions_lut{$emotion_id}{display};
+        next unless $emotions_lut{$emotion_id}{display} eq $display;
+        my $commands = $emotions_lut{$emotion_id}{command};
+        next unless $commands;
+        my ($first_command) = split /\s*,\s*/, $commands;
+        return $first_command if $first_command;
+    }
+    return;
+}
+
+sub _extractEmotionCommand {
+    my ($response) = @_;
+    return unless defined $response;
+    return unless $response =~ /^\s*(?:\/?e)\s+([^\s]+)\s*$/i;
+    return $1;
+}
+
+sub _shouldEchoEmotion {
+    my ($message) = @_;
+    return unless defined $message;
+    return unless defined $field;
+    return unless ($field->baseName // '') eq 'sec_pri';
+    return $message =~ /\b(reproduza|repete|repita|faz|execute|executa)\b.*\b(emoji|emote|emoticon)\b/i;
+}
+
+sub _queueEmotionResponse {
+    my ($sender, $command, $context) = @_;
+    my $state = _getBufferState($sender);
+    $state->{messages} = [];
+    $state->{buffer_deadline} = 0;
+    $state->{typing_until} = 0;
+    $state->{context} = $context;
+    push @{$state->{response_queue}}, "e $command";
+    $state->{response_started} = 0;
 }
 
 1; 
