@@ -14,6 +14,7 @@ use Misc qw(getEmotionByCommand);
 use Utils qw(getHex timeOut);
 use Cwd 'abs_path';
 use Time::HiRes qw(time);
+use Actor ();
 
 use lib $Plugins::current_plugin_folder;
 use AIChat::Config;
@@ -57,7 +58,7 @@ my $emotionHookID = Plugins::addHook('packet_emotion', \&onEmotion, undef);
 $hooks{packet_emotion_direct} = $emotionHookID;
 
 my %message_buffers;
-my $last_emotion_command;
+my %last_emotion_command_by_sender;
 
 sub _getBufferState {
     my ($sender) = @_;
@@ -320,8 +321,8 @@ sub onPrivateMessage {
     my $sender = bytesToString($args->{privMsgUser});
     my $message = bytesToString($args->{privMsg});
 
-    if (_shouldEchoEmotion($message) && $last_emotion_command) {
-        _queueEmotionResponse($sender, $last_emotion_command, { type => 'private' });
+    if (_shouldEchoEmotion($sender, $message)) {
+        _queueEmotionResponse($sender, $last_emotion_command_by_sender{$sender}, { type => 'private' });
         return;
     }
     AIChat::Log::log_message(
@@ -349,8 +350,8 @@ sub onPublicMessage {
     return unless defined $sender && defined $message;
     return if $char && defined $char->{name} && $sender eq $char->{name};
 
-    if (_shouldEchoEmotion($message) && $last_emotion_command) {
-        _queueEmotionResponse($sender, $last_emotion_command, { type => 'public' });
+    if (_shouldEchoEmotion($sender, $message)) {
+        _queueEmotionResponse($sender, $last_emotion_command_by_sender{$sender}, { type => 'public' });
         return;
     }
     AIChat::Log::log_message(
@@ -364,13 +365,16 @@ sub onPublicMessage {
 
 sub onEmotion {
     my (undef, $args) = @_;
-    return unless defined $field;
-    return unless ($field->baseName // '') eq 'sec_pri';
 
     my $command = _getEmotionCommandByDisplay($args->{emotion});
     return unless $command;
 
-    $last_emotion_command = $command;
+    my $actor = Actor::get($args->{ID});
+    return unless $actor;
+    my $name = $actor->name;
+    return unless defined $name && $name ne '';
+
+    $last_emotion_command_by_sender{$name} = $command;
 }
 
 sub _getEmotionCommandByDisplay {
@@ -395,10 +399,12 @@ sub _extractEmotionCommand {
 }
 
 sub _shouldEchoEmotion {
-    my ($message) = @_;
+    my ($sender, $message) = @_;
+    return unless defined $sender;
     return unless defined $message;
-    return unless defined $field;
-    return unless ($field->baseName // '') eq 'sec_pri';
+    my $last_emotion = $last_emotion_command_by_sender{$sender};
+    return unless $last_emotion;
+    return unless _hasConversationHistory($sender);
     return $message =~ /\b(reproduza|repete|repita|faz|execute|executa)\b.*\b(emoji|emote|emoticon)\b/i;
 }
 
@@ -411,6 +417,12 @@ sub _queueEmotionResponse {
     $state->{context} = $context;
     push @{$state->{response_queue}}, "e $command";
     $state->{response_started} = 0;
+}
+
+sub _hasConversationHistory {
+    my ($sender) = @_;
+    my $history = AIChat::ConversationHistory::getHistory($sender);
+    return $history && ref $history eq 'ARRAY' && @$history;
 }
 
 1; 
