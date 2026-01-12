@@ -64,6 +64,21 @@ my %last_emotion_command_by_sender;
 my %last_emotion_time_by_sender;
 my %last_emotion_display_by_sender;
 my %last_emotion_hint_by_sender;
+my %pending_emotion_request_by_sender;
+
+my @fallback_emotion_commands = qw(
+    flg6
+    !
+    ?
+    ho
+    lv
+    swt
+    ic
+    an
+    ag
+    $
+    ...
+);
 
 sub _getBufferState {
     my ($sender) = @_;
@@ -174,6 +189,9 @@ sub _sendQueuedResponse {
 
 sub onTick {
     my $now = time();
+
+    _processPendingEmotionRequests($now);
+
     for my $sender (keys %message_buffers) {
         my $state = $message_buffers{$sender};
         next unless $state;
@@ -326,6 +344,8 @@ sub onPrivateMessage {
     my $sender = bytesToString($args->{privMsgUser});
     my $message = bytesToString($args->{privMsg});
 
+    return if _queueEmotionRequestIfNeeded($sender, $message, 'private');
+
     _injectEmotionHint($sender);
     AIChat::Log::log_message(
         direction => 'in',
@@ -344,6 +364,8 @@ sub onPublicMessage {
 
     return unless defined $sender && defined $message;
     return if $char && defined $char->{name} && $sender eq $char->{name};
+
+    return if _queueEmotionRequestIfNeeded($sender, $message, 'public');
 
     _injectEmotionHint($sender);
 
@@ -380,6 +402,8 @@ sub onEmotion {
     $last_emotion_command_by_sender{$sender_key} = $command;
     $last_emotion_time_by_sender{$sender_key} = $last_emotion_time;
     $last_emotion_display_by_sender{$sender_key} = $args->{emotion};
+
+    _handlePendingEmotionRequest($sender_key, $command);
 }
 
 sub _getEmotionCommandByDisplay {
@@ -417,6 +441,79 @@ sub _normalizeSenderKey {
     $key =~ s/^\s+//;
     $key =~ s/\s+$//;
     return lc $key;
+}
+
+sub _queueEmotionRequestIfNeeded {
+    my ($sender, $message, $context) = @_;
+    return unless defined $sender && defined $message;
+    return unless _isEmotionRequest($message);
+
+    my $sender_key = _normalizeSenderKey($sender);
+    return unless $sender_key;
+
+    $pending_emotion_request_by_sender{$sender_key} = {
+        requested_at => time(),
+        context => $context,
+    };
+    return 1;
+}
+
+sub _isEmotionRequest {
+    my ($message) = @_;
+    return unless defined $message;
+    return 1 if $message =~ /\bemoticom\b/i;
+    return 1 if $message =~ /\bemoticon\b/i;
+    return 1 if $message =~ /\bemote\b/i;
+    return;
+}
+
+sub _handlePendingEmotionRequest {
+    my ($sender_key, $command) = @_;
+    return unless defined $sender_key;
+    my $pending = $pending_emotion_request_by_sender{$sender_key};
+    return unless $pending;
+
+    my $requested_at = $pending->{requested_at} // 0;
+    return unless $requested_at;
+
+    if ((time - $requested_at) <= 5) {
+        _sendEmotionByCommand($command);
+        delete $pending_emotion_request_by_sender{$sender_key};
+    }
+}
+
+sub _processPendingEmotionRequests {
+    my ($now) = @_;
+    for my $sender_key (keys %pending_emotion_request_by_sender) {
+        my $pending = $pending_emotion_request_by_sender{$sender_key};
+        next unless $pending;
+
+        my $requested_at = $pending->{requested_at} // 0;
+        next unless $requested_at;
+        next unless ($now - $requested_at) >= 5;
+
+        my $command = $last_emotion_command_by_sender{$sender_key};
+        if (!$command) {
+            $command = _pickFallbackEmotionCommand();
+        }
+
+        _sendEmotionByCommand($command) if $command;
+        delete $pending_emotion_request_by_sender{$sender_key};
+    }
+}
+
+sub _pickFallbackEmotionCommand {
+    my $count = scalar @fallback_emotion_commands;
+    return unless $count;
+    return $fallback_emotion_commands[int(rand($count))];
+}
+
+sub _sendEmotionByCommand {
+    my ($command) = @_;
+    return unless defined $command;
+    my $emotion_id = getEmotionByCommand($command);
+    return unless defined $emotion_id;
+    $messageSender->sendEmotion($emotion_id);
 }
 
 sub _getEmotionCommandFromText {
