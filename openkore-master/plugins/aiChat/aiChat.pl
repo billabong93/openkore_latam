@@ -136,6 +136,7 @@ sub _sendQueuedResponse {
     my ($sender, $state) = @_;
     return unless @{$state->{response_queue}};
     return if $state->{buffer_deadline} && time() < $state->{buffer_deadline};
+    return if _hasPendingEmotionRequest($sender);
 
     my $response = $state->{response_queue}[0];
     my $emotion_command = _extractEmotionCommand($response);
@@ -195,6 +196,7 @@ sub onTick {
     for my $sender (keys %message_buffers) {
         my $state = $message_buffers{$sender};
         next unless $state;
+        next if _hasPendingEmotionRequest($sender);
 
         if (_hasAggressiveMonsters()) {
             if (@{$state->{messages}} && $state->{buffer_deadline} && $now >= $state->{buffer_deadline}) {
@@ -402,8 +404,6 @@ sub onEmotion {
     $last_emotion_command_by_sender{$sender_key} = $command;
     $last_emotion_time_by_sender{$sender_key} = $last_emotion_time;
     $last_emotion_display_by_sender{$sender_key} = $args->{emotion};
-
-    _handlePendingEmotionRequest($sender_key, $command);
 }
 
 sub _getEmotionCommandByDisplay {
@@ -451,8 +451,11 @@ sub _queueEmotionRequestIfNeeded {
     my $sender_key = _normalizeSenderKey($sender);
     return unless $sender_key;
 
+    my $delay = 3 + rand(3);
+
     $pending_emotion_request_by_sender{$sender_key} = {
         requested_at => time(),
+        respond_at => time() + $delay,
         context => $context,
     };
     return 1;
@@ -467,30 +470,15 @@ sub _isEmotionRequest {
     return;
 }
 
-sub _handlePendingEmotionRequest {
-    my ($sender_key, $command) = @_;
-    return unless defined $sender_key;
-    my $pending = $pending_emotion_request_by_sender{$sender_key};
-    return unless $pending;
-
-    my $requested_at = $pending->{requested_at} // 0;
-    return unless $requested_at;
-
-    if ((time - $requested_at) <= 5) {
-        _sendEmotionByCommand($command);
-        delete $pending_emotion_request_by_sender{$sender_key};
-    }
-}
-
 sub _processPendingEmotionRequests {
     my ($now) = @_;
     for my $sender_key (keys %pending_emotion_request_by_sender) {
         my $pending = $pending_emotion_request_by_sender{$sender_key};
         next unless $pending;
 
-        my $requested_at = $pending->{requested_at} // 0;
-        next unless $requested_at;
-        next unless ($now - $requested_at) >= 5;
+        my $respond_at = $pending->{respond_at} // 0;
+        next unless $respond_at;
+        next unless $now >= $respond_at;
 
         my $command = $last_emotion_command_by_sender{$sender_key};
         if (!$command) {
@@ -514,6 +502,14 @@ sub _sendEmotionByCommand {
     my $emotion_id = getEmotionByCommand($command);
     return unless defined $emotion_id;
     $messageSender->sendEmotion($emotion_id);
+}
+
+sub _hasPendingEmotionRequest {
+    my ($sender) = @_;
+    return unless defined $sender;
+    my $sender_key = _normalizeSenderKey($sender);
+    return unless $sender_key;
+    return exists $pending_emotion_request_by_sender{$sender_key};
 }
 
 sub _getEmotionCommandFromText {
