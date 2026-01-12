@@ -4,15 +4,17 @@ use strict;
 use warnings;
 
 use Commands;
-use Globals qw(%timeout $messageSender $net %config $char $field %jobs_lut);
+use Globals qw(%timeout $messageSender $net %config $char $field %jobs_lut %emotions_lut);
 use Settings qw(%sys);
 use I18N qw(bytesToString);
 use Log qw(warning message debug);
 use Plugins;
 use AI;
+use Misc qw(getEmotionByCommand);
 use Utils qw(getHex timeOut);
 use Cwd 'abs_path';
 use Time::HiRes qw(time);
+use Actor ();
 
 use lib $Plugins::current_plugin_folder;
 use AIChat::Config;
@@ -20,6 +22,7 @@ use AIChat::APIClient;
 use AIChat::MessageHandler;
 use AIChat::ConversationHistory;
 use AIChat::HookManager;
+use AIChat::Log;
 
 use constant {
     PLUGIN_PREFIX => "[aiChat]",
@@ -51,8 +54,16 @@ my $privMsgHookID = Plugins::addHook('packet_privMsg', \&onPrivateMessage, undef
 $hooks{packet_privMsg_direct} = $privMsgHookID;
 my $pubMsgHookID = Plugins::addHook('packet_pubMsg', \&onPublicMessage, undef);
 $hooks{packet_pubMsg_direct} = $pubMsgHookID;
+my $emotionHookID = Plugins::addHook('packet_emotion', \&onEmotion, undef);
+$hooks{packet_emotion_direct} = $emotionHookID;
 
 my %message_buffers;
+my $last_emotion_command;
+my $last_emotion_time;
+my %last_emotion_command_by_sender;
+my %last_emotion_time_by_sender;
+my %last_emotion_display_by_sender;
+my %last_emotion_hint_by_sender;
 
 sub _getBufferState {
     my ($sender) = @_;
@@ -112,11 +123,16 @@ sub _sendQueuedResponse {
     return if $state->{buffer_deadline} && time() < $state->{buffer_deadline};
 
     my $response = $state->{response_queue}[0];
+    my $emotion_command = _extractEmotionCommand($response);
     if (!$state->{typing_until}) {
-        my $typing_speed = AIChat::Config::get('typing_speed');
         my $delay = 0;
-        if ($typing_speed && $typing_speed > 0) {
-            $delay = length($response) / $typing_speed;
+        if ($emotion_command) {
+            $delay = 2 + rand(3);
+        } else {
+            my $typing_speed = AIChat::Config::get('typing_speed');
+            if ($typing_speed && $typing_speed > 0) {
+                $delay = length($response) / $typing_speed;
+            }
         }
         $state->{typing_until} = time() + $delay;
     }
@@ -126,10 +142,29 @@ sub _sendQueuedResponse {
     $response = shift @{$state->{response_queue}};
     $state->{response_started} = 1;
     my $context = $state->{context} || {};
-    if ($context->{type} && $context->{type} eq 'public') {
+    if ($emotion_command) {
+        my $emotion_id = getEmotionByCommand($emotion_command);
+        if (defined $emotion_id) {
+            $messageSender->sendEmotion($emotion_id);
+        } else {
+            $messageSender->sendChat($response);
+        }
+    } elsif ($context->{type} && $context->{type} eq 'public') {
         $messageSender->sendChat($response);
+        AIChat::Log::log_message(
+            direction => 'out',
+            visibility => 'public',
+            sender => 'Public',
+            message => $response,
+        );
     } else {
         $messageSender->sendPrivateMsg($sender, $response);
+        AIChat::Log::log_message(
+            direction => 'out',
+            visibility => 'private',
+            sender => $sender,
+            message => $response,
+        );
     }
 
     AIChat::ConversationHistory::addMessage($sender, "assistant", $response);
@@ -210,6 +245,7 @@ sub onUnload {
     $hooks{main_loop_pre}->unhook();
     Plugins::delHook($hooks{packet_privMsg_direct}) if defined $hooks{packet_privMsg_direct};
     Plugins::delHook($hooks{packet_pubMsg_direct}) if defined $hooks{packet_pubMsg_direct};
+    Plugins::delHook($hooks{packet_emotion_direct}) if defined $hooks{packet_emotion_direct};
     
     # Tentar encerrar o servidor Node.js
     my $pid_file = "plugins/aiChat/proxy_pid.txt";
@@ -261,6 +297,7 @@ sub onCommand {
         message "Chave API: " . (AIChat::Config::get('api_key') ? "Configurada" : "Não configurada"), "list";
         message "Modelo: " . AIChat::Config::get('model'), "list";
         message "Prompt: " . AIChat::Config::get('prompt'), "list";
+        message "Prompt GM (sec_pri): " . AIChat::Config::get('prompt_gm'), "list";
         message "Max Tokens: " . AIChat::Config::get('max_tokens'), "list";
         message "Temperatura: " . AIChat::Config::get('temperature'), "list";
         message "Chance de dividir resposta: " . AIChat::Config::get('split_chance'), "list";
@@ -289,26 +326,115 @@ sub onPrivateMessage {
     my $sender = bytesToString($args->{privMsgUser});
     my $message = bytesToString($args->{privMsg});
 
+    _injectEmotionHint($sender);
+    AIChat::Log::log_message(
+        direction => 'in',
+        visibility => 'private',
+        sender => $sender,
+        message => $message,
+    );
     _enqueueMessage($sender, $message, { type => 'private' });
 }
 
 sub onPublicMessage {
     my (undef, $args) = @_;
     return unless defined $field;
-    my $map_name = $field->baseName // '';
-    if ($map_name ne 'sec_pri') {
-        my $lock_map = $config{lockMap} // '';
-        return unless $lock_map && $map_name eq $lock_map;
-        return unless AIChat::Config::get('public_on_lockmap');
-    }
-
     my $sender = bytesToString($args->{pubMsgUser} || $args->{MsgUser});
     my $message = bytesToString($args->{pubMsg} || $args->{Msg});
 
     return unless defined $sender && defined $message;
     return if $char && defined $char->{name} && $sender eq $char->{name};
 
+    _injectEmotionHint($sender);
+
+    my $map_name = $field->baseName // '';
+    if ($map_name ne 'sec_pri') {
+        my $lock_map = $config{lockMap} // '';
+        return unless $lock_map && $map_name eq $lock_map;
+        return unless AIChat::Config::get('public_on_lockmap');
+    }
+    AIChat::Log::log_message(
+        direction => 'in',
+        visibility => 'public',
+        sender => $sender,
+        message => $message,
+    );
     _enqueueMessage($sender, $message, { type => 'public' });
+}
+
+sub onEmotion {
+    my (undef, $args) = @_;
+
+    my $command = _getEmotionCommandByDisplay($args->{emotion});
+    return unless $command;
+
+    $last_emotion_command = $command;
+    $last_emotion_time = time;
+
+    my $actor = Actor::get($args->{ID});
+    return unless $actor;
+    my $name = bytesToString($actor->name);
+    return unless defined $name && $name ne '';
+    my $sender_key = _normalizeSenderKey($name);
+
+    $last_emotion_command_by_sender{$sender_key} = $command;
+    $last_emotion_time_by_sender{$sender_key} = $last_emotion_time;
+    $last_emotion_display_by_sender{$sender_key} = $args->{emotion};
+}
+
+sub _getEmotionCommandByDisplay {
+    my ($display) = @_;
+    return unless defined $display;
+    for my $emotion_id (keys %emotions_lut) {
+        next unless defined $emotions_lut{$emotion_id}{display};
+        next unless $emotions_lut{$emotion_id}{display} eq $display;
+        my $commands = $emotions_lut{$emotion_id}{command};
+        next unless $commands;
+        my ($first_command) = split /\s*,\s*/, $commands;
+        return $first_command if $first_command;
+    }
+    return;
+}
+
+sub _extractEmotionCommand {
+    my ($response) = @_;
+    return unless defined $response;
+    return unless $response =~ /^\s*(?:\/?e)\s+([^\s]+)\s*$/i;
+    return $1;
+}
+
+sub _normalizeSenderKey {
+    my ($sender) = @_;
+    return unless defined $sender;
+    my $key = $sender;
+    $key =~ s/^\s+//;
+    $key =~ s/\s+$//;
+    return lc $key;
+}
+
+sub _injectEmotionHint {
+    my ($sender) = @_;
+    return unless defined $sender;
+    my $sender_key = _normalizeSenderKey($sender);
+    return unless $sender_key;
+
+    my $command = $last_emotion_command_by_sender{$sender_key};
+    my $display = $last_emotion_display_by_sender{$sender_key};
+    my $seen_time = $last_emotion_time_by_sender{$sender_key};
+    if (!$command || !$seen_time || (time - $seen_time) > 120) {
+        $command = $last_emotion_command;
+        $seen_time = $last_emotion_time;
+        $display = undef;
+    }
+    return unless $command && $seen_time && (time - $seen_time) <= 120;
+
+    my $hint = "Último emoticon visto: comando e $command";
+    $hint .= " (display $display)" if defined $display && $display ne '';
+    my $last_hint = $last_emotion_hint_by_sender{$sender_key};
+    return if defined $last_hint && $last_hint eq $hint;
+
+    AIChat::ConversationHistory::addMessage($sender, "system", $hint, "emotion_hint");
+    $last_emotion_hint_by_sender{$sender_key} = $hint;
 }
 
 1; 

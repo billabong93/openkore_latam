@@ -8,6 +8,7 @@ use HTTP::Request;
 use JSON::Tiny qw(decode_json encode_json);
 use Log qw(warning message debug);
 use Utils qw(dumpHash);
+use Globals qw($field);
 
 use AIChat::Config;
 use AIChat::ConversationHistory;
@@ -38,10 +39,16 @@ sub callAPI {
     my $history = AIChat::ConversationHistory::getHistory($sender);
     
     # Prepara as mensagens incluindo o histórico
+    my $prompt = AIChat::Config::get('prompt');
+    if (defined $field && ($field->baseName // '') eq 'sec_pri') {
+        my $gm_prompt = AIChat::Config::get('prompt_gm');
+        $prompt = $gm_prompt if defined $gm_prompt && $gm_prompt ne '';
+    }
+
     my @messages = (
         {
             role => "system",
-            content => AIChat::Config::get('prompt')
+            content => $prompt
         }
     );
     
