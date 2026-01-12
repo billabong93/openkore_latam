@@ -67,6 +67,7 @@ my %last_emotion_hint_by_sender;
 my %pending_emotion_request_by_sender;
 my %pending_emotion_followup_by_sender;
 my %suppress_reply_until_by_sender;
+my %emote_request_times_by_sender;
 
 my @fallback_emotion_commands = qw(
     flg6
@@ -353,9 +354,12 @@ sub onPrivateMessage {
     my $sender = bytesToString($args->{privMsgUser});
     my $message = bytesToString($args->{privMsg});
 
-    my $intent = _interpretCommand($message, $sender, { map_name => $field ? $field->baseName : undef, lock_map => $config{lockMap} });
+    my $intent_context = { map_name => $field ? $field->baseName : undef, lock_map => $config{lockMap} };
+    my $intent = _interpretCommand($message, $sender, $intent_context);
     _injectEmotionHint($sender);
-    if (_queueEmotionRequestIfNeeded($sender, $message, 'private', $intent, { map_name => $field ? $field->baseName : undef, lock_map => $config{lockMap} })) {
+    if (_shouldRefuseEmoteRequest($sender, $intent, $intent_context)) {
+        _injectEmoteSpamRefusalHint($sender);
+    } elsif (_queueEmotionRequestIfNeeded($sender, $message, 'private', $intent, $intent_context)) {
         AIChat::Log::log_message(
             direction => 'in',
             visibility => 'private',
@@ -383,9 +387,12 @@ sub onPublicMessage {
     return unless defined $sender && defined $message;
     return if $char && defined $char->{name} && $sender eq $char->{name};
 
-    my $intent = _interpretCommand($message, $sender, { map_name => $field ? $field->baseName : undef, lock_map => $config{lockMap} });
+    my $intent_context = { map_name => $field ? $field->baseName : undef, lock_map => $config{lockMap} };
+    my $intent = _interpretCommand($message, $sender, $intent_context);
     _injectEmotionHint($sender);
-    if (_queueEmotionRequestIfNeeded($sender, $message, 'public', $intent, { map_name => $field ? $field->baseName : undef, lock_map => $config{lockMap} })) {
+    if (_shouldRefuseEmoteRequest($sender, $intent, $intent_context)) {
+        _injectEmoteSpamRefusalHint($sender);
+    } elsif (_queueEmotionRequestIfNeeded($sender, $message, 'public', $intent, $intent_context)) {
         AIChat::Log::log_message(
             direction => 'in',
             visibility => 'public',
@@ -478,6 +485,7 @@ sub _queueEmotionRequestIfNeeded {
     $state->{response_started} = 0;
 
     AIChat::ConversationHistory::addMessage($sender, "user", $message, "intent");
+    _recordEmoteRequest($sender);
 
     $pending_emotion_request_by_sender{$sender_key} = {
         requested_at => time(),
@@ -494,6 +502,49 @@ sub _isEmotionRequest {
     my $result = $intent || _interpretCommand($message, $sender, $context);
     return unless $result && ref $result eq 'HASH';
     return $result->{action} && $result->{action} eq 'emote';
+}
+
+sub _shouldRefuseEmoteRequest {
+    my ($sender, $intent, $context) = @_;
+    return unless defined $sender;
+    return unless $intent && ref $intent eq 'HASH';
+    return unless $intent->{action} && $intent->{action} eq 'emote';
+
+    my $map_name = $context && defined $context->{map_name} ? $context->{map_name} : '';
+    return if $map_name eq 'sec_pri';
+
+    my $lock_map = $context && defined $context->{lock_map} ? $context->{lock_map} : '';
+    return unless $lock_map && $map_name eq $lock_map;
+
+    return _isEmoteSpam($sender);
+}
+
+sub _recordEmoteRequest {
+    my ($sender) = @_;
+    return unless defined $sender;
+    my $sender_key = _normalizeSenderKey($sender);
+    return unless $sender_key;
+    push @{$emote_request_times_by_sender{$sender_key}}, time();
+}
+
+sub _isEmoteSpam {
+    my ($sender) = @_;
+    return unless defined $sender;
+    my $sender_key = _normalizeSenderKey($sender);
+    return unless $sender_key;
+    my $now = time();
+    my $window = 60;
+    my $max_requests = 3;
+    my $times = $emote_request_times_by_sender{$sender_key} || [];
+    my @recent = grep { ($now - $_) <= $window } @$times;
+    $emote_request_times_by_sender{$sender_key} = \@recent;
+    return scalar(@recent) >= $max_requests;
+}
+
+sub _injectEmoteSpamRefusalHint {
+    my ($sender) = @_;
+    return unless defined $sender;
+    AIChat::ConversationHistory::addMessage($sender, "system", "Usuario insistiu em varios emoticons seguidos. Responda curto e seco recusando ou pedindo para parar.", "intent");
 }
 
 sub _interpretCommand {
