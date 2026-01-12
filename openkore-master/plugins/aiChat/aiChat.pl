@@ -66,6 +66,7 @@ my %last_emotion_display_by_sender;
 my %last_emotion_hint_by_sender;
 my %pending_emotion_request_by_sender;
 my %suppress_reply_until_by_sender;
+my %pending_emotion_followup_by_sender;
 
 my @fallback_emotion_commands = qw(
     flg6
@@ -194,11 +195,13 @@ sub onTick {
     my $now = time();
 
     _processPendingEmotionRequests($now);
+    _processPendingEmotionFollowups($now);
 
     for my $sender (keys %message_buffers) {
         my $state = $message_buffers{$sender};
         next unless $state;
         next if _hasPendingEmotionRequest($sender);
+        next if _hasPendingEmotionFollowup($sender);
         next if _isReplySuppressed($sender);
 
         if (_hasAggressiveMonsters()) {
@@ -511,7 +514,7 @@ sub _processPendingEmotionRequests {
         }
 
         _sendEmotionByCommand($command) if $command;
-        _sendEmotionFollowup($pending->{sender_name}, $pending->{context});
+        _queueEmotionFollowup($pending->{sender_name}, $pending->{context});
         $suppress_reply_until_by_sender{$sender_key} = $now + 2;
         delete $pending_emotion_request_by_sender{$sender_key};
     }
@@ -549,6 +552,14 @@ sub _hasPendingEmotionRequest {
     return exists $pending_emotion_request_by_sender{$sender_key};
 }
 
+sub _hasPendingEmotionFollowup {
+    my ($sender) = @_;
+    return unless defined $sender;
+    my $sender_key = _normalizeSenderKey($sender);
+    return unless $sender_key;
+    return exists $pending_emotion_followup_by_sender{$sender_key};
+}
+
 sub _isReplySuppressed {
     my ($sender) = @_;
     return unless defined $sender;
@@ -560,29 +571,27 @@ sub _isReplySuppressed {
     return;
 }
 
-sub _sendEmotionFollowup {
+sub _queueEmotionFollowup {
     my ($sender_name, $context) = @_;
     return unless defined $sender_name;
     my $followup = _pickEmotionFollowup();
     return unless $followup;
 
-    if ($context && $context eq 'public') {
-        $messageSender->sendChat($followup);
-        AIChat::Log::log_message(
-            direction => 'out',
-            visibility => 'public',
-            sender => 'Public',
-            message => $followup,
-        );
-    } else {
-        $messageSender->sendPrivateMsg($sender_name, $followup);
-        AIChat::Log::log_message(
-            direction => 'out',
-            visibility => 'private',
-            sender => $sender_name,
-            message => $followup,
-        );
+    my $sender_key = _normalizeSenderKey($sender_name);
+    return unless $sender_key;
+
+    my $typing_speed = AIChat::Config::get('typing_speed');
+    my $typing_delay = 0;
+    if ($typing_speed && $typing_speed > 0) {
+        $typing_delay = length($followup) / $typing_speed;
     }
+
+    $pending_emotion_followup_by_sender{$sender_key} = {
+        send_at => time() + $typing_delay,
+        message => $followup,
+        context => $context,
+        sender_name => $sender_name,
+    };
 }
 
 sub _pickEmotionFollowup {
@@ -592,6 +601,41 @@ sub _pickEmotionFollowup {
         "to liberado?",
     );
     return $options[int(rand(@options))];
+}
+
+sub _processPendingEmotionFollowups {
+    my ($now) = @_;
+    for my $sender_key (keys %pending_emotion_followup_by_sender) {
+        my $pending = $pending_emotion_followup_by_sender{$sender_key};
+        next unless $pending;
+
+        my $send_at = $pending->{send_at} // 0;
+        next unless $send_at;
+        next unless $now >= $send_at;
+
+        my $message = $pending->{message};
+        my $context = $pending->{context};
+        my $sender_name = $pending->{sender_name};
+        if ($context && $context eq 'public') {
+            $messageSender->sendChat($message);
+            AIChat::Log::log_message(
+                direction => 'out',
+                visibility => 'public',
+                sender => 'Public',
+                message => $message,
+            );
+        } else {
+            $messageSender->sendPrivateMsg($sender_name, $message);
+            AIChat::Log::log_message(
+                direction => 'out',
+                visibility => 'private',
+                sender => $sender_name,
+                message => $message,
+            );
+        }
+
+        delete $pending_emotion_followup_by_sender{$sender_key};
+    }
 }
 
 sub _getEmotionCommandFromText {
