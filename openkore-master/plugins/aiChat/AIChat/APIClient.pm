@@ -93,6 +93,40 @@ sub callAPI {
     }
 }
 
+sub callAPIWithMessages {
+    my ($self, $messages, $options) = @_;
+    return undef unless $messages && ref $messages eq 'ARRAY';
+
+    my $proxy_url = 'http://localhost:3000/proxy';
+    my $data = {
+        provider => $self->{provider},
+        model => $self->{model},
+        messages => $messages,
+        max_tokens => $self->{max_tokens},
+        temperature => $self->{temperature},
+    };
+
+    if ($options && ref $options eq 'HASH') {
+        $data->{max_tokens} = $options->{max_tokens} if defined $options->{max_tokens};
+        $data->{temperature} = $options->{temperature} if defined $options->{temperature};
+    }
+
+    my $json_data = encode_json($data);
+    my $request = HTTP::Request->new('POST', $proxy_url);
+    $request->header('Content-Type' => 'application/json');
+    $request->content($json_data);
+
+    my $response = $ua->request($request);
+
+    if ($response->is_success) {
+        my $result = decode_json($response->content);
+        return $result->{choices}[0]{message}{content};
+    } else {
+        warning "[aiChat] Proxy request failed: " . $response->status_line . ". Content: " . $response->decoded_content . "\n", "plugin";
+        return undef;
+    }
+}
+
 # Deixamos as subs originais comentadas para referência
 sub _sendOpenAIRequest { die "Not implemented, use proxy."; }
 sub _sendDeepSeekRequest { die "Not implemented, use proxy."; }

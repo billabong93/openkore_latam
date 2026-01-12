@@ -4,6 +4,7 @@ use strict;
 use warnings;
 
 use Log qw(warning message debug error);
+use JSON::Tiny qw(decode_json);
 # No direct Globals qw($char %jobs_lut $field) here.
 # Instead, we will rely on data populated by aiChat.pl
 
@@ -170,4 +171,56 @@ sub processMessages {
     return $parts;
 }
 
-1; 
+sub interpretCommand {
+    my ($message, $sender) = @_;
+    return undef unless defined $message && defined $sender;
+
+    my $history = AIChat::ConversationHistory::getHistory($sender) || [];
+    my @recent = grep { $_->{role} ne "system" } @$history;
+    @recent = @recent[-6 .. -1] if @recent > 6;
+
+    my @messages = (
+        {
+            role => "system",
+            content => "Voce e um classificador de comandos do bot. Responda apenas com JSON valido no formato {\"action\":\"chat|emote|none\"}. Use o contexto recente se necessario. Marque \"emote\" quando pedirem para reproduzir um emoticon, mesmo em pedidos repetidos ou indiretos. Se quiser recusar, marque \"chat\" para responder verbalmente. Marque \"chat\" quando for uma pergunta/comentario comum. Marque \"none\" quando nao houver acao clara. Nao inclua nenhum texto fora do JSON."
+        }
+    );
+
+    push @messages, map {
+        {
+            role => $_->{role},
+            content => $_->{content},
+        }
+    } @recent;
+
+    push @messages, {
+        role => "user",
+        content => $message,
+    };
+
+    my $response;
+    eval {
+        $response = $api_client->callAPIWithMessages(\@messages, {
+            max_tokens => 80,
+            temperature => 0,
+        });
+    };
+    if ($@) {
+        warning "[aiChat] Erro ao interpretar comando: $@\n", "plugin";
+        return undef;
+    }
+
+    return undef unless defined $response && length $response;
+    my $parsed;
+    eval {
+        $parsed = decode_json($response);
+    };
+    if ($@ || !ref $parsed) {
+        warning "[aiChat] Resposta invalida ao interpretar comando: $response\n", "plugin";
+        return undef;
+    }
+
+    return $parsed;
+}
+
+1;
