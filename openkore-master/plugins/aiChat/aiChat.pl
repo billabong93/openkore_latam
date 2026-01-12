@@ -353,9 +353,9 @@ sub onPrivateMessage {
     my $sender = bytesToString($args->{privMsgUser});
     my $message = bytesToString($args->{privMsg});
 
-    my $intent = _interpretCommand($message, $sender);
+    my $intent = _interpretCommand($message, $sender, { map_name => $field ? $field->baseName : undef, lock_map => $config{lockMap} });
     _injectEmotionHint($sender);
-    if (_queueEmotionRequestIfNeeded($sender, $message, 'private', $intent)) {
+    if (_queueEmotionRequestIfNeeded($sender, $message, 'private', $intent, { map_name => $field ? $field->baseName : undef, lock_map => $config{lockMap} })) {
         AIChat::Log::log_message(
             direction => 'in',
             visibility => 'private',
@@ -383,9 +383,9 @@ sub onPublicMessage {
     return unless defined $sender && defined $message;
     return if $char && defined $char->{name} && $sender eq $char->{name};
 
-    my $intent = _interpretCommand($message, $sender);
+    my $intent = _interpretCommand($message, $sender, { map_name => $field ? $field->baseName : undef, lock_map => $config{lockMap} });
     _injectEmotionHint($sender);
-    if (_queueEmotionRequestIfNeeded($sender, $message, 'public', $intent)) {
+    if (_queueEmotionRequestIfNeeded($sender, $message, 'public', $intent, { map_name => $field ? $field->baseName : undef, lock_map => $config{lockMap} })) {
         AIChat::Log::log_message(
             direction => 'in',
             visibility => 'public',
@@ -463,9 +463,9 @@ sub _normalizeSenderKey {
 }
 
 sub _queueEmotionRequestIfNeeded {
-    my ($sender, $message, $context, $intent) = @_;
+    my ($sender, $message, $context, $intent, $intent_context) = @_;
     return unless defined $sender && defined $message;
-    return unless _isEmotionRequest($message, $sender, $intent);
+    return unless _isEmotionRequest($message, $sender, $intent, $intent_context);
 
     my $sender_key = _normalizeSenderKey($sender);
     return unless $sender_key;
@@ -489,17 +489,17 @@ sub _queueEmotionRequestIfNeeded {
 }
 
 sub _isEmotionRequest {
-    my ($message, $sender, $intent) = @_;
+    my ($message, $sender, $intent, $context) = @_;
     return unless defined $message && defined $sender;
-    my $result = $intent || _interpretCommand($message, $sender);
+    my $result = $intent || _interpretCommand($message, $sender, $context);
     return unless $result && ref $result eq 'HASH';
     return $result->{action} && $result->{action} eq 'emote';
 }
 
 sub _interpretCommand {
-    my ($message, $sender) = @_;
+    my ($message, $sender, $context) = @_;
     return unless defined $message && defined $sender;
-    return AIChat::MessageHandler::interpretCommand($message, $sender);
+    return AIChat::MessageHandler::interpretCommand($message, $sender, $context);
 }
 
 sub _processPendingEmotionRequests {

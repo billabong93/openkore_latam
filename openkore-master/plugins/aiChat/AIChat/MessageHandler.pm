@@ -172,18 +172,24 @@ sub processMessages {
 }
 
 sub interpretCommand {
-    my ($message, $sender) = @_;
+    my ($message, $sender, $context) = @_;
     return undef unless defined $message && defined $sender;
 
     my $history = AIChat::ConversationHistory::getHistory($sender) || [];
     my @recent = grep { $_->{role} ne "system" } @$history;
     @recent = @recent[-6 .. -1] if @recent > 6;
 
-    my $map_name = $bot_character_data{map_name} // 'desconhecido';
+    my @recent_intents = grep { ($_->{type} // '') eq 'intent' } @$history;
+    @recent_intents = @recent_intents[-10 .. -1] if @recent_intents > 10;
+    my $recent_emote_requests = scalar @recent_intents;
+
+    my $map_name = $context && defined $context->{map_name} ? $context->{map_name} : ($bot_character_data{map_name} // 'desconhecido');
+    my $lock_map = $context && defined $context->{lock_map} ? $context->{lock_map} : '';
+    my $lock_map_info = $lock_map ne '' ? $lock_map : 'nenhum';
     my @messages = (
         {
             role => "system",
-            content => "Voce e um classificador de comandos do bot. Responda apenas com JSON valido no formato {\"action\":\"chat|emote|none\"}. Contexto: mapa atual=$map_name. Use o contexto recente se necessario. Marque \"emote\" quando pedirem para reproduzir um emoticon, mesmo em pedidos repetidos ou indiretos. Se a pessoa estiver importunando, voce pode recusar escolhendo \"chat\" e responder verbalmente. Em sec_pri, nunca recuse pedidos de emoticon: use \"emote\" sempre que o pedido for de emoticon. Marque \"chat\" quando for uma pergunta/comentario comum. Marque \"none\" quando nao houver acao clara. Nao inclua nenhum texto fora do JSON."
+            content => "Voce e um classificador de comandos do bot. Responda apenas com JSON valido no formato {\"action\":\"chat|emote|none\"}. Contexto: mapa atual=$map_name, lockMap=$lock_map_info, pedidos_emote_recentemente=$recent_emote_requests. Use o contexto recente se necessario. Marque \"emote\" quando pedirem para reproduzir um emoticon, mesmo em pedidos repetidos ou indiretos. Em sec_pri, nunca recuse pedidos de emoticon: use \"emote\" sempre que o pedido for de emoticon. Fora de sec_pri, aplique moderacao de spam somente quando estiver no lockMap (mapa atual == lockMap). Se estiverem importunando, voce pode recusar escolhendo \"chat\" para responder verbalmente. Marque \"chat\" quando for uma pergunta/comentario comum. Marque \"none\" quando nao houver acao clara. Nao inclua nenhum texto fora do JSON."
         }
     );
 
