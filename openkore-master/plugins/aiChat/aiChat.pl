@@ -383,11 +383,14 @@ sub onEmotion {
 }
 
 sub _getEmotionCommandByDisplay {
-    my ($display) = @_;
+    my ($display, $case_insensitive) = @_;
     return unless defined $display;
+    my $normalized_display = $case_insensitive ? lc $display : $display;
     for my $emotion_id (keys %emotions_lut) {
         next unless defined $emotions_lut{$emotion_id}{display};
-        next unless $emotions_lut{$emotion_id}{display} eq $display;
+        my $candidate = $emotions_lut{$emotion_id}{display};
+        $candidate = lc $candidate if $case_insensitive;
+        next unless $candidate eq $normalized_display;
         my $commands = $emotions_lut{$emotion_id}{command};
         next unless $commands;
         my ($first_command) = split /\s*,\s*/, $commands;
@@ -399,8 +402,15 @@ sub _getEmotionCommandByDisplay {
 sub _extractEmotionCommand {
     my ($response) = @_;
     return unless defined $response;
-    return unless $response =~ /^\s*(?:\/?e)\s+([^\s]+)\s*$/i;
-    return $1;
+    if ($response =~ /^\s*(?:\/?e)\s+([^\s]+)\s*$/i) {
+        return $1;
+    }
+    if ($response =~ /^\s*[\*\[]\s*(.+?)\s*[\*\]]\s*$/) {
+        my $display = $1;
+        my $command = _getEmotionCommandByDisplay($display, 1);
+        return $command if $command;
+    }
+    return;
 }
 
 sub _normalizeSenderKey {
