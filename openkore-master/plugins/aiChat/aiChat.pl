@@ -60,9 +60,10 @@ $hooks{packet_emotion_direct} = $emotionHookID;
 my %message_buffers;
 my $last_emotion_command;
 my $last_emotion_time;
-my %last_interaction_time;
 my %last_emotion_command_by_sender;
 my %last_emotion_time_by_sender;
+my %last_emotion_display_by_sender;
+my %last_emotion_hint_by_sender;
 
 sub _getBufferState {
     my ($sender) = @_;
@@ -325,15 +326,7 @@ sub onPrivateMessage {
     my $sender = bytesToString($args->{privMsgUser});
     my $message = bytesToString($args->{privMsg});
 
-    my $sender_key = _normalizeSenderKey($sender);
-    $last_interaction_time{$sender_key} = time;
-
-    if (my $emotion_command = _findRecentEmotionForSender($sender_key)) {
-        if (_shouldEchoEmotion($sender_key, $message, $emotion_command)) {
-            _queueEmotionResponse($sender, $emotion_command, { type => 'private' });
-            return;
-        }
-    }
+    _injectEmotionHint($sender);
     AIChat::Log::log_message(
         direction => 'in',
         visibility => 'private',
@@ -352,15 +345,7 @@ sub onPublicMessage {
     return unless defined $sender && defined $message;
     return if $char && defined $char->{name} && $sender eq $char->{name};
 
-    my $sender_key = _normalizeSenderKey($sender);
-    $last_interaction_time{$sender_key} = time;
-
-    if (my $emotion_command = _findRecentEmotionForSender($sender_key)) {
-        if (_shouldEchoEmotion($sender_key, $message, $emotion_command)) {
-            _queueEmotionResponse($sender, $emotion_command, { type => 'public' });
-            return;
-        }
-    }
+    _injectEmotionHint($sender);
 
     my $map_name = $field->baseName // '';
     if ($map_name ne 'sec_pri') {
@@ -394,6 +379,7 @@ sub onEmotion {
 
     $last_emotion_command_by_sender{$sender_key} = $command;
     $last_emotion_time_by_sender{$sender_key} = $last_emotion_time;
+    $last_emotion_display_by_sender{$sender_key} = $args->{emotion};
 }
 
 sub _getEmotionCommandByDisplay {
@@ -417,58 +403,6 @@ sub _extractEmotionCommand {
     return $1;
 }
 
-sub _shouldEchoEmotion {
-    my ($sender_key, $message, $emotion_command) = @_;
-    return unless defined $sender_key;
-    return unless defined $message;
-    return unless $emotion_command;
-    return unless _hasRecentInteraction($sender_key);
-    return $message =~ /\b(reproduza|repete|repita|faz|fa[aâ]a|execute|executa)\b.*\b(emoji|emote|emoticon|emoticom)\b/i
-        || $message =~ /\b(reproduza|repete|repita|faz|fa[aâ]a|execute|executa)\b.*\b(esse|essa|isso|aqui)\b/i
-        || $message =~ /\b(agora|entao|então)\b.*\b(faz|fa[aâ]a)\b.*\b(esse|essa|isso|aqui)\b/i;
-}
-
-sub _queueEmotionResponse {
-    my ($sender, $command, $context) = @_;
-    my $state = _getBufferState($sender);
-    $state->{messages} = [];
-    $state->{buffer_deadline} = 0;
-    $state->{typing_until} = 0;
-    $state->{context} = $context;
-    push @{$state->{response_queue}}, "e $command";
-    $state->{response_started} = 0;
-}
-
-sub _hasConversationHistory {
-    my ($sender_key) = @_;
-    my $history = AIChat::ConversationHistory::getHistory($sender_key);
-    return $history && ref $history eq 'ARRAY' && @$history;
-}
-
-sub _hasRecentInteraction {
-    my ($sender_key) = @_;
-    return unless $sender_key;
-    return 1 if _hasConversationHistory($sender_key);
-    my $last_time = $last_interaction_time{$sender_key};
-    return unless $last_time;
-    return (time - $last_time) <= 300;
-}
-
-sub _findRecentEmotionForSender {
-    my ($sender_key) = @_;
-    return unless $sender_key;
-
-    my $sender_command = $last_emotion_command_by_sender{$sender_key};
-    my $sender_time = $last_emotion_time_by_sender{$sender_key};
-    if ($sender_command && $sender_time && (time - $sender_time) <= 120) {
-        return $sender_command;
-    }
-
-    return unless $last_emotion_command;
-    return unless defined $last_emotion_time && (time - $last_emotion_time) <= 120;
-    return $last_emotion_command;
-}
-
 sub _normalizeSenderKey {
     my ($sender) = @_;
     return unless defined $sender;
@@ -476,6 +410,31 @@ sub _normalizeSenderKey {
     $key =~ s/^\s+//;
     $key =~ s/\s+$//;
     return lc $key;
+}
+
+sub _injectEmotionHint {
+    my ($sender) = @_;
+    return unless defined $sender;
+    my $sender_key = _normalizeSenderKey($sender);
+    return unless $sender_key;
+
+    my $command = $last_emotion_command_by_sender{$sender_key};
+    my $display = $last_emotion_display_by_sender{$sender_key};
+    my $seen_time = $last_emotion_time_by_sender{$sender_key};
+    if (!$command || !$seen_time || (time - $seen_time) > 120) {
+        $command = $last_emotion_command;
+        $seen_time = $last_emotion_time;
+        $display = undef;
+    }
+    return unless $command && $seen_time && (time - $seen_time) <= 120;
+
+    my $hint = "Último emoticon visto: comando e $command";
+    $hint .= " (display $display)" if defined $display && $display ne '';
+    my $last_hint = $last_emotion_hint_by_sender{$sender_key};
+    return if defined $last_hint && $last_hint eq $hint;
+
+    AIChat::ConversationHistory::addMessage($sender, "system", $hint, "emotion_hint");
+    $last_emotion_hint_by_sender{$sender_key} = $hint;
 }
 
 1; 
