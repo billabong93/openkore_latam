@@ -399,8 +399,15 @@ sub _getEmotionCommandByDisplay {
 sub _extractEmotionCommand {
     my ($response) = @_;
     return unless defined $response;
-    return unless $response =~ /^\s*(?:\/?e)\s+([^\s]+)\s*$/i;
-    return $1;
+    if ($response =~ /^\s*(?:\/?e)\s+([^\s]+)\s*$/i) {
+        return $1;
+    }
+
+    if ($response =~ /(?:^|\s)(?:\/?e)\s+([^\s]+)/i) {
+        return $1;
+    }
+
+    return _getEmotionCommandFromText($response);
 }
 
 sub _normalizeSenderKey {
@@ -410,6 +417,79 @@ sub _normalizeSenderKey {
     $key =~ s/^\s+//;
     $key =~ s/\s+$//;
     return lc $key;
+}
+
+sub _getEmotionCommandFromText {
+    my ($text) = @_;
+    return unless defined $text;
+
+    my @candidates;
+    while ($text =~ /\*([^*]+)\*/g) {
+        push @candidates, $1;
+    }
+    push @candidates, $text;
+
+    for my $candidate (@candidates) {
+        my $trimmed = $candidate;
+        $trimmed =~ s/^\s+//;
+        $trimmed =~ s/\s+$//;
+        next unless length $trimmed;
+
+        my $command = _getEmotionCommandByDisplay($trimmed);
+        return $command if $command;
+
+        $command = _getEmotionCommandByNormalizedDisplay($trimmed);
+        return $command if $command;
+    }
+
+    my $normalized_text = _normalizeEmotionDisplay($text);
+    return unless length $normalized_text;
+
+    for my $emotion_id (keys %emotions_lut) {
+        my $stored_display = $emotions_lut{$emotion_id}{display};
+        next unless defined $stored_display;
+        my $normalized_display = _normalizeEmotionDisplay($stored_display);
+        next unless length $normalized_display;
+        next unless index($normalized_text, $normalized_display) >= 0;
+        my $commands = $emotions_lut{$emotion_id}{command};
+        next unless $commands;
+        my ($first_command) = split /\s*,\s*/, $commands;
+        return $first_command if $first_command;
+    }
+
+    return;
+}
+
+sub _getEmotionCommandByNormalizedDisplay {
+    my ($display) = @_;
+    return unless defined $display;
+    my $normalized = _normalizeEmotionDisplay($display);
+    return unless length $normalized;
+
+    for my $emotion_id (keys %emotions_lut) {
+        my $stored_display = $emotions_lut{$emotion_id}{display};
+        next unless defined $stored_display;
+        my $normalized_display = _normalizeEmotionDisplay($stored_display);
+        next unless length $normalized_display;
+        next unless $normalized_display eq $normalized;
+        my $commands = $emotions_lut{$emotion_id}{command};
+        next unless $commands;
+        my ($first_command) = split /\s*,\s*/, $commands;
+        return $first_command if $first_command;
+    }
+    return;
+}
+
+sub _normalizeEmotionDisplay {
+    my ($display) = @_;
+    return '' unless defined $display;
+    my $normalized = $display;
+    $normalized =~ s/^\s+//;
+    $normalized =~ s/\s+$//;
+    $normalized =~ s/^\*+//;
+    $normalized =~ s/\*+$//;
+    $normalized =~ s/\s+/ /g;
+    return lc $normalized;
 }
 
 sub _injectEmotionHint {
