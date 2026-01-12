@@ -542,6 +542,7 @@ sub _sendEmotionByCommand {
 sub _queueEmotionFollowup {
     my ($sender_name, $context) = @_;
     return unless defined $sender_name;
+    return unless rand() < 0.4;
     my $followup = _pickEmotionFollowup();
     return unless $followup;
 
@@ -570,6 +571,13 @@ sub _pickEmotionFollowup {
         "fiz certo?",
         "era esse emoticom?",
         "to liberado?",
+        "ta bom pra vc?",
+        "mais alguma coisa?",
+        "ja posso ir?",
+        "foi isso mesmo?",
+        "precisa de mais?",
+        "beleza assim?",
+        "agora ta ok?",
     );
     return $options[int(rand(@options))];
 }

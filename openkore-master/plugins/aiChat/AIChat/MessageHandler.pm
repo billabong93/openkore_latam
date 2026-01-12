@@ -179,10 +179,11 @@ sub interpretCommand {
     my @recent = grep { $_->{role} ne "system" } @$history;
     @recent = @recent[-6 .. -1] if @recent > 6;
 
+    my $map_name = $bot_character_data{map_name} // 'desconhecido';
     my @messages = (
         {
             role => "system",
-            content => "Voce e um classificador de comandos do bot. Responda apenas com JSON valido no formato {\"action\":\"chat|emote|none\"}. Use o contexto recente se necessario. Marque \"emote\" quando pedirem para reproduzir um emoticon, mesmo em pedidos repetidos ou indiretos. Se quiser recusar, marque \"chat\" para responder verbalmente. Marque \"chat\" quando for uma pergunta/comentario comum. Marque \"none\" quando nao houver acao clara. Nao inclua nenhum texto fora do JSON."
+            content => "Voce e um classificador de comandos do bot. Responda apenas com JSON valido no formato {\"action\":\"chat|emote|none\"}. Contexto: mapa atual=$map_name. Use o contexto recente se necessario. Marque \"emote\" quando pedirem para reproduzir um emoticon, mesmo em pedidos repetidos ou indiretos. Se a pessoa estiver importunando, voce pode recusar escolhendo \"chat\" e responder verbalmente. Em sec_pri, nunca recuse pedidos de emoticon: use \"emote\" sempre que o pedido for de emoticon. Marque \"chat\" quando for uma pergunta/comentario comum. Marque \"none\" quando nao houver acao clara. Nao inclua nenhum texto fora do JSON."
         }
     );
 
