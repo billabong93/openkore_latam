@@ -123,7 +123,10 @@ sub _flushBufferedMessages {
 
     my $responses = AIChat::MessageHandler::processMessages(\@messages, $sender);
     if ($responses && ref $responses eq 'ARRAY' && @$responses) {
-        push @{$state->{response_queue}}, @$responses;
+        my @filtered = grep { defined $_ && $_ ne '' } @$responses;
+        if (@filtered) {
+            push @{$state->{response_queue}}, @filtered;
+        }
         $state->{response_started} = 0;
     } else {
         debug "[aiChat] Nenhuma resposta da AI gerada para mensagens de '$sender'\n", "plugin";

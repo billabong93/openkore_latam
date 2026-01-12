@@ -59,7 +59,8 @@ sub getCharacterInfo {
 }
 
 sub _splitResponse {
-    my ($response) = @_;
+    my ($response, $sender_messages) = @_;
+    $response = _dedupeMirror($response, $sender_messages);
     my @parts;
     my $split_chance = AIChat::Config::get('split_chance');
     $split_chance = 0.2 unless defined $split_chance;
@@ -167,8 +168,37 @@ sub processMessages {
 
     return undef unless defined $response && length $response > 0;
 
-    my $parts = _splitResponse($response);
+    my $parts = _splitResponse($response, $messages);
     return $parts;
+}
+
+sub _normalizeEchoText {
+    my ($text) = @_;
+    return '' unless defined $text;
+    my $normalized = lc $text;
+    $normalized =~ s/^\s+//;
+    $normalized =~ s/\s+$//;
+    $normalized =~ s/\s+/ /g;
+    $normalized =~ s/[?!.,:;'"()]+//g;
+    return $normalized;
+}
+
+sub _dedupeMirror {
+    my ($response, $sender_messages) = @_;
+    return $response unless defined $response && $sender_messages && ref $sender_messages eq 'ARRAY';
+    my $normalized_response = _normalizeEchoText($response);
+    return $response unless length $normalized_response;
+
+    for my $message (@$sender_messages) {
+        next unless defined $message;
+        my $normalized_message = _normalizeEchoText($message);
+        next unless length $normalized_message;
+        if ($normalized_response eq $normalized_message) {
+            return '';
+        }
+    }
+
+    return $response;
 }
 
 sub interpretCommand {
