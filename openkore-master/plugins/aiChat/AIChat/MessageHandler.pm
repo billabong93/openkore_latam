@@ -4,6 +4,7 @@ use strict;
 use warnings;
 
 use Log qw(warning message debug error);
+use JSON::Tiny qw(decode_json);
 # No direct Globals qw($char %jobs_lut $field) here.
 # Instead, we will rely on data populated by aiChat.pl
 
@@ -170,4 +171,56 @@ sub processMessages {
     return $parts;
 }
 
-1; 
+sub isEmotionRequest {
+    my ($message, $sender) = @_;
+    return 0 unless defined $message && defined $sender;
+
+    my $history = AIChat::ConversationHistory::getHistory($sender) || [];
+    my @recent = grep { $_->{role} ne "system" } @$history;
+    @recent = @recent[-6 .. -1] if @recent > 6;
+
+    my @messages = (
+        {
+            role => "system",
+            content => "Voce e um classificador. Responda apenas com JSON valido no formato {\"emote_request\": true|false}. Marque true quando o jogador estiver pedindo para o bot reproduzir um emoticon (mesmo que seja de forma indireta ou como continuacao do pedido anterior). Use o contexto recente se necessario. Nao inclua nenhum texto fora do JSON."
+        }
+    );
+
+    push @messages, map {
+        {
+            role => $_->{role},
+            content => $_->{content},
+        }
+    } @recent;
+
+    push @messages, {
+        role => "user",
+        content => $message,
+    };
+
+    my $response;
+    eval {
+        $response = $api_client->callAPIWithMessages(\@messages, {
+            max_tokens => 60,
+            temperature => 0,
+        });
+    };
+    if ($@) {
+        warning "[aiChat] Erro ao classificar pedido de emoticon: $@\n", "plugin";
+        return 0;
+    }
+
+    return 0 unless defined $response && length $response;
+    my $parsed;
+    eval {
+        $parsed = decode_json($response);
+    };
+    if ($@ || !ref $parsed) {
+        warning "[aiChat] Resposta invalida ao classificar pedido de emoticon: $response\n", "plugin";
+        return 0;
+    }
+
+    return $parsed->{emote_request} ? 1 : 0;
+}
+
+1;
