@@ -496,6 +496,13 @@ sub _isEmotionRequest {
     return 1 if $message =~ /\bemoticom\b/i;
     return 1 if $message =~ /\bemoticon\b/i;
     return 1 if $message =~ /\bemote\b/i;
+    return 1 if $message =~ /\bfaz\s+esse\b/i;
+    return 1 if $message =~ /\bfaz\s+esse\s+tamb[eé]m\b/i;
+    return 1 if $message =~ /\besse\s+aqui\b/i;
+    return 1 if $message =~ /\besse\s+tamb[eé]m\b/i;
+    return 1 if $message =~ /\bconsegue\s+fazer\b/i;
+    return 1 if $message =~ /\breproduz(ir|e)\b/i;
+
     return;
 }
 
@@ -554,10 +561,10 @@ sub _queueEmotionFollowup {
     return unless $sender_key;
 
     my $typing_speed = AIChat::Config::get('typing_speed');
-    my $typing_delay = 1;
+    my $typing_delay = 2;
     if ($typing_speed && $typing_speed > 0) {
         $typing_delay = length($followup) / $typing_speed;
-        $typing_delay = 1 if $typing_delay < 1;
+        $typing_delay = 2 if $typing_delay < 2;
     }
 
     my $send_at = time() + $typing_delay;
