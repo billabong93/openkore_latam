@@ -399,8 +399,7 @@ sub onPublicMessage {
     if ($map_name ne 'sec_pri') {
         my $lock_map = $config{lockMap} // '';
         my $allow_public = AIChat::Config::get('public_on_lockmap');
-        my $allow_intent = $intent && $intent->{action} && $intent->{action} eq 'chat';
-        return unless ($lock_map && $map_name eq $lock_map && $allow_public) || $allow_intent;
+        return unless $lock_map && $map_name eq $lock_map && $allow_public;
     }
     AIChat::Log::log_message(
         direction => 'in',
