@@ -399,8 +399,27 @@ sub _getEmotionCommandByDisplay {
 sub _extractEmotionCommand {
     my ($response) = @_;
     return unless defined $response;
-    return unless $response =~ /^\s*(?:\/?e)\s+([^\s]+)\s*$/i;
-    return $1;
+    if ($response =~ /^\s*(?:\/?e)\s+([^\s]+)\s*$/i) {
+        return $1;
+    }
+
+    my $trimmed = $response;
+    $trimmed =~ s/^\s+//;
+    $trimmed =~ s/\s+$//;
+    return unless length $trimmed;
+
+    my $display_candidate = $trimmed;
+    my $command = _getEmotionCommandByDisplay($display_candidate);
+    return $command if $command;
+
+    $display_candidate = "*$trimmed*";
+    $command = _getEmotionCommandByDisplay($display_candidate);
+    return $command if $command;
+
+    $command = _getEmotionCommandByNormalizedDisplay($trimmed);
+    return $command if $command;
+
+    return;
 }
 
 sub _normalizeSenderKey {
@@ -410,6 +429,38 @@ sub _normalizeSenderKey {
     $key =~ s/^\s+//;
     $key =~ s/\s+$//;
     return lc $key;
+}
+
+sub _getEmotionCommandByNormalizedDisplay {
+    my ($display) = @_;
+    return unless defined $display;
+    my $normalized = _normalizeEmotionDisplay($display);
+    return unless length $normalized;
+
+    for my $emotion_id (keys %emotions_lut) {
+        my $stored_display = $emotions_lut{$emotion_id}{display};
+        next unless defined $stored_display;
+        my $normalized_display = _normalizeEmotionDisplay($stored_display);
+        next unless length $normalized_display;
+        next unless $normalized_display eq $normalized;
+        my $commands = $emotions_lut{$emotion_id}{command};
+        next unless $commands;
+        my ($first_command) = split /\s*,\s*/, $commands;
+        return $first_command if $first_command;
+    }
+    return;
+}
+
+sub _normalizeEmotionDisplay {
+    my ($display) = @_;
+    return '' unless defined $display;
+    my $normalized = $display;
+    $normalized =~ s/^\s+//;
+    $normalized =~ s/\s+$//;
+    $normalized =~ s/^\*+//;
+    $normalized =~ s/\*+$//;
+    $normalized =~ s/\s+/ /g;
+    return lc $normalized;
 }
 
 sub _injectEmotionHint {
