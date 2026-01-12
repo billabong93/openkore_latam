@@ -539,21 +539,6 @@ sub _getEmotionCommandFromText {
         return $command if $command;
     }
 
-    my $normalized_text = _normalizeEmotionDisplay($text);
-    return unless length $normalized_text;
-
-    for my $emotion_id (keys %emotions_lut) {
-        my $stored_display = $emotions_lut{$emotion_id}{display};
-        next unless defined $stored_display;
-        my $normalized_display = _normalizeEmotionDisplay($stored_display);
-        next unless length $normalized_display;
-        next unless index($normalized_text, $normalized_display) >= 0;
-        my $commands = $emotions_lut{$emotion_id}{command};
-        next unless $commands;
-        my ($first_command) = split /\s*,\s*/, $commands;
-        return $first_command if $first_command;
-    }
-
     return;
 }
 
