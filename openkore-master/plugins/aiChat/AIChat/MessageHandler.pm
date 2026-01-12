@@ -171,9 +171,9 @@ sub processMessages {
     return $parts;
 }
 
-sub isEmotionRequest {
+sub interpretCommand {
     my ($message, $sender) = @_;
-    return 0 unless defined $message && defined $sender;
+    return undef unless defined $message && defined $sender;
 
     my $history = AIChat::ConversationHistory::getHistory($sender) || [];
     my @recent = grep { $_->{role} ne "system" } @$history;
@@ -182,7 +182,7 @@ sub isEmotionRequest {
     my @messages = (
         {
             role => "system",
-            content => "Voce e um classificador. Responda apenas com JSON valido no formato {\"emote_request\": true|false}. Marque true quando o jogador estiver pedindo para o bot reproduzir um emoticon (mesmo que seja de forma indireta ou como continuacao do pedido anterior). Use o contexto recente se necessario. Nao inclua nenhum texto fora do JSON."
+            content => "Voce e um classificador de comandos do bot. Responda apenas com JSON valido no formato {\"action\":\"chat|emote|none\"}. Use o contexto recente se necessario. Marque \"emote\" quando pedirem para reproduzir um emoticon. Marque \"chat\" quando for uma pergunta/comentario comum. Marque \"none\" quando nao houver acao clara. Nao inclua nenhum texto fora do JSON."
         }
     );
 
@@ -201,26 +201,26 @@ sub isEmotionRequest {
     my $response;
     eval {
         $response = $api_client->callAPIWithMessages(\@messages, {
-            max_tokens => 60,
+            max_tokens => 80,
             temperature => 0,
         });
     };
     if ($@) {
-        warning "[aiChat] Erro ao classificar pedido de emoticon: $@\n", "plugin";
-        return 0;
+        warning "[aiChat] Erro ao interpretar comando: $@\n", "plugin";
+        return undef;
     }
 
-    return 0 unless defined $response && length $response;
+    return undef unless defined $response && length $response;
     my $parsed;
     eval {
         $parsed = decode_json($response);
     };
     if ($@ || !ref $parsed) {
-        warning "[aiChat] Resposta invalida ao classificar pedido de emoticon: $response\n", "plugin";
-        return 0;
+        warning "[aiChat] Resposta invalida ao interpretar comando: $response\n", "plugin";
+        return undef;
     }
 
-    return $parsed->{emote_request} ? 1 : 0;
+    return $parsed;
 }
 
 1;

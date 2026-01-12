@@ -493,7 +493,9 @@ sub _queueEmotionRequestIfNeeded {
 sub _isEmotionRequest {
     my ($message, $sender) = @_;
     return unless defined $message && defined $sender;
-    return AIChat::MessageHandler::isEmotionRequest($message, $sender);
+    my $result = AIChat::MessageHandler::interpretCommand($message, $sender);
+    return unless $result && ref $result eq 'HASH';
+    return $result->{action} && $result->{action} eq 'emote';
 }
 
 sub _processPendingEmotionRequests {
