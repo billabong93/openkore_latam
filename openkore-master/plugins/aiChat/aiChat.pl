@@ -423,7 +423,9 @@ sub _shouldEchoEmotion {
     return unless defined $message;
     return unless $emotion_command;
     return unless _hasRecentInteraction($sender_key);
-    return $message =~ /\b(reproduza|repete|repita|faz|execute|executa)\b.*\b(emoji|emote|emoticon)\b/i;
+    return $message =~ /\b(reproduza|repete|repita|faz|fa[aâ]a|execute|executa)\b.*\b(emoji|emote|emoticon|emoticom)\b/i
+        || $message =~ /\b(reproduza|repete|repita|faz|fa[aâ]a|execute|executa)\b.*\b(esse|essa|isso|aqui)\b/i
+        || $message =~ /\b(agora|entao|então)\b.*\b(faz|fa[aâ]a)\b.*\b(esse|essa|isso|aqui)\b/i;
 }
 
 sub _queueEmotionResponse {
