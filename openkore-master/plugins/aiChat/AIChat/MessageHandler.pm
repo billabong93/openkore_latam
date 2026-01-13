@@ -283,7 +283,7 @@ sub generateEmoteFollowup {
         },
         {
             role => "system",
-            content => "Responda com uma mensagem curta apos um emoticon, confirmando se era o que a pessoa queria. Use o estilo de confirmacao curto tipo \"ok?\", \"mais alguma coisa?\", \"ta bom?\", \"foi isso?\". Mantenha entre 2 e 6 palavras. Nao use emojis. Nao seja rude ou agressivo. Varie a frase e seja natural."
+            content => "Responda com uma mensagem curta apos um emoticon, confirmando se era o que a pessoa queria. Use o estilo de confirmacao curto tipo \"ok?\", \"mais alguma coisa?\", \"ta bom?\", \"foi isso?\". Mantenha entre 2 e 6 palavras. Nao use emojis. Nao seja rude, agressivo ou negativo. Nao diga que nao vai fazer ou que esta ocupado. Varie a frase e seja natural."
         }
     );
 
