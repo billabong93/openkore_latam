@@ -481,6 +481,52 @@ sub dropDbUnknownReply {
     return _unknownDropReply();
 }
 
+sub generateDropDbChatResponse {
+    my ($message, $sender) = @_;
+    return dropDbUnknownReply() unless defined $message && $message ne '';
+
+    my $drop_context = _buildDropDbContext();
+    return dropDbUnknownReply() unless $drop_context;
+
+    my $prompt = AIChat::Config::get('prompt');
+    my @messages = (
+        {
+            role => "system",
+            content => $prompt
+        },
+        {
+            role => "system",
+            content => join "\n",
+                $drop_context,
+                "Responda somente usando as informacoes do banco acima.",
+                "Se nao houver informacao clara no banco, responda com uma frase curta de desconhecimento.",
+                "Exemplos de desconhecimento: nao sei, nao conheco, sei nao, nao to ligado, desculpa nao sei.",
+        },
+        {
+            role => "user",
+            content => $message,
+        }
+    );
+
+    my $response;
+    my $max_tokens = AIChat::Config::get('max_tokens');
+    my $temperature = AIChat::Config::get('temperature');
+    eval {
+        $response = $api_client->callAPIWithMessages(\@messages, {
+            max_tokens => $max_tokens,
+            temperature => $temperature,
+        });
+    };
+    if ($@ || !defined $response || $response eq '') {
+        return dropDbUnknownReply();
+    }
+
+    $response =~ s/\s+/ /g;
+    $response =~ s/^\s+//;
+    $response =~ s/\s+$//;
+    return $response ne '' ? $response : dropDbUnknownReply();
+}
+
 sub _buildWorldContext {
     my $map_name = $bot_character_data{map_name} // 'desconhecido';
     my $monsters = _normalizeList($bot_character_data{map_monsters});
