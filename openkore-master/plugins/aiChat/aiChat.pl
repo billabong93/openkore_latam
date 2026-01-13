@@ -274,6 +274,7 @@ sub updateBotCharacterData {
         }
         my @map_items = sort keys %map_items;
         $AIChat::MessageHandler::bot_character_data{map_items} = \@map_items;
+        AIChat::MessageHandler::updateMondbFromMap(\@map_monsters, \@map_items);
         
         debug "[aiChat] Dados do personagem atualizados: " . join(", ", map { "$_: " . $AIChat::MessageHandler::bot_character_data{$_} } keys %AIChat::MessageHandler::bot_character_data) . "\n", "plugin";
     } else {

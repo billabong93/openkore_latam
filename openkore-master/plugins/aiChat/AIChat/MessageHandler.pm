@@ -186,7 +186,7 @@ sub _buildWorldContext {
         "Itens vistos no chao: $item_text",
         "Drops basicos possiveis no mapa: $drop_map_text",
         "Drops basicos (geral): $drop_general",
-        "Se perguntarem sobre drops, responda apenas com base nesses dados. Use os nomes oficiais de monstros e itens desta lista (tabelas do servidor) e responda em linguagem popular. Se nao tiver certeza, nao invente nomes.";
+        "Se perguntarem sobre drops, responda apenas com base nesses dados. Use os nomes oficiais de monstros e itens desta lista (tabelas do servidor) e responda em linguagem popular. Se nao tiver certeza, diga que nao sabe ou nao tem certeza.";
 }
 
 sub _normalizeList {
@@ -253,6 +253,80 @@ sub _loadMonsterDropDb {
 
     $mondb_cache = \%db;
     return $mondb_cache;
+}
+
+sub updateMondbFromMap {
+    my ($map_monsters, $map_items) = @_;
+    my $monsters = _normalizeList($map_monsters);
+    my $items = _normalizeList($map_items);
+    return unless @$monsters && @$items;
+
+    my %new_items = map { $_ => 1 } grep { defined $_ && $_ ne '' } @$items;
+    return unless %new_items;
+
+    my $path = File::Spec->catfile($Plugins::current_plugin_folder, 'mondb.txt');
+    return unless -e $path;
+
+    my @lines = ();
+    my %drops_by_monster = ();
+    if (open my $fh, '<:encoding(UTF-8)', $path) {
+        @lines = <$fh>;
+        close $fh;
+    }
+
+    for my $line (@lines) {
+        my $raw = $line;
+        chomp $raw;
+        $raw =~ s/\r//g;
+        next if $raw =~ /^\s*#/ || $raw !~ /:/;
+        my ($monster, $drop_text) = split /\s*:\s*/, $raw, 2;
+        next unless defined $monster && defined $drop_text;
+        my @drops = map {
+            my $item = $_;
+            $item =~ s/^\s+//;
+            $item =~ s/\s+$//;
+            $item;
+        } split /\s*,\s*/, $drop_text;
+        $drops_by_monster{$monster} = \@drops;
+    }
+
+    my %line_index = ();
+    for my $i (0 .. $#lines) {
+        my $raw = $lines[$i];
+        chomp $raw;
+        $raw =~ s/\r//g;
+        next if $raw =~ /^\s*#/ || $raw !~ /:/;
+        my ($monster) = split /\s*:\s*/, $raw, 2;
+        $line_index{$monster} = $i if defined $monster;
+    }
+
+    my $changed = 0;
+    for my $monster (@$monsters) {
+        next unless defined $monster && $monster ne '';
+        my %merged = map { $_ => 1 } @{ $drops_by_monster{$monster} || [] };
+        @merged{keys %new_items} = (1) x scalar keys %new_items;
+        my @merged_list = sort keys %merged;
+        next unless @merged_list;
+        $drops_by_monster{$monster} = \@merged_list;
+        if (!exists $line_index{$monster}) {
+            push @lines, "$monster: " . join(', ', @merged_list) . "\n";
+            $changed = 1;
+        } else {
+            my $index = $line_index{$monster};
+            my $updated_line = "$monster: " . join(', ', @merged_list) . "\n";
+            if ($lines[$index] ne $updated_line) {
+                $lines[$index] = $updated_line;
+                $changed = 1;
+            }
+        }
+    }
+
+    return unless $changed;
+    if (open my $fh, '>:encoding(UTF-8)', $path) {
+        print $fh @lines;
+        close $fh;
+        $mondb_cache = undef;
+    }
 }
 
 sub _translateItemName {
