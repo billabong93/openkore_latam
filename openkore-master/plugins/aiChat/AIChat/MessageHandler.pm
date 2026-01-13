@@ -174,7 +174,7 @@ sub _buildWorldContext {
 
     my $monster_text = @$monsters ? join(', ', @$monsters) : 'nenhum confirmado';
     my $item_text = @$items ? join(', ', @$items) : 'nenhum confirmado';
-    my $drop_context = _buildBasicDropContext($monsters);
+    my $drop_context = _buildBasicDropContext($monsters, $map_name);
 
     my $drop_map_text = $drop_context->{map} || 'nenhum basico confirmado';
     my $drop_general = $drop_context->{general} || 'desconhecido';
@@ -197,7 +197,7 @@ sub _normalizeList {
 }
 
 sub _buildBasicDropContext {
-    my ($monsters) = @_;
+    my ($monsters, $map_name) = @_;
     my $mondb = _loadMonsterDropDb();
     return { general => '', map => '' } unless $mondb && %$mondb;
 
@@ -211,6 +211,13 @@ sub _buildBasicDropContext {
         push @general, "$monster: " . join(', ', @$drops);
         if ($present{lc $monster}) {
             push @map_specific, "$monster: " . join(', ', @$drops);
+        }
+    }
+
+    if (defined $map_name && $map_name ne '') {
+        my $map_key = "Mapa $map_name";
+        if ($mondb->{$map_key} && @{$mondb->{$map_key}}) {
+            push @map_specific, "$map_key: " . join(', ', @{$mondb->{$map_key}});
         }
     }
 
@@ -256,10 +263,10 @@ sub _loadMonsterDropDb {
 }
 
 sub updateMondbFromMap {
-    my ($map_monsters, $map_items) = @_;
-    my $monsters = _normalizeList($map_monsters);
+    my ($map_name, $map_items) = @_;
+    return unless defined $map_name && $map_name ne '';
     my $items = _normalizeList($map_items);
-    return unless @$monsters && @$items;
+    return unless @$items;
 
     my %new_items = map { $_ => 1 } grep { defined $_ && $_ ne '' } @$items;
     return unless %new_items;
@@ -301,23 +308,21 @@ sub updateMondbFromMap {
     }
 
     my $changed = 0;
-    for my $monster (@$monsters) {
-        next unless defined $monster && $monster ne '';
-        my %merged = map { $_ => 1 } @{ $drops_by_monster{$monster} || [] };
-        @merged{keys %new_items} = (1) x scalar keys %new_items;
-        my @merged_list = sort keys %merged;
-        next unless @merged_list;
-        $drops_by_monster{$monster} = \@merged_list;
-        if (!exists $line_index{$monster}) {
-            push @lines, "$monster: " . join(', ', @merged_list) . "\n";
+    my $map_key = "Mapa $map_name";
+    my %merged = map { $_ => 1 } @{ $drops_by_monster{$map_key} || [] };
+    @merged{keys %new_items} = (1) x scalar keys %new_items;
+    my @merged_list = sort keys %merged;
+    return unless @merged_list;
+    $drops_by_monster{$map_key} = \@merged_list;
+    if (!exists $line_index{$map_key}) {
+        push @lines, "$map_key: " . join(', ', @merged_list) . "\n";
+        $changed = 1;
+    } else {
+        my $index = $line_index{$map_key};
+        my $updated_line = "$map_key: " . join(', ', @merged_list) . "\n";
+        if ($lines[$index] ne $updated_line) {
+            $lines[$index] = $updated_line;
             $changed = 1;
-        } else {
-            my $index = $line_index{$monster};
-            my $updated_line = "$monster: " . join(', ', @merged_list) . "\n";
-            if ($lines[$index] ne $updated_line) {
-                $lines[$index] = $updated_line;
-                $changed = 1;
-            }
         }
     }
 
