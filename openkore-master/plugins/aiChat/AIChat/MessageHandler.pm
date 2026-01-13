@@ -8,6 +8,9 @@ use JSON::Tiny qw(decode_json);
 # No direct Globals qw($char %jobs_lut $field) here.
 # Instead, we will rely on data populated by aiChat.pl
 
+use File::Spec;
+use Plugins;
+
 use AIChat::APIClient;
 use AIChat::Config;
 use AIChat::ConversationHistory;
@@ -16,6 +19,9 @@ use AIChat::ConversationHistory;
 our %bot_character_data;
 
 my $api_client;
+my $mondb_cache;
+my $item_translation_cache;
+my %mondb_map_cache;
 
 BEGIN {
     $api_client = AIChat::APIClient->new();
@@ -141,6 +147,340 @@ sub _ensureCharacterInfo {
     }
 }
 
+sub _ensureWorldContext {
+    my ($sender) = @_;
+    return unless defined $sender;
+
+    my $world_context = _buildWorldContext();
+    return unless $world_context;
+
+    my $history = AIChat::ConversationHistory::getHistory($sender) || [];
+    my $last_context;
+    for (my $i = @$history - 1; $i >= 0; $i--) {
+        my $entry = $history->[$i];
+        next unless $entry->{role} && $entry->{role} eq 'system';
+        next unless ($entry->{type} // '') eq 'world_context';
+        $last_context = $entry->{content};
+        last;
+    }
+    return if defined $last_context && $last_context eq $world_context;
+
+    AIChat::ConversationHistory::addMessage($sender, "system", $world_context, "world_context");
+}
+
+sub _ensureDropDbContext {
+    my ($sender) = @_;
+    return unless defined $sender;
+
+    my $drop_context = _buildDropDbContext();
+    return unless $drop_context;
+
+    my $history = AIChat::ConversationHistory::getHistory($sender) || [];
+    my $last_context;
+    for (my $i = @$history - 1; $i >= 0; $i--) {
+        my $entry = $history->[$i];
+        next unless $entry->{role} && $entry->{role} eq 'system';
+        next unless ($entry->{type} // '') eq 'drop_db_context';
+        $last_context = $entry->{content};
+        last;
+    }
+    return if defined $last_context && $last_context eq $drop_context;
+
+    AIChat::ConversationHistory::addMessage($sender, "system", $drop_context, "drop_db_context");
+}
+
+sub _buildDropDbContext {
+    my $mondb = _loadMonsterDropDb();
+    return undef unless $mondb && %$mondb;
+
+    my @entries;
+    for my $key (sort keys %$mondb) {
+        my $entry = $mondb->{$key} || {};
+        my $drops = $entry->{drops} || [];
+        my $maps = $entry->{maps} || [];
+        next unless @$drops || @$maps;
+        my $map_text = @$maps ? " (" . join(', ', @$maps) . ") " : " ";
+        push @entries, "$key:$map_text" . join(', ', @$drops);
+    }
+    return undef unless @entries;
+
+    my $item_index = _buildDropItemIndex($mondb);
+
+    return join "\n",
+        "Banco de drops conhecido (use somente essas informacoes):",
+        @entries,
+        (@$item_index ? ("Indice de itens (item -> monstros que dropam):", @$item_index) : ()),
+        "Se nao houver informacao, diga que nao sabe ou nao tem certeza.";
+}
+
+sub _buildDropItemIndex {
+    my ($mondb) = @_;
+    return [] unless $mondb && %$mondb;
+
+    my %item_to_monsters;
+    for my $monster (sort keys %$mondb) {
+        next if $monster =~ /^Mapa\s+/i;
+        my $entry = $mondb->{$monster} || {};
+        my $drops = $entry->{drops} || [];
+        next unless @$drops;
+        for my $drop (@$drops) {
+            next unless defined $drop && $drop ne '';
+            push @{$item_to_monsters{$drop}}, $monster;
+        }
+    }
+
+    my @entries;
+    for my $item (sort keys %item_to_monsters) {
+        my %seen;
+        my @monsters = grep { !$seen{$_}++ } @{$item_to_monsters{$item}};
+        push @entries, "$item: " . join(', ', @monsters) if @monsters;
+    }
+
+    return \@entries;
+}
+
+sub _buildWorldContext {
+    my $map_name = $bot_character_data{map_name} // 'desconhecido';
+    my $monsters = _normalizeList($bot_character_data{map_monsters});
+    my $items = _normalizeList($bot_character_data{map_items});
+
+    my $monster_text = @$monsters ? join(', ', @$monsters) : 'nenhum confirmado';
+    my $item_text = @$items ? join(', ', @$items) : 'nenhum confirmado';
+    my $drop_context = _buildBasicDropContext($monsters, $map_name);
+
+    my $drop_map_text = $drop_context->{map} || 'nenhum basico confirmado';
+    my $drop_general = $drop_context->{general} || 'desconhecido';
+
+    return join "\n",
+        "Contexto do mapa atual:",
+        "Mapa: $map_name",
+        "Monstros vistos aqui: $monster_text",
+        "Itens vistos no chao: $item_text",
+        "Drops basicos possiveis no mapa: $drop_map_text",
+        "Drops basicos (geral): $drop_general",
+        "Regras para drops: se perguntarem onde pega um item, responda com os monstros listados aqui. Se perguntarem o que um monstro dropa, responda com os itens listados aqui. Se nao houver informacao, diga que nao sabe ou nao tem certeza. Use os nomes oficiais de monstros e itens desta lista (tabelas do servidor) e responda em linguagem popular.";
+}
+
+sub _normalizeList {
+    my ($value) = @_;
+    return [] unless defined $value;
+    return $value if ref $value eq 'ARRAY';
+    return [];
+}
+
+sub _buildBasicDropContext {
+    my ($monsters, $map_name) = @_;
+    my $mondb = _loadMonsterDropDb();
+    return { general => '', map => '' } unless $mondb && %$mondb;
+
+    my %present = map { lc $_ => 1 } @$monsters;
+    my @general;
+    my @map_specific;
+
+    for my $monster (sort keys %$mondb) {
+        my $entry = $mondb->{$monster} || {};
+        my $drops = $entry->{drops} || [];
+        next unless @$drops;
+        push @general, "$monster: " . join(', ', @$drops);
+        if ($present{lc $monster}) {
+            push @map_specific, "$monster: " . join(', ', @$drops);
+        }
+    }
+
+    if (defined $map_name && $map_name ne '') {
+        my $map_key = "Mapa $map_name";
+        if ($mondb->{$map_key} && @{$mondb->{$map_key}{drops} || []}) {
+            my $drops = $mondb->{$map_key}{drops} || [];
+            push @map_specific, "$map_key: " . join(', ', @$drops);
+        }
+    }
+
+    return {
+        general => join('; ', @general),
+        map => join('; ', @map_specific),
+    };
+}
+
+sub _loadMonsterDropDb {
+    return $mondb_cache if $mondb_cache;
+
+    my $path = File::Spec->catfile($Plugins::current_plugin_folder, 'mondb.txt');
+    unless (-e $path) {
+        $mondb_cache = {};
+        return $mondb_cache;
+    }
+
+    my %db;
+    if (open my $fh, '<:encoding(UTF-8)', $path) {
+        while (my $line = <$fh>) {
+            chomp $line;
+            $line =~ s/\r//g;
+            $line =~ s/^\s+//;
+            $line =~ s/\s+$//;
+            next if $line eq '' || $line =~ /^\s*#/;
+            my ($monster, $drop_text) = split /\s*:\s*/, $line, 2;
+            next unless defined $monster && defined $drop_text;
+            my @maps;
+            if ($drop_text =~ s/^\(\s*([^)]+)\s*\)\s*//) {
+                @maps = map {
+                    my $map = $_;
+                    $map =~ s/^\s+//;
+                    $map =~ s/\s+$//;
+                    $map;
+                } split /\s*,\s*/, $1;
+            }
+            my @drops = map {
+                my $item = $_;
+                $item =~ s/^\s+//;
+                $item =~ s/\s+$//;
+                _translateItemName($item);
+            } split /\s*,\s*/, $drop_text;
+            @drops = grep { defined $_ && $_ ne '' } @drops;
+            $db{$monster} = { drops => \@drops, maps => \@maps } if @drops || @maps;
+        }
+        close $fh;
+    }
+
+    $mondb_cache = \%db;
+    return $mondb_cache;
+}
+
+sub updateMondbFromMap {
+    my ($map_name, $map_items) = @_;
+    return unless defined $map_name && $map_name ne '';
+    my $items = _normalizeList($map_items);
+    return unless @$items;
+
+    my %new_items = map { $_ => 1 } grep { defined $_ && $_ ne '' } @$items;
+    return unless %new_items;
+    my $signature = join "\n", sort keys %new_items;
+    return if defined $mondb_map_cache{$map_name} && $mondb_map_cache{$map_name} eq $signature;
+    $mondb_map_cache{$map_name} = $signature;
+
+    my $path = File::Spec->catfile($Plugins::current_plugin_folder, 'mondb.txt');
+    return unless -e $path;
+
+    my @lines = ();
+    my %drops_by_monster = ();
+    if (open my $fh, '<:encoding(UTF-8)', $path) {
+        @lines = <$fh>;
+        close $fh;
+    }
+
+    for my $line (@lines) {
+        my $raw = $line;
+        chomp $raw;
+        $raw =~ s/\r//g;
+        next if $raw =~ /^\s*#/ || $raw !~ /:/;
+        my ($monster, $drop_text) = split /\s*:\s*/, $raw, 2;
+        next unless defined $monster && defined $drop_text;
+        if ($drop_text =~ s/^\(\s*([^)]+)\s*\)\s*//) {
+            # Map list intentionally ignored for drop merge.
+        }
+        my @drops = map {
+            my $item = $_;
+            $item =~ s/^\s+//;
+            $item =~ s/\s+$//;
+            $item;
+        } split /\s*,\s*/, $drop_text;
+        $drops_by_monster{$monster} = \@drops;
+    }
+
+    my %line_index = ();
+    for my $i (0 .. $#lines) {
+        my $raw = $lines[$i];
+        chomp $raw;
+        $raw =~ s/\r//g;
+        next if $raw =~ /^\s*#/ || $raw !~ /:/;
+        my ($monster) = split /\s*:\s*/, $raw, 2;
+        $line_index{$monster} = $i if defined $monster;
+    }
+
+    my $changed = 0;
+    my $map_key = "Mapa $map_name";
+    my %merged = map { $_ => 1 } @{ $drops_by_monster{$map_key} || [] };
+    @merged{keys %new_items} = (1) x scalar keys %new_items;
+    my @merged_list = sort keys %merged;
+    return unless @merged_list;
+    $drops_by_monster{$map_key} = \@merged_list;
+    if (!exists $line_index{$map_key}) {
+        push @lines, "$map_key: ($map_name) " . join(', ', @merged_list) . "\n";
+        $changed = 1;
+    } else {
+        my $index = $line_index{$map_key};
+        my $updated_line = "$map_key: ($map_name) " . join(', ', @merged_list) . "\n";
+        if ($lines[$index] ne $updated_line) {
+            $lines[$index] = $updated_line;
+            $changed = 1;
+        }
+    }
+
+    return unless $changed;
+    if (open my $fh, '>:encoding(UTF-8)', $path) {
+        print $fh @lines;
+        close $fh;
+        $mondb_cache = undef;
+    }
+}
+
+sub _translateItemName {
+    my ($item_name) = @_;
+    return '' unless defined $item_name && $item_name ne '';
+    my $normalized = $item_name;
+    $normalized =~ s/\s+$//;
+    $normalized =~ s/^\s+//;
+
+    my $map = _loadItemTranslationMap();
+    return $map->{lc $normalized} if exists $map->{lc $normalized};
+    return $normalized;
+}
+
+sub _loadItemTranslationMap {
+    return $item_translation_cache if $item_translation_cache;
+
+    my $tables_dir = File::Spec->catfile($Plugins::current_plugin_folder, '..', '..', 'tables');
+    my $english_path = File::Spec->catfile($tables_dir, 'items.txt');
+    $english_path = File::Spec->catfile($tables_dir, 'Old', 'items.txt') unless -e $english_path;
+    my $translated_path = File::Spec->catfile($tables_dir, 'ROla', 'items.txt');
+
+    my %english_by_id;
+    if (-e $english_path && open my $fh, '<:encoding(UTF-8)', $english_path) {
+        while (my $line = <$fh>) {
+            chomp $line;
+            $line =~ s/\r//g;
+            next if $line =~ /^\s*#/ || $line =~ /^\s*\/\// || $line eq '';
+            my ($id, $name) = split /#/, $line, 3;
+            next unless defined $id && defined $name;
+            $english_by_id{$id} = $name if $name ne '';
+        }
+        close $fh;
+    }
+
+    my %translated_by_id;
+    if (-e $translated_path && open my $fh, '<:encoding(UTF-8)', $translated_path) {
+        while (my $line = <$fh>) {
+            chomp $line;
+            $line =~ s/\r//g;
+            next if $line =~ /^\s*#/ || $line =~ /^\s*\/\// || $line eq '';
+            my ($id, $name) = split /#/, $line, 3;
+            next unless defined $id && defined $name;
+            $translated_by_id{$id} = $name if $name ne '';
+        }
+        close $fh;
+    }
+
+    my %map;
+    for my $id (keys %english_by_id) {
+        my $english = $english_by_id{$id};
+        my $translated = $translated_by_id{$id};
+        next unless defined $english && defined $translated;
+        $map{lc $english} = $translated;
+    }
+
+    $item_translation_cache = \%map;
+    return $item_translation_cache;
+}
+
 sub processMessage {
     my ($message, $sender) = @_;
     return processMessages([$message], $sender);
@@ -151,6 +491,8 @@ sub processMessages {
     return undef unless $messages && ref $messages eq 'ARRAY' && @$messages;
 
     _ensureCharacterInfo($sender);
+    _ensureWorldContext($sender);
+    _ensureDropDbContext($sender);
 
     for my $message (@$messages) {
         AIChat::ConversationHistory::addMessage($sender, "user", $message);
