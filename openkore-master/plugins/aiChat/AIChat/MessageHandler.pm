@@ -5,6 +5,7 @@ use warnings;
 
 use Log qw(warning message debug error);
 use JSON::Tiny qw(decode_json);
+use Unicode::Normalize qw(NFD);
 # No direct Globals qw($char %jobs_lut $field) here.
 # Instead, we will rely on data populated by aiChat.pl
 
@@ -22,6 +23,7 @@ my $api_client;
 my $mondb_cache;
 my $item_translation_cache;
 my %mondb_map_cache;
+my $mondb_search_cache;
 
 BEGIN {
     $api_client = AIChat::APIClient->new();
@@ -239,6 +241,361 @@ sub _buildDropItemIndex {
     return \@entries;
 }
 
+sub _normalizeQueryText {
+    my ($text) = @_;
+    return '' unless defined $text;
+    my $normalized = NFD($text);
+    $normalized =~ s/\pM//g;
+    $normalized = lc $normalized;
+    $normalized =~ s/[^\pL\pN]+/ /g;
+    $normalized =~ s/\s+/ /g;
+    $normalized =~ s/^\s+//;
+    $normalized =~ s/\s+$//;
+    return $normalized;
+}
+
+sub _tokenizeText {
+    my ($text) = @_;
+    my $normalized = _normalizeQueryText($text);
+    return [] unless length $normalized;
+    return [split / /, $normalized];
+}
+
+sub _containsTokenSequence {
+    my ($tokens, $phrase_tokens) = @_;
+    return 0 unless $tokens && $phrase_tokens;
+    my $token_count = scalar @$tokens;
+    my $phrase_count = scalar @$phrase_tokens;
+    return 0 unless $token_count && $phrase_count;
+    return 0 if $phrase_count > $token_count;
+
+    for (my $i = 0; $i <= $token_count - $phrase_count; $i++) {
+        my $matched = 1;
+        for (my $j = 0; $j < $phrase_count; $j++) {
+            if ($tokens->[$i + $j] ne $phrase_tokens->[$j]) {
+                $matched = 0;
+                last;
+            }
+        }
+        return 1 if $matched;
+    }
+
+    return 0;
+}
+
+sub _findBestPhraseMatch {
+    my ($tokens, $candidates) = @_;
+    return unless $tokens && $candidates;
+    my $best;
+    my $best_len = 0;
+
+    for my $candidate (@$candidates) {
+        next unless defined $candidate && $candidate ne '';
+        my $phrase_tokens = _tokenizeText($candidate);
+        next unless @$phrase_tokens;
+        next if scalar(@$phrase_tokens) < $best_len;
+        next unless _containsTokenSequence($tokens, $phrase_tokens);
+        $best = $candidate;
+        $best_len = scalar @$phrase_tokens;
+    }
+
+    return $best;
+}
+
+sub _buildMondbSearchIndex {
+    my ($mondb) = @_;
+    return {} unless $mondb && %$mondb;
+
+    my %monsters_by_key;
+    my %items;
+    my %maps;
+    my %item_to_monsters;
+    my %map_to_monsters;
+    my %map_to_items;
+
+    for my $monster (sort keys %$mondb) {
+        my $entry = $mondb->{$monster} || {};
+        my $drops = $entry->{drops} || [];
+        my $maps = $entry->{maps} || [];
+
+        if ($monster =~ /^Mapa\s+/i) {
+            if (@$maps) {
+                for my $map (@$maps) {
+                    $maps{$map} = $map if defined $map && $map ne '';
+                }
+            }
+            if (@$drops) {
+                my ($map_name) = $monster =~ /^Mapa\s+(.+)/i;
+                if (defined $map_name && $map_name ne '') {
+                    $map_to_items{$map_name} = $drops;
+                    $maps{$map_name} = $map_name;
+                }
+            }
+            next;
+        }
+
+        $monsters_by_key{$monster} = $monster;
+
+        if (@$maps) {
+            for my $map (@$maps) {
+                next unless defined $map && $map ne '';
+                $maps{$map} = $map;
+                push @{$map_to_monsters{$map}}, $monster;
+            }
+        }
+
+        next unless @$drops;
+        for my $drop (@$drops) {
+            next unless defined $drop && $drop ne '';
+            $items{$drop} = $drop;
+            push @{$item_to_monsters{$drop}}, $monster;
+        }
+    }
+
+    return {
+        monsters => [sort keys %monsters_by_key],
+        items => [sort keys %items],
+        maps => [sort keys %maps],
+        item_to_monsters => \%item_to_monsters,
+        map_to_monsters => \%map_to_monsters,
+        map_to_items => \%map_to_items,
+    };
+}
+
+sub _getMondbSearchIndex {
+    my $mondb = _loadMonsterDropDb();
+    return {} unless $mondb && %$mondb;
+    return $mondb_search_cache if $mondb_search_cache;
+    $mondb_search_cache = _buildMondbSearchIndex($mondb);
+    return $mondb_search_cache;
+}
+
+sub _hasToken {
+    my ($tokens, $needles) = @_;
+    return 0 unless $tokens && $needles;
+    my %token_lookup = map { $_ => 1 } @$tokens;
+    for my $needle (@$needles) {
+        return 1 if $token_lookup{$needle};
+    }
+    return 0;
+}
+
+sub _unknownDropReply {
+    my @options = (
+        'nao sei',
+        'nao conheco',
+        'sei nao',
+        'nao to ligado',
+        'desculpa nao sei',
+        'nao faço ideia',
+        'nao lembro',
+    );
+    return $options[int(rand(@options))];
+}
+
+sub _readMonsterDropDbRaw {
+    my $path = File::Spec->catfile($Plugins::current_plugin_folder, 'mondb.txt');
+    return undef unless -e $path;
+    my @lines;
+    if (open my $fh, '<:encoding(UTF-8)', $path) {
+        @lines = <$fh>;
+        close $fh;
+    }
+    return undef unless @lines;
+    my @raw_lines;
+    for my $line (@lines) {
+        my $raw = $line;
+        chomp $raw;
+        $raw =~ s/\r//g;
+        push @raw_lines, $raw;
+    }
+    return undef unless @raw_lines;
+    return join "\n", @raw_lines;
+}
+
+sub _formatListWithMaps {
+    my ($mondb, $monsters) = @_;
+    my @entries;
+    for my $monster_name (@$monsters) {
+        my $entry = $mondb->{$monster_name} || {};
+        my $maps = $entry->{maps} || [];
+        if (@$maps) {
+            push @entries, "$monster_name (" . join(', ', @$maps) . ")";
+        } else {
+            push @entries, $monster_name;
+        }
+    }
+    return join(', ', @entries);
+}
+
+sub generateDropDbResponse {
+    my ($message) = @_;
+    return undef unless defined $message && $message ne '';
+
+    my $mondb = _loadMonsterDropDb();
+    return undef unless $mondb && %$mondb;
+
+    my $index = _getMondbSearchIndex();
+    return undef unless $index && %$index;
+
+    my $tokens = _tokenizeText($message);
+    return undef unless $tokens && @$tokens;
+
+    my $monster = _findBestPhraseMatch($tokens, $index->{monsters});
+    my $item = _findBestPhraseMatch($tokens, $index->{items});
+    my $map = _findBestPhraseMatch($tokens, $index->{maps});
+
+    my $mentions_where = _hasToken($tokens, [qw(onde aonde pego pegar pega encontro encontrar mapa map)]);
+    my $mentions_drop = _hasToken($tokens, [qw(drop drops dropa dropar drope loot caiu cai)]);
+    my $mentions_query = _hasToken($tokens, [qw(monstro monster monstros itens item drop drops dropa dropar mapa map)]);
+
+    my $query_type;
+    if ($monster && !$item) {
+        $query_type = 'monster';
+    } elsif ($item && !$monster) {
+        $query_type = 'item';
+    } elsif ($monster && $item) {
+        if ($mentions_where) {
+            $query_type = 'item';
+        } elsif ($mentions_drop) {
+            $query_type = 'monster';
+        } else {
+            $query_type = 'monster';
+        }
+    } elsif ($map) {
+        $query_type = 'map';
+    }
+
+    if ($query_type && $query_type eq 'monster') {
+        my $entry = $mondb->{$monster} || {};
+        my $drops = $entry->{drops} || [];
+        my $maps = $entry->{maps} || [];
+        return undef unless @$drops || @$maps;
+        if ($mentions_where && @$maps) {
+            return "$monster fica em $maps->[0]";
+        }
+        my @parts;
+        push @parts, "dropa: " . join(', ', @$drops) if @$drops;
+        push @parts, "mapas: " . join(', ', @$maps) if @$maps;
+        return join ' | ', $monster, @parts;
+    }
+
+    if ($query_type && $query_type eq 'item') {
+        my $monsters = $index->{item_to_monsters}{$item} || [];
+        return undef unless @$monsters;
+        if ($mentions_where) {
+            my $first_monster = $monsters->[0];
+            my $entry = $mondb->{$first_monster} || {};
+            my $maps = $entry->{maps} || [];
+            return "$item dropa de $first_monster em $maps->[0]" if @$maps;
+            return "$item dropa de $first_monster";
+        }
+        my $entries = _formatListWithMaps($mondb, $monsters);
+        return "$item dropa de $entries";
+    }
+
+    if ($query_type && $query_type eq 'map') {
+        my $monsters = $index->{map_to_monsters}{$map} || [];
+        my $items = $index->{map_to_items}{$map} || [];
+        return undef unless @$monsters || @$items;
+        my @parts;
+        push @parts, "monstros: " . join(', ', @$monsters) if @$monsters;
+        push @parts, "itens: " . join(', ', @$items) if @$items;
+        return "mapa $map: " . join(' | ', @parts);
+    }
+
+    return undef;
+}
+
+sub dropDbUnknownReply {
+    return _unknownDropReply();
+}
+
+sub generateDropDbChatResponse {
+    my ($message, $sender) = @_;
+    return dropDbUnknownReply() unless defined $message && $message ne '';
+
+    my $drop_context = <<'MONDB';
+# Formato: Monstro: (Mapa1, Mapa2, Mapa3)  Drop1, Drop2, Drop3
+# Itens em ingles serao traduzidos via tables/items.txt -> tables/ROla/items.txt
+Poring: (prt_fild08, prt_fild05, pay_fild04)  Jellopy, Faca [4], Muco Pegajoso, Maçã, Garrafa Vazia, Maçã Verde, Carta Poring
+Drops: (moc_fild07, moc_fild01, moc_fild12)  Jellopy, Bastão [4], Muco Pegajoso, Maçã, Garrafa Vazia, Suco de Laranja, Carta Drops
+Poporing: (pay_fild04, gef_fild04, prt_fild03)  Muco Pegajoso, Garleta, Erva Verde, Uvas, Maçã, Main Gauche [3], Carta Poporing
+Lunático: (prt_fild00, prt_fild01, prt_fild02)  Trevo, Pluma, Nariz de Palhaço, Maçã, Erva Vermelha, Cenoura, Cenoura Arco-Íris, Carta Lunático
+Pupa: (prt_fild08, prt_fild01, mjolnir_11)  Fracon, Crisálida, Muco Pegajoso, Casca, Minério de Ferro, Carta Pupa
+ChonChon: (prt_fild04, prt_sew01, mjolnir_01)  Ferro, Casca, Jellopy, Punhal [4], Boneco de Chonchon, Minério de Ferro, Carta ChonChon
+Fabre: (gef_fild04, prt_fild08, mjolnir_01)  Felpa, Pluma, Clava [4], Esmeralda, Erva Verde, Trevo, Clava [3], Carta Fabre
+Salgueiro: (pay_fild08, prt_fild01, pay_fild01)  Raiz de Árvore, Tronco, Resina, Batata Doce, Tronco Estéril, Tronco Sólido, Tronco de Alta Qualidade, Carta Salgueiro
+Condor: (moc_fild18, moc_fild07, moc_fild11)  Garra de Ave, Arco [4], Gema Amarela, Flecha, Carne, Plumas de Ave, Laranja, Carta Condor
+Mandrágora: (mjolnir_02, mjolnir_05, mjolnir_11)  Vida Verdejante, Ranseur [4], Erva Verde, Broto, Trevo de Quatro Folhas, Chicote de Gaia, Carta Mandrágora
+Sapo de Rodda: (gef_fild01, gef_fild04, prt_fild04)  Pata Pegajosa, Ova de Sapo, Erva Verde, Esmeralda, Garrafa Vazia, Carta Sapo de Rodda
+Rocker: (prt_fild07, mjolnir_01, mjolnir_09)  Perna de Gafanhoto, Violão da Mãe Terra, Antenas Verdes, Azagaia [4], Folha de Hinalle, Boneco de Rocker, Hinalle, Carta Rocker
+Rabo de Verme: (pay_fild10, pay_fild01, prt_fild02)  Vida Verdejante, Emveretarcon, Escama Afiada, Pique [4], Erva Amarela, Esmeralda, Laço Verde, Carta Rabo de Verme
+Esporo: (pay_fild08, pay_fild01, mjolnir_09)  Esporo de Cogumelo, Erva Vermelha, Erva Azul, Boneco de Esporo, Chapéu, Esporo Venenoso, Morango, Carta Esporo
+Esqueleto: (pay_dun00, prt_fild01, prt_sew03)  Fracon, Osso, Jellopy, Erva Vermelha, Anel de Caveira, Carta Esqueleto
+Zumbi: (pay_dun00, prt_sew03, pay_dun01)  Unha Apodrecida, Rubi Amaldiçoado, Muco Pegajoso, Mandíbula Horrenda, Opala, Carta Zumbi
+Jibóia: (pay_fild02, pay_fild03, moc_fild12)  Escamas de Cobra, Erva Vermelha, Emveretarcon, Canino Venenoso, Escama Brilhante, Maçã, Carta Jibóia
+Bebê Selvagem: (pay_fild09, prt_fild03, prt_fild11)  Couro de Animal, Carne, Carne de Selvagem, Pluma, Fracon, Leite Doce, Carta Bebê Selvagem
+Filhote de Lobo: (moc_fild03, prt_fild02, prt_fild04)  Fracon, Couro de Animal, Túnica [1], Sangue de Lobo, Camisa de Algodão, Asura [3], Laranja, Carta Filhote de Lobo
+Escorpião: (moc_fild18, moc_fild11, moc_pyrd02)  Sangue Escarlate, Cauda de Escorpião, Minério de Elunium, Casca Rija, Torrão de Areia Fina, Erva Amarela, Ferro Enferrujado, Carta Escorpião
+Besouro-Ladrão: (prt_sew01, prt_sew02, prt_sew03)  Pele de Verme, Gibão, Gibão [1], Erva Vermelha, Jellopy, Minério de Ferro
+Ovo de Besouro-Ladrão: (prt_sew01, prt_sew02, prt_sew03)  Fracon, Crisálida, Muco Pegajoso, Gema Vermelha, Concha Preta, Minério de Ferro, Carta Ovo de Besouro-Ladrão
+Besouro-Ladrão Fêmea: (prt_sew02, prt_sew03, mjo_dun01)  Pele de Verme, Garleta, Antenas de Inseto, Erva Vermelha, Gema Vermelha, Minério de Ferro, Carta Besouro-Ladrão Fêmea
+Besouro-Ladrão Macho: (prt_sew02, prt_sew03, prt_sew04)  Emveretarcon, Antenas de Inseto, Pele de Verme, Espada Matadora [3], Erva Amarela, Zircônio, Kataná [3], Carta Besouro-Ladrão Macho
+Creamy: (gef_fild01, mjolnir_03, prt_fild04)  Pó de Borboleta, Manto de Seda [1], Mel, Asa de Borboleta, Florzinha, Flor, Relâmpago Nível 3, Carta Creamy
+Familiar: (pay_dun00, prt_sew01, prt_sew02)  Dente de Morcego, Alfanje [4], Laço [1], Uvas, Erva Vermelha, Poção da Concentração, Carta Familiar
+PecoPeco: (moc_fild01, moc_fild18, moc_fild02)  Bico de Ave, Sandálias [1], Erva Amarela, Erva Vermelha, Vareta [2], Laranja, Carta PecoPeco
+Zangão: (mjolnir_03, mjolnir_07, mjolnir_09)  Frescor do Vento, Ferrão de Abelha, Jellopy, Erva Verde, Mel, Carta Zangão
+Ambernite: (gef_fild09, mjolnir_01, prt_fild04)  Cristal Azul, Casco de Caramujo, Garleta, Casca, Casca Rija, Minério de Elunium, Minério de Ferro, Carta Ambernite
+Pé-Grande: (pay_fild07, pay_fild09, pay_fild01)  Pata de Urso, Chapéu Fedorento, Couro de Animal, Boneca de Pelúcia, Batata Doce, Mel, Minério de Oridecon, Carta Pé-Grande
+Caramelo: (mjolnir_01, mjolnir_03, prt_fild02)  Espinho de Porco-Espinho, Casaco [1], Couro de Animal, Glaive [3], Ranseur [4], Pique [4], Asa de Mosca, Carta Caramelo
+Percevejo: (mjolnir_01, mjolnir_10, prt_sew01)  Frescor do Vento, Emveretarcon, Casco Arco-Íris, Garleta, Minério de Elunium, Casca Rija, Minério de Ferro, Carta Percevejo
+Yoyo: (prt_fild03, pay_fild02, prt_fild11)  Rabo de Macaco, Cacau, Erva Amarela, Couro de Animal, Boneco de Yoyo, Morango, Laranja, Carta Yoyo
+Tarou: (prt_sew01, prt_sew02, pay_dun00)  Cauda de Rato, Couro de Animal, Pluma, Ração para Monstros, Armadilha para Insetos, Carta Tarou
+Muka: (moc_fild18, moc_fild01, moc_fild11)  Vida Verdejante, Espinho de Cacto, Garrafa Vazia, Erva Verde, Erva Vermelha, Guisarme [2], Minério de Ferro, Carta Muka
+Vitata: (moc_pyrd03, moc_pyrd01, moc_fild11)  Vida Verdejante, Pele de Verme, Scell, Mel, Geléia Real, Minério de Oridecon, Carta Vitata
+MONDB
+
+    my $prompt = AIChat::Config::get('prompt');
+    my $combined_prompt = join "\n",
+        $prompt,
+        "Banco de dados de monstros e drops (formato: Monstro: (Mapa1, Mapa2) Drop1, Drop2):",
+        $drop_context,
+        "Use somente as informacoes do banco acima.",
+        "Quando perguntarem onde fica um monstro, use o primeiro mapa da lista.",
+        "Quando perguntarem onde pega um item, use o primeiro monstro que dropa e o primeiro mapa desse monstro.",
+        "Se nao houver informacao clara, responda com uma frase curta de desconhecimento, como um player.",
+        "Exemplos: nao sei, nao conheco, sei nao, nao to ligado, desculpa nao sei.";
+    my @messages = (
+        {
+            role => "system",
+            content => $combined_prompt
+        },
+        {
+            role => "user",
+            content => $message,
+        }
+    );
+
+    my $response;
+    my $max_tokens = AIChat::Config::get('max_tokens');
+    my $temperature = AIChat::Config::get('temperature');
+    eval {
+        $response = $api_client->callAPIWithMessages(\@messages, {
+            max_tokens => $max_tokens,
+            temperature => $temperature,
+        });
+    };
+    if ($@ || !defined $response || $response eq '') {
+        return dropDbUnknownReply();
+    }
+
+    $response =~ s/\s+/ /g;
+    $response =~ s/^\s+//;
+    $response =~ s/\s+$//;
+    return $response ne '' ? $response : dropDbUnknownReply();
+}
+
 sub _buildWorldContext {
     my $map_name = $bot_character_data{map_name} // 'desconhecido';
     my $monsters = _normalizeList($bot_character_data{map_monsters});
@@ -342,6 +699,7 @@ sub _loadMonsterDropDb {
     }
 
     $mondb_cache = \%db;
+    $mondb_search_cache = undef;
     return $mondb_cache;
 }
 
@@ -420,6 +778,7 @@ sub updateMondbFromMap {
         print $fh @lines;
         close $fh;
         $mondb_cache = undef;
+        $mondb_search_cache = undef;
     }
 }
 
@@ -562,7 +921,7 @@ sub interpretCommand {
     my @messages = (
         {
             role => "system",
-            content => "Voce e um classificador de comandos do bot. Responda apenas com JSON valido no formato {\"action\":\"chat|emote|emote_random|none\"}. Contexto: mapa atual=$map_name, lockMap=$lock_map_info, pedidos_emote_recentemente=$recent_emote_requests. Use o contexto recente se necessario. Marque \"emote\" quando pedirem para reproduzir um emoticon, mesmo em pedidos repetidos ou indiretos. Marque \"emote_random\" quando pedirem um emoticon aleatorio, diferente, outro, ou variado. Em sec_pri, nunca recuse pedidos de emoticon: use \"emote\" ou \"emote_random\" quando o pedido for de emoticon. Fora de sec_pri, aplique moderacao de spam somente quando estiver no lockMap (mapa atual == lockMap). Se estiverem importunando, voce pode recusar escolhendo \"chat\" para responder verbalmente. Marque \"chat\" quando for uma pergunta/comentario comum. Marque \"none\" quando nao houver acao clara. Nao inclua nenhum texto fora do JSON."
+            content => "Voce e um classificador de comandos do bot. Responda apenas com JSON valido no formato {\"action\":\"chat|emote|emote_random|drop_db|none\"}. Contexto: mapa atual=$map_name, lockMap=$lock_map_info, pedidos_emote_recentemente=$recent_emote_requests. Use o contexto recente se necessario. Marque \"emote\" quando pedirem para reproduzir um emoticon, mesmo em pedidos repetidos ou indiretos. Marque \"emote_random\" quando pedirem um emoticon aleatorio, diferente, outro, ou variado. Use \"drop_db\" quando a pessoa pedir informacoes sobre monstros, drops, itens ou mapas (ex: onde pega um item, o que um monstro dropa, mapas com um monstro). Nunca use \"drop_db\" para pedidos de emoticon. Em sec_pri, nunca recuse pedidos de emoticon: use \"emote\" ou \"emote_random\" quando o pedido for de emoticon. Fora de sec_pri, aplique moderacao de spam somente quando estiver no lockMap (mapa atual == lockMap). Se estiverem importunando, voce pode recusar escolhendo \"chat\" para responder verbalmente. Marque \"chat\" quando for uma pergunta/comentario comum. Marque \"none\" quando nao houver acao clara. Nao inclua nenhum texto fora do JSON."
         }
     );
 
