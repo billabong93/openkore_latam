@@ -21,6 +21,7 @@ our %bot_character_data;
 my $api_client;
 my $mondb_cache;
 my $item_translation_cache;
+my %mondb_map_cache;
 
 BEGIN {
     $api_client = AIChat::APIClient->new();
@@ -186,7 +187,7 @@ sub _buildWorldContext {
         "Itens vistos no chao: $item_text",
         "Drops basicos possiveis no mapa: $drop_map_text",
         "Drops basicos (geral): $drop_general",
-        "Se perguntarem sobre drops, responda apenas com base nesses dados. Use os nomes oficiais de monstros e itens desta lista (tabelas do servidor) e responda em linguagem popular. Se nao tiver certeza, diga que nao sabe ou nao tem certeza.";
+        "Regras para drops: se perguntarem onde pega um item, responda com os monstros listados aqui. Se perguntarem o que um monstro dropa, responda com os itens listados aqui. Se nao houver informacao, diga que nao sabe ou nao tem certeza. Use os nomes oficiais de monstros e itens desta lista (tabelas do servidor) e responda em linguagem popular.";
 }
 
 sub _normalizeList {
@@ -270,6 +271,9 @@ sub updateMondbFromMap {
 
     my %new_items = map { $_ => 1 } grep { defined $_ && $_ ne '' } @$items;
     return unless %new_items;
+    my $signature = join "\n", sort keys %new_items;
+    return if defined $mondb_map_cache{$map_name} && $mondb_map_cache{$map_name} eq $signature;
+    $mondb_map_cache{$map_name} = $signature;
 
     my $path = File::Spec->catfile($Plugins::current_plugin_folder, 'mondb.txt');
     return unless -e $path;
