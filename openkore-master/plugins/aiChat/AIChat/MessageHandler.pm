@@ -283,7 +283,7 @@ sub generateEmoteFollowup {
         },
         {
             role => "system",
-            content => "Responda com uma mensagem curta apos um emoticon, confirmando se era o que a pessoa queria. Mantenha entre 2 e 6 palavras. Nao use emojis. Varie a frase e seja natural."
+            content => "Responda com uma mensagem curta apos um emoticon, confirmando se era o que a pessoa queria. Use o estilo de confirmacao curto tipo \"ok?\", \"mais alguma coisa?\", \"ta bom?\", \"foi isso?\". Mantenha entre 2 e 6 palavras. Nao use emojis. Nao seja rude ou agressivo. Varie a frase e seja natural."
         }
     );
 
@@ -307,8 +307,14 @@ sub generateEmoteFollowup {
     }
 
     return undef unless defined $response && length $response;
+    $response =~ s/\s+/ /g;
     $response =~ s/^\s+//;
     $response =~ s/\s+$//;
+    return undef unless length $response;
+    my @words = split /\s+/, $response;
+    if (@words > 6) {
+        $response = join ' ', @words[0..5];
+    }
     return $response if length $response;
     return undef;
 }
