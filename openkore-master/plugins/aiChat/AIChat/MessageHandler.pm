@@ -195,9 +195,12 @@ sub _buildDropDbContext {
 
     my @entries;
     for my $key (sort keys %$mondb) {
-        my $drops = $mondb->{$key} || [];
-        next unless @$drops;
-        push @entries, "$key: " . join(', ', @$drops);
+        my $entry = $mondb->{$key} || {};
+        my $drops = $entry->{drops} || [];
+        my $maps = $entry->{maps} || [];
+        next unless @$drops || @$maps;
+        my $map_text = @$maps ? " (" . join(', ', @$maps) . ") " : " ";
+        push @entries, "$key:$map_text" . join(', ', @$drops);
     }
     return undef unless @entries;
 
@@ -217,7 +220,8 @@ sub _buildDropItemIndex {
     my %item_to_monsters;
     for my $monster (sort keys %$mondb) {
         next if $monster =~ /^Mapa\s+/i;
-        my $drops = $mondb->{$monster} || [];
+        my $entry = $mondb->{$monster} || {};
+        my $drops = $entry->{drops} || [];
         next unless @$drops;
         for my $drop (@$drops) {
             next unless defined $drop && $drop ne '';
@@ -274,7 +278,8 @@ sub _buildBasicDropContext {
     my @map_specific;
 
     for my $monster (sort keys %$mondb) {
-        my $drops = $mondb->{$monster} || [];
+        my $entry = $mondb->{$monster} || {};
+        my $drops = $entry->{drops} || [];
         next unless @$drops;
         push @general, "$monster: " . join(', ', @$drops);
         if ($present{lc $monster}) {
@@ -284,8 +289,9 @@ sub _buildBasicDropContext {
 
     if (defined $map_name && $map_name ne '') {
         my $map_key = "Mapa $map_name";
-        if ($mondb->{$map_key} && @{$mondb->{$map_key}}) {
-            push @map_specific, "$map_key: " . join(', ', @{$mondb->{$map_key}});
+        if ($mondb->{$map_key} && @{$mondb->{$map_key}{drops} || []}) {
+            my $drops = $mondb->{$map_key}{drops} || [];
+            push @map_specific, "$map_key: " . join(', ', @$drops);
         }
     }
 
@@ -314,6 +320,15 @@ sub _loadMonsterDropDb {
             next if $line eq '' || $line =~ /^\s*#/;
             my ($monster, $drop_text) = split /\s*:\s*/, $line, 2;
             next unless defined $monster && defined $drop_text;
+            my @maps;
+            if ($drop_text =~ s/^\(\s*([^)]+)\s*\)\s*//) {
+                @maps = map {
+                    my $map = $_;
+                    $map =~ s/^\s+//;
+                    $map =~ s/\s+$//;
+                    $map;
+                } split /\s*,\s*/, $1;
+            }
             my @drops = map {
                 my $item = $_;
                 $item =~ s/^\s+//;
@@ -321,7 +336,7 @@ sub _loadMonsterDropDb {
                 _translateItemName($item);
             } split /\s*,\s*/, $drop_text;
             @drops = grep { defined $_ && $_ ne '' } @drops;
-            $db{$monster} = \@drops if @drops;
+            $db{$monster} = { drops => \@drops, maps => \@maps } if @drops || @maps;
         }
         close $fh;
     }
@@ -359,6 +374,9 @@ sub updateMondbFromMap {
         next if $raw =~ /^\s*#/ || $raw !~ /:/;
         my ($monster, $drop_text) = split /\s*:\s*/, $raw, 2;
         next unless defined $monster && defined $drop_text;
+        if ($drop_text =~ s/^\(\s*([^)]+)\s*\)\s*//) {
+            # Map list intentionally ignored for drop merge.
+        }
         my @drops = map {
             my $item = $_;
             $item =~ s/^\s+//;
@@ -386,11 +404,11 @@ sub updateMondbFromMap {
     return unless @merged_list;
     $drops_by_monster{$map_key} = \@merged_list;
     if (!exists $line_index{$map_key}) {
-        push @lines, "$map_key: " . join(', ', @merged_list) . "\n";
+        push @lines, "$map_key: ($map_name) " . join(', ', @merged_list) . "\n";
         $changed = 1;
     } else {
         my $index = $line_index{$map_key};
-        my $updated_line = "$map_key: " . join(', ', @merged_list) . "\n";
+        my $updated_line = "$map_key: ($map_name) " . join(', ', @merged_list) . "\n";
         if ($lines[$index] ne $updated_line) {
             $lines[$index] = $updated_line;
             $changed = 1;
