@@ -186,7 +186,7 @@ sub _buildWorldContext {
         "Itens vistos no chao: $item_text",
         "Drops basicos possiveis no mapa: $drop_map_text",
         "Drops basicos (geral): $drop_general",
-        "Use os nomes oficiais de monstros e itens desta lista (tabelas do servidor) e responda em linguagem popular. Se nao tiver certeza, nao invente nomes.";
+        "Se perguntarem sobre drops, responda apenas com base nesses dados. Use os nomes oficiais de monstros e itens desta lista (tabelas do servidor) e responda em linguagem popular. Se nao tiver certeza, nao invente nomes.";
 }
 
 sub _normalizeList {
@@ -329,10 +329,6 @@ sub processMessages {
         AIChat::ConversationHistory::addMessage($sender, "user", $message);
     }
 
-    my $last_message = $messages->[-1];
-    my $drop_reply = _handleDropQuery($last_message);
-    return [$drop_reply] if defined $drop_reply && $drop_reply ne '';
-
     my $combined_message = join "\n", @$messages;
     my $response;
     eval {
@@ -347,100 +343,6 @@ sub processMessages {
 
     my $parts = _splitResponse($response, $messages);
     return $parts;
-}
-
-sub _handleDropQuery {
-    my ($message) = @_;
-    return undef unless defined $message && $message ne '';
-
-    my $mondb = _loadMonsterDropDb();
-    return undef unless $mondb && %$mondb;
-
-    my $normalized = _normalizeMessage($message);
-    return undef unless $normalized ne '';
-
-    my $mentions_drop = $normalized =~ /\bdropa\b|\bdrops?\b|\bderruba\b|\bloot\b/;
-    my $mentions_where = $normalized =~ /\bonde\b|\bpego\b|\bpegar\b|\bacha\b|\btem\b/;
-
-    my $monster_hit = _matchMonsterName($normalized, $mondb);
-    if ($monster_hit && $mentions_drop) {
-        my $drops = $mondb->{$monster_hit} || [];
-        return undef unless @$drops;
-        return sprintf("%s dropa: %s.", $monster_hit, join(', ', @$drops));
-    }
-
-    my $item_hit = _matchItemName($normalized, $mondb);
-    if ($item_hit && ($mentions_drop || $mentions_where)) {
-        my @monsters = _monstersForItem($item_hit, $mondb);
-        return undef unless @monsters;
-        my $monsters_text = join(', ', @monsters);
-        return sprintf("%s? cai de %s.", $item_hit, $monsters_text);
-    }
-
-    return undef;
-}
-
-sub _normalizeMessage {
-    my ($text) = @_;
-    return '' unless defined $text;
-    my $normalized = lc $text;
-    $normalized =~ s/[\r\n]+/ /g;
-    $normalized =~ s/[^a-z0-9áàâãéèêíìîóòôõúùûç\s]/ /g;
-    $normalized =~ s/\s+/ /g;
-    $normalized =~ s/^\s+//;
-    $normalized =~ s/\s+$//;
-    return $normalized;
-}
-
-sub _matchMonsterName {
-    my ($message, $mondb) = @_;
-    my @monsters = sort { length($b) <=> length($a) } keys %$mondb;
-    for my $monster (@monsters) {
-        my $needle = _normalizeMessage($monster);
-        next unless $needle;
-        if ($message =~ /\b\Q$needle\E\b/) {
-            return $monster;
-        }
-    }
-    return undef;
-}
-
-sub _matchItemName {
-    my ($message, $mondb) = @_;
-    my %seen;
-    for my $drops (values %$mondb) {
-        for my $item (@$drops) {
-            $seen{$item} = 1;
-        }
-    }
-    my @items = sort { length($b) <=> length($a) } keys %seen;
-    for my $item (@items) {
-        my $needle = _normalizeMessage($item);
-        next unless $needle;
-        if ($message =~ /\b\Q$needle\E\b/) {
-            return $item;
-        }
-    }
-    return undef;
-}
-
-sub _monstersForItem {
-    my ($item, $mondb) = @_;
-    my $needle = _normalizeMessage($item);
-    return () unless $needle;
-    my @monsters;
-    for my $monster (sort keys %$mondb) {
-        my $drops = $mondb->{$monster} || [];
-        for my $drop (@$drops) {
-            my $drop_norm = _normalizeMessage($drop);
-            next unless $drop_norm;
-            if ($drop_norm eq $needle) {
-                push @monsters, $monster;
-                last;
-            }
-        }
-    }
-    return @monsters;
 }
 
 sub _normalizeEchoText {
