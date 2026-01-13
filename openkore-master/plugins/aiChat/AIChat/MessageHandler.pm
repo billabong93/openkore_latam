@@ -168,6 +168,45 @@ sub _ensureWorldContext {
     AIChat::ConversationHistory::addMessage($sender, "system", $world_context, "world_context");
 }
 
+sub _ensureDropDbContext {
+    my ($sender) = @_;
+    return unless defined $sender;
+
+    my $drop_context = _buildDropDbContext();
+    return unless $drop_context;
+
+    my $history = AIChat::ConversationHistory::getHistory($sender) || [];
+    my $last_context;
+    for (my $i = @$history - 1; $i >= 0; $i--) {
+        my $entry = $history->[$i];
+        next unless $entry->{role} && $entry->{role} eq 'system';
+        next unless ($entry->{type} // '') eq 'drop_db_context';
+        $last_context = $entry->{content};
+        last;
+    }
+    return if defined $last_context && $last_context eq $drop_context;
+
+    AIChat::ConversationHistory::addMessage($sender, "system", $drop_context, "drop_db_context");
+}
+
+sub _buildDropDbContext {
+    my $mondb = _loadMonsterDropDb();
+    return undef unless $mondb && %$mondb;
+
+    my @entries;
+    for my $key (sort keys %$mondb) {
+        my $drops = $mondb->{$key} || [];
+        next unless @$drops;
+        push @entries, "$key: " . join(', ', @$drops);
+    }
+    return undef unless @entries;
+
+    return join "\n",
+        "Banco de drops conhecido (use somente essas informacoes):",
+        @entries,
+        "Se nao houver informacao, diga que nao sabe ou nao tem certeza.";
+}
+
 sub _buildWorldContext {
     my $map_name = $bot_character_data{map_name} // 'desconhecido';
     my $monsters = _normalizeList($bot_character_data{map_monsters});
@@ -407,6 +446,7 @@ sub processMessages {
 
     _ensureCharacterInfo($sender);
     _ensureWorldContext($sender);
+    _ensureDropDbContext($sender);
 
     for my $message (@$messages) {
         AIChat::ConversationHistory::addMessage($sender, "user", $message);
