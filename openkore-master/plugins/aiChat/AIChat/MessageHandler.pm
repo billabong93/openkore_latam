@@ -402,17 +402,15 @@ sub _readMonsterDropDbRaw {
         close $fh;
     }
     return undef unless @lines;
-    my @filtered;
+    my @raw_lines;
     for my $line (@lines) {
         my $raw = $line;
         chomp $raw;
         $raw =~ s/\r//g;
-        next if $raw =~ /^\s*#/;
-        next if $raw =~ /^\s*$/;
-        push @filtered, $raw;
+        push @raw_lines, $raw;
     }
-    return undef unless @filtered;
-    return join "\n", @filtered;
+    return undef unless @raw_lines;
+    return join "\n", @raw_lines;
 }
 
 sub _formatListWithMaps {
