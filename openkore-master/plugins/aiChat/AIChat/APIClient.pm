@@ -16,6 +16,12 @@ use AIChat::ConversationHistory;
 my $ua = LWP::UserAgent->new;
 $ua->timeout(20); # Aumentar timeout para proxy
 
+sub _normalize_number {
+    my ($value, $fallback) = @_;
+    return $fallback unless defined $value;
+    return $value + 0;
+}
+
 sub new {
     my $class = shift;
     my $self = {
@@ -23,8 +29,8 @@ sub new {
         # Não precisamos mais da API Key aqui, o proxy cuidará disso
         # api_key => AIChat::Config::get('api_key'),
         model => AIChat::Config::get('model'),
-        max_tokens => AIChat::Config::get('max_tokens'),
-        temperature => AIChat::Config::get('temperature'),
+        max_tokens => _normalize_number(AIChat::Config::get('max_tokens'), 150),
+        temperature => _normalize_number(AIChat::Config::get('temperature'), 0.6),
     };
     bless $self, $class;
     return $self;
@@ -107,8 +113,10 @@ sub callAPIWithMessages {
     };
 
     if ($options && ref $options eq 'HASH') {
-        $data->{max_tokens} = $options->{max_tokens} if defined $options->{max_tokens};
-        $data->{temperature} = $options->{temperature} if defined $options->{temperature};
+        $data->{max_tokens} = _normalize_number($options->{max_tokens}, $data->{max_tokens})
+            if defined $options->{max_tokens};
+        $data->{temperature} = _normalize_number($options->{temperature}, $data->{temperature})
+            if defined $options->{temperature};
     }
 
     my $json_data = encode_json($data);
