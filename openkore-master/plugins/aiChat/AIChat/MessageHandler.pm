@@ -261,4 +261,56 @@ sub interpretCommand {
     return $parsed;
 }
 
+sub generateEmoteFollowup {
+    my ($sender, $context) = @_;
+    return undef unless defined $sender;
+
+    my $history = AIChat::ConversationHistory::getHistory($sender) || [];
+    my @recent = grep { $_->{role} ne "system" } @$history;
+    @recent = @recent[-6 .. -1] if @recent > 6;
+
+    my $prompt = AIChat::Config::get('prompt');
+    my $map_name = $context && defined $context->{map_name} ? $context->{map_name} : ($bot_character_data{map_name} // '');
+    if (defined $map_name && $map_name eq 'sec_pri') {
+        my $gm_prompt = AIChat::Config::get('prompt_gm');
+        $prompt = $gm_prompt if defined $gm_prompt && $gm_prompt ne '';
+    }
+
+    my @messages = (
+        {
+            role => "system",
+            content => $prompt
+        },
+        {
+            role => "system",
+            content => "Responda com uma mensagem curta apos um emoticon, confirmando se era o que a pessoa queria. Mantenha entre 2 e 6 palavras. Nao use emojis. Varie a frase e seja natural."
+        }
+    );
+
+    push @messages, map {
+        {
+            role => $_->{role},
+            content => $_->{content},
+        }
+    } @recent;
+
+    my $response;
+    eval {
+        $response = $api_client->callAPIWithMessages(\@messages, {
+            max_tokens => 40,
+            temperature => 0.7,
+        });
+    };
+    if ($@) {
+        warning "[aiChat] Erro ao gerar followup de emoticon: $@\n", "plugin";
+        return undef;
+    }
+
+    return undef unless defined $response && length $response;
+    $response =~ s/^\s+//;
+    $response =~ s/\s+$//;
+    return $response if length $response;
+    return undef;
+}
+
 1;

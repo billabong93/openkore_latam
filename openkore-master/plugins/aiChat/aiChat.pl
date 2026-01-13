@@ -612,7 +612,7 @@ sub _queueEmotionFollowup {
     my ($sender_name, $context) = @_;
     return unless defined $sender_name;
     return unless rand() < 0.25;
-    my $followup = _pickEmotionFollowup();
+    my $followup = AIChat::MessageHandler::generateEmoteFollowup($sender_name, { map_name => $field ? $field->baseName : undef });
     return unless $followup;
 
     my $sender_key = _normalizeSenderKey($sender_name);
@@ -633,36 +633,6 @@ sub _queueEmotionFollowup {
         sender_name => $sender_name,
     };
     $suppress_reply_until_by_sender{$sender_key} = $send_at + 1;
-}
-
-sub _pickEmotionFollowup {
-    my @options = (
-        "fiz certo?",
-        "era esse emoticom?",
-        "to liberado?",
-        "ta bom pra vc?",
-        "mais alguma coisa?",
-        "ja posso ir?",
-        "foi isso mesmo?",
-        "precisa de mais?",
-        "beleza assim?",
-        "agora ta ok?",
-        "ok?",
-        "legal?",
-        "satisfeito?",
-        "mais algum?",
-        "bom?",
-        "de boa?",
-        "ta suave?",
-        "quer mais?",
-        "foi isso?",
-        "ta certo?",
-        "ta blz?",
-        "serve assim?",
-        "pronto?",
-        "resolvido?",
-    );
-    return $options[int(rand(@options))];
 }
 
 sub _processPendingEmotionFollowups {
