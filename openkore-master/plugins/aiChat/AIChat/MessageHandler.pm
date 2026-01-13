@@ -200,8 +200,10 @@ sub _buildDropDbContext {
         my $entry = $mondb->{$key} || {};
         my $drops = $entry->{drops} || [];
         my $maps = $entry->{maps} || [];
-        next unless @$drops || @$maps;
-        my $map_text = @$maps ? " (" . join(', ', @$maps) . ") " : " ";
+        my $location = $entry->{location};
+        next unless @$drops || @$maps || (defined $location && $location ne '');
+        my @places = grep { defined $_ && $_ ne '' } ($location, @$maps);
+        my $map_text = @places ? " (" . join(', ', @places) . ") " : " ";
         push @entries, "$key:$map_text" . join(', ', @$drops);
     }
     return undef unless @entries;
@@ -317,6 +319,7 @@ sub _buildMondbSearchIndex {
         my $entry = $mondb->{$monster} || {};
         my $drops = $entry->{drops} || [];
         my $maps = $entry->{maps} || [];
+        my $location = $entry->{location};
 
         if ($monster =~ /^Mapa\s+/i) {
             if (@$maps) {
@@ -336,9 +339,9 @@ sub _buildMondbSearchIndex {
 
         $monsters_by_key{$monster} = $monster;
 
-        if (@$maps) {
-            for my $map (@$maps) {
-                next unless defined $map && $map ne '';
+        my @places = grep { defined $_ && $_ ne '' } ($location, @$maps);
+        if (@places) {
+            for my $map (@places) {
                 $maps{$map} = $map;
                 push @{$map_to_monsters{$map}}, $monster;
             }
@@ -414,18 +417,33 @@ sub _readMonsterDropDbRaw {
 }
 
 sub _formatListWithMaps {
-    my ($mondb, $monsters) = @_;
+    my ($mondb, $monsters, $include_maps) = @_;
     my @entries;
     for my $monster_name (@$monsters) {
         my $entry = $mondb->{$monster_name} || {};
+        my $location = $entry->{location};
         my $maps = $entry->{maps} || [];
-        if (@$maps) {
-            push @entries, "$monster_name (" . join(', ', @$maps) . ")";
+        my @places = grep { defined $_ && $_ ne '' } ($location);
+        if ($include_maps && @$maps) {
+            push @places, @$maps;
+        }
+        if (@places) {
+            push @entries, "$monster_name (" . join(', ', @places) . ")";
         } else {
             push @entries, $monster_name;
         }
     }
     return join(', ', @entries);
+}
+
+sub _getPreferredLocation {
+    my ($entry) = @_;
+    return undef unless $entry && ref $entry eq 'HASH';
+    my $location = $entry->{location};
+    return $location if defined $location && $location ne '';
+    my $maps = $entry->{maps} || [];
+    return $maps->[0] if @$maps;
+    return undef;
 }
 
 sub generateDropDbResponse {
@@ -448,6 +466,8 @@ sub generateDropDbResponse {
     my $mentions_where = _hasToken($tokens, [qw(onde aonde pego pegar pega encontro encontrar mapa map)]);
     my $mentions_drop = _hasToken($tokens, [qw(drop drops dropa dropar drope loot caiu cai)]);
     my $mentions_query = _hasToken($tokens, [qw(monstro monster monstros itens item drop drops dropa dropar mapa map)]);
+    my $mentions_specific = _hasToken($tokens, [qw(detalhe detalhes especifico especifica exato exata preciso precisa completo completa codigo)]);
+    my $mentions_map = _hasToken($tokens, [qw(mapa map)]);
 
     my $query_type;
     if ($monster && !$item) {
@@ -470,13 +490,22 @@ sub generateDropDbResponse {
         my $entry = $mondb->{$monster} || {};
         my $drops = $entry->{drops} || [];
         my $maps = $entry->{maps} || [];
-        return undef unless @$drops || @$maps;
-        if ($mentions_where && @$maps) {
-            return "$monster fica em $maps->[0]";
+        my $location = _getPreferredLocation($entry);
+        return undef unless @$drops || @$maps || (defined $location && $location ne '');
+        if ($mentions_where && (defined $location || @$maps)) {
+            if (($mentions_specific || $mentions_map) && @$maps) {
+                return "$monster fica em $maps->[0]";
+            }
+            return "$monster fica em $location" if defined $location;
         }
         my @parts;
         push @parts, "dropa: " . join(', ', @$drops) if @$drops;
-        push @parts, "mapas: " . join(', ', @$maps) if @$maps;
+        if (defined $location && $location ne '') {
+            push @parts, "localizacao: $location";
+        }
+        if (($mentions_specific || $mentions_map) && @$maps) {
+            push @parts, "mapas: " . join(', ', @$maps);
+        }
         return join ' | ', $monster, @parts;
     }
 
@@ -487,10 +516,14 @@ sub generateDropDbResponse {
             my $first_monster = $monsters->[0];
             my $entry = $mondb->{$first_monster} || {};
             my $maps = $entry->{maps} || [];
-            return "$item dropa de $first_monster em $maps->[0]" if @$maps;
+            my $location = _getPreferredLocation($entry);
+            if (($mentions_specific || $mentions_map) && @$maps) {
+                return "$item dropa de $first_monster em $maps->[0]";
+            }
+            return "$item dropa de $first_monster em $location" if defined $location;
             return "$item dropa de $first_monster";
         }
-        my $entries = _formatListWithMaps($mondb, $monsters);
+        my $entries = _formatListWithMaps($mondb, $monsters, ($mentions_specific || $mentions_map));
         return "$item dropa de $entries";
     }
 
@@ -501,7 +534,8 @@ sub generateDropDbResponse {
         my @parts;
         push @parts, "monstros: " . join(', ', @$monsters) if @$monsters;
         push @parts, "itens: " . join(', ', @$items) if @$items;
-        return "mapa $map: " . join(' | ', @parts);
+        my $label = ($mentions_specific || $mentions_map) ? 'mapa' : 'localizacao';
+        return "$label $map: " . join(' | ', @parts);
     }
 
     return undef;
@@ -521,11 +555,12 @@ sub generateDropDbChatResponse {
     my $prompt = AIChat::Config::get('prompt');
     my $combined_prompt = join "\n",
         $prompt,
-        "Banco de dados de monstros e drops (formato: Monstro: (Mapa1, Mapa2) Drop1, Drop2):",
+        "Banco de dados de monstros e drops (formato: Monstro: (Localizacao, Mapa1, Mapa2) Drop1, Drop2):",
         $drop_context,
         "Use somente as informacoes do banco acima.",
-        "Quando perguntarem onde fica um monstro, use o primeiro mapa da lista.",
-        "Quando perguntarem onde pega um item, use o primeiro monstro que dropa e o primeiro mapa desse monstro.",
+        "Quando perguntarem onde fica um monstro, use a Localizacao.",
+        "Quando perguntarem onde pega um item, use o primeiro monstro que dropa e a Localizacao desse monstro.",
+        "So cite mapas (ex: prt_fild08) se a pessoa pedir mais detalhes, algo mais especifico ou mencionar mapa.",
         "Se nao houver informacao clara, responda com uma frase curta de desconhecimento, como um player.",
         "Exemplos: nao sei, nao conheco, sei nao, nao to ligado, desculpa nao sei.";
     my @messages = (
@@ -640,13 +675,17 @@ sub _loadMonsterDropDb {
             my ($monster, $drop_text) = split /\s*:\s*/, $line, 2;
             next unless defined $monster && defined $drop_text;
             my @maps;
+            my $location;
             if ($drop_text =~ s/^\(\s*([^)]+)\s*\)\s*//) {
-                @maps = map {
+                my @places = map {
                     my $map = $_;
                     $map =~ s/^\s+//;
                     $map =~ s/\s+$//;
                     $map;
                 } split /\s*,\s*/, $1;
+                $location = shift @places if @places;
+                @maps = @places;
+                @maps = ($location) if !@maps && defined $location && $location ne '';
             }
             my @drops = map {
                 my $item = $_;
@@ -655,7 +694,13 @@ sub _loadMonsterDropDb {
                 _translateItemName($item);
             } split /\s*,\s*/, $drop_text;
             @drops = grep { defined $_ && $_ ne '' } @drops;
-            $db{$monster} = { drops => \@drops, maps => \@maps } if @drops || @maps;
+            if (@drops || @maps || (defined $location && $location ne '')) {
+                $db{$monster} = {
+                    drops => \@drops,
+                    maps => \@maps,
+                    location => $location,
+                };
+            }
         }
         close $fh;
     }
