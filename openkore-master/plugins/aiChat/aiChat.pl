@@ -83,6 +83,10 @@ my @fallback_emotion_commands = qw(
     ...
 );
 
+use constant {
+    MAX_CHAT_LENGTH => 200,
+};
+
 sub _getBufferState {
     my ($sender) = @_;
     return $message_buffers{$sender} ||= {
@@ -93,6 +97,22 @@ sub _getBufferState {
         response_started => 0,
         context => undef,
     };
+}
+
+sub _sanitizeOutgoingMessage {
+    my ($message) = @_;
+    return '' unless defined $message;
+    my $sanitized = $message;
+    $sanitized =~ s/\s*\r?\n\s*/ /g;
+    $sanitized =~ s/[\x00-\x1F\x7F]+/ /g;
+    $sanitized =~ s/\s+/ /g;
+    $sanitized =~ s/^\s+//;
+    $sanitized =~ s/\s+$//;
+    if (length($sanitized) > MAX_CHAT_LENGTH) {
+        $sanitized = substr($sanitized, 0, MAX_CHAT_LENGTH);
+        $sanitized =~ s/\s+$//;
+    }
+    return $sanitized;
 }
 
 sub _enqueueMessage {
@@ -171,9 +191,26 @@ sub _sendQueuedResponse {
         if (defined $emotion_id) {
             $messageSender->sendEmotion($emotion_id);
         } else {
+            $response = _sanitizeOutgoingMessage($response);
+            if (!$response) {
+                debug "[aiChat] Resposta vazia apos sanitizacao para '$sender'\n", "plugin";
+                $state->{typing_until} = 0;
+                $state->{response_started} = 0 unless @{$state->{response_queue}};
+                return;
+            }
             $messageSender->sendChat($response);
         }
-    } elsif ($context->{type} && $context->{type} eq 'public') {
+    } else {
+        $response = _sanitizeOutgoingMessage($response);
+        if (!$response) {
+            debug "[aiChat] Resposta vazia apos sanitizacao para '$sender'\n", "plugin";
+            $state->{typing_until} = 0;
+            $state->{response_started} = 0 unless @{$state->{response_queue}};
+            return;
+        }
+    }
+
+    if (!$emotion_command && $context->{type} && $context->{type} eq 'public') {
         $messageSender->sendChat($response);
         AIChat::Log::log_message(
             direction => 'out',
@@ -181,7 +218,7 @@ sub _sendQueuedResponse {
             sender => 'Public',
             message => $response,
         );
-    } else {
+    } elsif (!$emotion_command) {
         $messageSender->sendPrivateMsg($sender, $response);
         AIChat::Log::log_message(
             direction => 'out',
@@ -672,7 +709,11 @@ sub _processPendingEmotionFollowups {
         next unless $send_at;
         next unless $now >= $send_at;
 
-        my $message = $pending->{message};
+        my $message = _sanitizeOutgoingMessage($pending->{message});
+        if (!$message) {
+            delete $pending_emotion_followup_by_sender{$sender_key};
+            next;
+        }
         my $context = $pending->{context};
         my $sender_name = $pending->{sender_name};
         if ($context && $context eq 'public') {
