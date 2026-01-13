@@ -201,10 +201,38 @@ sub _buildDropDbContext {
     }
     return undef unless @entries;
 
+    my $item_index = _buildDropItemIndex($mondb);
+
     return join "\n",
         "Banco de drops conhecido (use somente essas informacoes):",
         @entries,
+        (@$item_index ? ("Indice de itens (item -> monstros que dropam):", @$item_index) : ()),
         "Se nao houver informacao, diga que nao sabe ou nao tem certeza.";
+}
+
+sub _buildDropItemIndex {
+    my ($mondb) = @_;
+    return [] unless $mondb && %$mondb;
+
+    my %item_to_monsters;
+    for my $monster (sort keys %$mondb) {
+        next if $monster =~ /^Mapa\s+/i;
+        my $drops = $mondb->{$monster} || [];
+        next unless @$drops;
+        for my $drop (@$drops) {
+            next unless defined $drop && $drop ne '';
+            push @{$item_to_monsters{$drop}}, $monster;
+        }
+    }
+
+    my @entries;
+    for my $item (sort keys %item_to_monsters) {
+        my %seen;
+        my @monsters = grep { !$seen{$_}++ } @{$item_to_monsters{$item}};
+        push @entries, "$item: " . join(', ', @monsters) if @monsters;
+    }
+
+    return \@entries;
 }
 
 sub _buildWorldContext {
