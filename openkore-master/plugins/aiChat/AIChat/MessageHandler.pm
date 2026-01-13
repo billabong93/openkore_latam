@@ -22,6 +22,7 @@ my $api_client;
 my $mondb_cache;
 my $item_translation_cache;
 my %mondb_map_cache;
+my $mondb_search_cache;
 
 BEGIN {
     $api_client = AIChat::APIClient->new();
@@ -239,6 +240,220 @@ sub _buildDropItemIndex {
     return \@entries;
 }
 
+sub _normalizeQueryText {
+    my ($text) = @_;
+    return '' unless defined $text;
+    my $normalized = lc $text;
+    $normalized =~ s/[^a-z0-9]+/ /g;
+    $normalized =~ s/\s+/ /g;
+    $normalized =~ s/^\s+//;
+    $normalized =~ s/\s+$//;
+    return $normalized;
+}
+
+sub _tokenizeText {
+    my ($text) = @_;
+    my $normalized = _normalizeQueryText($text);
+    return [] unless length $normalized;
+    return [split / /, $normalized];
+}
+
+sub _containsTokenSequence {
+    my ($tokens, $phrase_tokens) = @_;
+    return 0 unless $tokens && $phrase_tokens;
+    my $token_count = scalar @$tokens;
+    my $phrase_count = scalar @$phrase_tokens;
+    return 0 unless $token_count && $phrase_count;
+    return 0 if $phrase_count > $token_count;
+
+    for (my $i = 0; $i <= $token_count - $phrase_count; $i++) {
+        my $matched = 1;
+        for (my $j = 0; $j < $phrase_count; $j++) {
+            if ($tokens->[$i + $j] ne $phrase_tokens->[$j]) {
+                $matched = 0;
+                last;
+            }
+        }
+        return 1 if $matched;
+    }
+
+    return 0;
+}
+
+sub _findBestPhraseMatch {
+    my ($tokens, $candidates) = @_;
+    return unless $tokens && $candidates;
+    my $best;
+    my $best_len = 0;
+
+    for my $candidate (@$candidates) {
+        next unless defined $candidate && $candidate ne '';
+        my $phrase_tokens = _tokenizeText($candidate);
+        next unless @$phrase_tokens;
+        next if scalar(@$phrase_tokens) < $best_len;
+        next unless _containsTokenSequence($tokens, $phrase_tokens);
+        $best = $candidate;
+        $best_len = scalar @$phrase_tokens;
+    }
+
+    return $best;
+}
+
+sub _buildMondbSearchIndex {
+    my ($mondb) = @_;
+    return {} unless $mondb && %$mondb;
+
+    my %monsters_by_key;
+    my %items;
+    my %maps;
+    my %item_to_monsters;
+    my %map_to_monsters;
+    my %map_to_items;
+
+    for my $monster (sort keys %$mondb) {
+        my $entry = $mondb->{$monster} || {};
+        my $drops = $entry->{drops} || [];
+        my $maps = $entry->{maps} || [];
+
+        if ($monster =~ /^Mapa\s+/i) {
+            if (@$maps) {
+                for my $map (@$maps) {
+                    $maps{$map} = $map if defined $map && $map ne '';
+                }
+            }
+            if (@$drops) {
+                my ($map_name) = $monster =~ /^Mapa\s+(.+)/i;
+                if (defined $map_name && $map_name ne '') {
+                    $map_to_items{$map_name} = $drops;
+                    $maps{$map_name} = $map_name;
+                }
+            }
+            next;
+        }
+
+        $monsters_by_key{$monster} = $monster;
+
+        if (@$maps) {
+            for my $map (@$maps) {
+                next unless defined $map && $map ne '';
+                $maps{$map} = $map;
+                push @{$map_to_monsters{$map}}, $monster;
+            }
+        }
+
+        next unless @$drops;
+        for my $drop (@$drops) {
+            next unless defined $drop && $drop ne '';
+            $items{$drop} = $drop;
+            push @{$item_to_monsters{$drop}}, $monster;
+        }
+    }
+
+    return {
+        monsters => [sort keys %monsters_by_key],
+        items => [sort keys %items],
+        maps => [sort keys %maps],
+        item_to_monsters => \%item_to_monsters,
+        map_to_monsters => \%map_to_monsters,
+        map_to_items => \%map_to_items,
+    };
+}
+
+sub _getMondbSearchIndex {
+    my $mondb = _loadMonsterDropDb();
+    return {} unless $mondb && %$mondb;
+    return $mondb_search_cache if $mondb_search_cache;
+    $mondb_search_cache = _buildMondbSearchIndex($mondb);
+    return $mondb_search_cache;
+}
+
+sub _hasToken {
+    my ($tokens, $needles) = @_;
+    return 0 unless $tokens && $needles;
+    my %token_lookup = map { $_ => 1 } @$tokens;
+    for my $needle (@$needles) {
+        return 1 if $token_lookup{$needle};
+    }
+    return 0;
+}
+
+sub generateDropDbResponse {
+    my ($message) = @_;
+    return undef unless defined $message && $message ne '';
+
+    my $mondb = _loadMonsterDropDb();
+    return undef unless $mondb && %$mondb;
+
+    my $index = _getMondbSearchIndex();
+    return undef unless $index && %$index;
+
+    my $tokens = _tokenizeText($message);
+    return undef unless $tokens && @$tokens;
+
+    my $monster = _findBestPhraseMatch($tokens, $index->{monsters});
+    my $item = _findBestPhraseMatch($tokens, $index->{items});
+    my $map = _findBestPhraseMatch($tokens, $index->{maps});
+
+    my $mentions_where = _hasToken($tokens, [qw(onde aonde pego pegar pega encontro encontrar mapa map)]);
+    my $mentions_drop = _hasToken($tokens, [qw(drop drops dropa dropar drope loot caiu cai)]);
+
+    my $query_type;
+    if ($monster && !$item) {
+        $query_type = 'monster';
+    } elsif ($item && !$monster) {
+        $query_type = 'item';
+    } elsif ($monster && $item) {
+        if ($mentions_where) {
+            $query_type = 'item';
+        } elsif ($mentions_drop) {
+            $query_type = 'monster';
+        } else {
+            $query_type = 'monster';
+        }
+    } elsif ($map) {
+        $query_type = 'map';
+    }
+
+    if ($query_type && $query_type eq 'monster') {
+        my $entry = $mondb->{$monster} || {};
+        my $drops = $entry->{drops} || [];
+        my $maps = $entry->{maps} || [];
+        return 'nao sei' unless @$drops || @$maps;
+        my @parts;
+        push @parts, "dropa: " . join(', ', @$drops) if @$drops;
+        push @parts, "mapas: " . join(', ', @$maps) if @$maps;
+        return join ' | ', $monster, @parts;
+    }
+
+    if ($query_type && $query_type eq 'item') {
+        my $monsters = $index->{item_to_monsters}{$item} || [];
+        return 'nao sei' unless @$monsters;
+        my @entries;
+        for my $monster_name (@$monsters) {
+            my $entry = $mondb->{$monster_name} || {};
+            my $maps = $entry->{maps} || [];
+            if (@$maps) {
+                push @entries, "$monster_name (" . join(', ', @$maps) . ")";
+            } else {
+                push @entries, $monster_name;
+            }
+        }
+        return "$item: " . join(', ', @entries);
+    }
+
+    if ($query_type && $query_type eq 'map') {
+        my $monsters = $index->{map_to_monsters}{$map} || [];
+        my $items = $index->{map_to_items}{$map} || [];
+        return 'nao sei' unless @$monsters || @$items;
+        my @parts;
+        push @parts, "monstros: " . join(', ', @$monsters) if @$monsters;
+        push @parts, "itens: " . join(', ', @$items) if @$items;
+        return "mapa $map: " . join(' | ', @parts);
+    }
+
+    return 'nao sei';
+}
+
 sub _buildWorldContext {
     my $map_name = $bot_character_data{map_name} // 'desconhecido';
     my $monsters = _normalizeList($bot_character_data{map_monsters});
@@ -342,6 +557,7 @@ sub _loadMonsterDropDb {
     }
 
     $mondb_cache = \%db;
+    $mondb_search_cache = undef;
     return $mondb_cache;
 }
 
@@ -420,6 +636,7 @@ sub updateMondbFromMap {
         print $fh @lines;
         close $fh;
         $mondb_cache = undef;
+        $mondb_search_cache = undef;
     }
 }
 
@@ -562,7 +779,7 @@ sub interpretCommand {
     my @messages = (
         {
             role => "system",
-            content => "Voce e um classificador de comandos do bot. Responda apenas com JSON valido no formato {\"action\":\"chat|emote|emote_random|none\"}. Contexto: mapa atual=$map_name, lockMap=$lock_map_info, pedidos_emote_recentemente=$recent_emote_requests. Use o contexto recente se necessario. Marque \"emote\" quando pedirem para reproduzir um emoticon, mesmo em pedidos repetidos ou indiretos. Marque \"emote_random\" quando pedirem um emoticon aleatorio, diferente, outro, ou variado. Em sec_pri, nunca recuse pedidos de emoticon: use \"emote\" ou \"emote_random\" quando o pedido for de emoticon. Fora de sec_pri, aplique moderacao de spam somente quando estiver no lockMap (mapa atual == lockMap). Se estiverem importunando, voce pode recusar escolhendo \"chat\" para responder verbalmente. Marque \"chat\" quando for uma pergunta/comentario comum. Marque \"none\" quando nao houver acao clara. Nao inclua nenhum texto fora do JSON."
+            content => "Voce e um classificador de comandos do bot. Responda apenas com JSON valido no formato {\"action\":\"chat|emote|emote_random|drop_db|none\"}. Contexto: mapa atual=$map_name, lockMap=$lock_map_info, pedidos_emote_recentemente=$recent_emote_requests. Use o contexto recente se necessario. Marque \"emote\" quando pedirem para reproduzir um emoticon, mesmo em pedidos repetidos ou indiretos. Marque \"emote_random\" quando pedirem um emoticon aleatorio, diferente, outro, ou variado. Use \"drop_db\" quando a pessoa pedir informacoes sobre monstros, drops, itens ou mapas (ex: onde pega um item, o que um monstro dropa, mapas com um monstro). Nunca use \"drop_db\" para pedidos de emoticon. Em sec_pri, nunca recuse pedidos de emoticon: use \"emote\" ou \"emote_random\" quando o pedido for de emoticon. Fora de sec_pri, aplique moderacao de spam somente quando estiver no lockMap (mapa atual == lockMap). Se estiverem importunando, voce pode recusar escolhendo \"chat\" para responder verbalmente. Marque \"chat\" quando for uma pergunta/comentario comum. Marque \"none\" quando nao houver acao clara. Nao inclua nenhum texto fora do JSON."
         }
     );
 
