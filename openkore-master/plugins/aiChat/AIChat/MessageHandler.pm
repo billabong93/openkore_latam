@@ -11,6 +11,7 @@ use JSON::Tiny qw(decode_json);
 use AIChat::APIClient;
 use AIChat::Config;
 use AIChat::ConversationHistory;
+use AIChat::MonsterDB;
 
 # Global hash to store the bot's character data
 our %bot_character_data;
@@ -152,11 +153,21 @@ sub processMessages {
 
     _ensureCharacterInfo($sender);
 
+    my $combined_message = join "\n", @$messages;
+    my $monster_context = AIChat::MonsterDB::buildContext($combined_message);
+
     for my $message (@$messages) {
         AIChat::ConversationHistory::addMessage($sender, "user", $message);
     }
 
-    my $combined_message = join "\n", @$messages;
+    if ($monster_context && $monster_context->{short_circuit}) {
+        return [$monster_context->{response}];
+    }
+
+    if ($monster_context && $monster_context->{system_message}) {
+        AIChat::ConversationHistory::addMessage($sender, "system", $monster_context->{system_message}, "monster_db");
+    }
+
     my $response;
     eval {
         $response = $api_client->callAPI($combined_message, $sender);

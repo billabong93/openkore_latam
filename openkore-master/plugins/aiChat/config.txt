@@ -33,3 +33,6 @@ aiChat_buffer_delay 2
 
 # Habilita responder chat público no lockMap
 aiChat_public_on_lockmap 1
+
+# Caminho para o banco de dados de monstros (mondb.txt)
+aiChat_mondb_path tables/mondb.txt

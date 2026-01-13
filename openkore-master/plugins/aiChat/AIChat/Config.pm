@@ -21,6 +21,7 @@ use constant {
     DEFAULT_SPLIT_CHANCE => 0.2, # Chance de dividir resposta em duas mensagens
     DEFAULT_BUFFER_DELAY => 2, # Segundos para aguardar novas mensagens antes de responder
     DEFAULT_PUBLIC_ON_LOCKMAP => 1, # Permitir respostas no chat publico quando estiver no lockMap
+    DEFAULT_MONDB_PATH => "tables/mondb.txt",
 };
 
 # Use a lexically scoped variable for the package's internal config
@@ -38,6 +39,7 @@ my %_file_key_map = (
     aiChat_split_chance => 'split_chance',
     aiChat_buffer_delay => 'buffer_delay',
     aiChat_public_on_lockmap => 'public_on_lockmap',
+    aiChat_mondb_path => 'mondb_path',
 );
 
 sub _configFilePath {
@@ -59,6 +61,7 @@ sub _loadFromConfigHash {
         'aiChat_split_chance',
         'aiChat_buffer_delay',
         'aiChat_public_on_lockmap',
+        'aiChat_mondb_path',
     );
 
     for my $file_key (@load_order) {
@@ -113,6 +116,7 @@ BEGIN {
         split_chance => DEFAULT_SPLIT_CHANCE,
         buffer_delay => DEFAULT_BUFFER_DELAY,
         public_on_lockmap => DEFAULT_PUBLIC_ON_LOCKMAP,
+        mondb_path => DEFAULT_MONDB_PATH,
     );
 }
 
@@ -151,6 +155,7 @@ sub save {
     print $fh "aiChat_split_chance $_aiChatConfig{split_chance}\n";
     print $fh "aiChat_buffer_delay $_aiChatConfig{buffer_delay}\n";
     print $fh "aiChat_public_on_lockmap $_aiChatConfig{public_on_lockmap}\n";
+    print $fh "aiChat_mondb_path $_aiChatConfig{mondb_path}\n";
     close $fh or warning "[aiChat] Não foi possível fechar $config_file: $!\n", "plugin";
 }
 

@@ -32,6 +32,7 @@ Configure as opções no `plugins/aiChat/config.txt` ou via console do OpenKore 
 *   `aiChat_max_tokens`: Máx. tokens na resposta (padrão: `150`)
 *   `aiChat_temperature`: Criatividade da IA (0.0-1.0, padrão: `0.6`)
 *   `aiChat_typing_speed`: Velocidade de digitação em caracteres/segundo (padrão: `20`)
+*   `aiChat_mondb_path`: Caminho para o `mondb.txt` (padrão: `tables/mondb.txt`)
 
 ### B. No Proxy Node.js (`api_proxy.js`)
 
@@ -57,3 +58,4 @@ Abra `plugins/aiChat/api_proxy.js` e **insira sua chave de API diretamente** (ex
 *   **Erros de `Can't locate module...`**: Módulos Perl ou Node.js não instalados. Verifique "Pré-requisitos".
 *   **IA não responde / respostas ruins**: Verifique se o proxy está rodando, a chave de API em `api_proxy.js`, e ajuste o `prompt`, `max_tokens` e `temperature`.
 *   **Informações do personagem incorretas**: Verifique os logs de depuração do OpenKore por `[aiChat] Dados do personagem atualizados:`.
+*   **Respostas sobre monstros erradas**: Confirme que `aiChat_mondb_path` aponta para o `mondb.txt` correto. Se o arquivo não existir, o aiChat responde `nao sei` para perguntas de monstros/drops/mapas.

@@ -334,6 +334,7 @@ sub onCommand {
         message "Chance de dividir resposta: " . AIChat::Config::get('split_chance'), "list";
         message "Delay do buffer: " . AIChat::Config::get('buffer_delay'), "list";
         message "Responder no chat publico no lockMap: " . AIChat::Config::get('public_on_lockmap'), "list";
+        message "Caminho mondb.txt: " . AIChat::Config::get('mondb_path'), "list";
     } elsif ($arg =~ /^provider\s+(openai|deepseek)$/) {
         if (AIChat::Config::set('provider', $1)) {
             message $translator->translatef("%s Provedor alterado para %s\n", PLUGIN_PREFIX, $1), "list";
