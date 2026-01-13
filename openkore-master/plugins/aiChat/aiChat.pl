@@ -135,6 +135,19 @@ sub _enqueueMessage {
     }
 }
 
+sub _queueDirectResponse {
+    my ($sender, $response, $context) = @_;
+    return unless defined $sender && defined $response;
+    my $state = _getBufferState($sender);
+    $state->{messages} = [];
+    $state->{response_queue} = [];
+    $state->{buffer_deadline} = 0;
+    $state->{typing_until} = 0;
+    $state->{response_started} = 0;
+    $state->{context} = $context;
+    push @{$state->{response_queue}}, $response;
+}
+
 sub _flushBufferedMessages {
     my ($sender, $state) = @_;
     my @messages = @{$state->{messages}};
@@ -434,6 +447,14 @@ sub onPrivateMessage {
             message => $message,
         );
         return;
+    } elsif (_queueDropDbResponseIfNeeded($sender, $message, 'private', $intent)) {
+        AIChat::Log::log_message(
+            direction => 'in',
+            visibility => 'private',
+            sender => $sender,
+            message => $message,
+        );
+        return;
     }
 
     AIChat::Log::log_message(
@@ -460,6 +481,14 @@ sub onPublicMessage {
     if (_shouldRefuseEmoteRequest($sender, $intent, $intent_context)) {
         _injectEmoteSpamRefusalHint($sender);
     } elsif (_queueEmotionRequestIfNeeded($sender, $message, 'public', $intent, $intent_context)) {
+        AIChat::Log::log_message(
+            direction => 'in',
+            visibility => 'public',
+            sender => $sender,
+            message => $message,
+        );
+        return;
+    } elsif (_queueDropDbResponseIfNeeded($sender, $message, 'public', $intent)) {
         AIChat::Log::log_message(
             direction => 'in',
             visibility => 'public',
@@ -525,6 +554,19 @@ sub _extractEmotionCommand {
         return $1;
     }
     return;
+}
+
+sub _queueDropDbResponseIfNeeded {
+    my ($sender, $message, $context, $intent) = @_;
+    return unless defined $sender && defined $message;
+    return unless $intent && ref $intent eq 'HASH';
+    return unless ($intent->{action} // '') eq 'drop_db';
+
+    my $response = AIChat::MessageHandler::generateDropDbResponse($message);
+    $response = AIChat::MessageHandler::dropDbUnknownReply() unless defined $response && $response ne '';
+    AIChat::ConversationHistory::addMessage($sender, "user", $message, "intent");
+    _queueDirectResponse($sender, $response, { type => $context });
+    return 1;
 }
 
 sub _normalizeSenderKey {
