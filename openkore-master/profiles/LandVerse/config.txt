@@ -58,8 +58,8 @@ XKore_ID
 
 master LandVerse
 server 0
-username CeltosOfc
-password dhm@4862
+username 
+password 
 loginPinCode
 char 0
 otpSeed
