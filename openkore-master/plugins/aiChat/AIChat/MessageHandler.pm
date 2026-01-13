@@ -532,6 +532,8 @@ sub generateDropDbChatResponse {
                 "Banco de dados de monstros e drops (formato: Monstro: (Mapa1, Mapa2) Drop1, Drop2):",
                 $drop_context,
                 "Use somente as informacoes do banco acima.",
+                "Quando perguntarem onde fica um monstro, use o primeiro mapa da lista.",
+                "Quando perguntarem onde pega um item, use o primeiro monstro que dropa e o primeiro mapa desse monstro.",
                 "Se nao houver informacao clara, responda com uma frase curta de desconhecimento, como um player.",
                 "Exemplos: nao sei, nao conheco, sei nao, nao to ligado, desculpa nao sei.",
         },

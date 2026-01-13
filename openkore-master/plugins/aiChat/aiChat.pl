@@ -562,9 +562,9 @@ sub _queueDropDbResponseIfNeeded {
     return unless $intent && ref $intent eq 'HASH';
     return unless ($intent->{action} // '') eq 'drop_db';
 
-    my $response = AIChat::MessageHandler::generateDropDbResponse($message);
+    my $response = AIChat::MessageHandler::generateDropDbChatResponse($message, $sender);
     if (!defined $response || $response eq '') {
-        $response = AIChat::MessageHandler::generateDropDbChatResponse($message, $sender);
+        $response = AIChat::MessageHandler::generateDropDbResponse($message);
     }
     $response = AIChat::MessageHandler::dropDbUnknownReply() unless defined $response && $response ne '';
     AIChat::ConversationHistory::addMessage($sender, "user", $message, "intent");
