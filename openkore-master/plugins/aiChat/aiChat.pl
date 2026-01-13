@@ -4,7 +4,7 @@ use strict;
 use warnings;
 
 use Commands;
-use Globals qw(%timeout $messageSender $net %config $char $field %jobs_lut %emotions_lut);
+use Globals qw(%timeout $messageSender $net %config $char $field %jobs_lut %emotions_lut %monsters %items %monsters_lut %monsters_name_lut %items_lut);
 use Settings qw(%sys);
 use I18N qw(bytesToString);
 use Log qw(warning message debug);
@@ -248,6 +248,32 @@ sub updateBotCharacterData {
             debug "[aiChat] \$field não está definido.\n", "plugin";
         }
         $AIChat::MessageHandler::bot_character_data{map_name} = $current_map_name;
+
+        my %map_monsters;
+        for my $id (keys %monsters) {
+            my $monster = $monsters{$id};
+            next unless $monster;
+            my $name = $monster->{name};
+            if ((!defined $name || $name eq '') && $monster->{nameID}) {
+                $name = $monsters_lut{$monster->{nameID}} || $monsters_name_lut{$monster->{nameID}};
+            }
+            $map_monsters{$name} = 1 if defined $name && $name ne '';
+        }
+        my @map_monsters = sort keys %map_monsters;
+        $AIChat::MessageHandler::bot_character_data{map_monsters} = \@map_monsters;
+
+        my %map_items;
+        for my $id (keys %items) {
+            my $item = $items{$id};
+            next unless $item;
+            my $name = $item->{name};
+            if ((!defined $name || $name eq '') && $item->{nameID}) {
+                $name = $items_lut{$item->{nameID}};
+            }
+            $map_items{$name} = 1 if defined $name && $name ne '';
+        }
+        my @map_items = sort keys %map_items;
+        $AIChat::MessageHandler::bot_character_data{map_items} = \@map_items;
         
         debug "[aiChat] Dados do personagem atualizados: " . join(", ", map { "$_: " . $AIChat::MessageHandler::bot_character_data{$_} } keys %AIChat::MessageHandler::bot_character_data) . "\n", "plugin";
     } else {
