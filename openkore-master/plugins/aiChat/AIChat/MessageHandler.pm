@@ -515,46 +515,8 @@ sub generateDropDbChatResponse {
     my ($message, $sender) = @_;
     return dropDbUnknownReply() unless defined $message && $message ne '';
 
-    my $drop_context = <<'MONDB';
-# Formato: Monstro: (Mapa1, Mapa2, Mapa3)  Drop1, Drop2, Drop3
-# Itens em ingles serao traduzidos via tables/items.txt -> tables/ROla/items.txt
-Poring: (prt_fild08, prt_fild05, pay_fild04)  Jellopy, Faca [4], Muco Pegajoso, Maçã, Garrafa Vazia, Maçã Verde, Carta Poring
-Drops: (moc_fild07, moc_fild01, moc_fild12)  Jellopy, Bastão [4], Muco Pegajoso, Maçã, Garrafa Vazia, Suco de Laranja, Carta Drops
-Poporing: (pay_fild04, gef_fild04, prt_fild03)  Muco Pegajoso, Garleta, Erva Verde, Uvas, Maçã, Main Gauche [3], Carta Poporing
-Lunático: (prt_fild00, prt_fild01, prt_fild02)  Trevo, Pluma, Nariz de Palhaço, Maçã, Erva Vermelha, Cenoura, Cenoura Arco-Íris, Carta Lunático
-Pupa: (prt_fild08, prt_fild01, mjolnir_11)  Fracon, Crisálida, Muco Pegajoso, Casca, Minério de Ferro, Carta Pupa
-ChonChon: (prt_fild04, prt_sew01, mjolnir_01)  Ferro, Casca, Jellopy, Punhal [4], Boneco de Chonchon, Minério de Ferro, Carta ChonChon
-Fabre: (gef_fild04, prt_fild08, mjolnir_01)  Felpa, Pluma, Clava [4], Esmeralda, Erva Verde, Trevo, Clava [3], Carta Fabre
-Salgueiro: (pay_fild08, prt_fild01, pay_fild01)  Raiz de Árvore, Tronco, Resina, Batata Doce, Tronco Estéril, Tronco Sólido, Tronco de Alta Qualidade, Carta Salgueiro
-Condor: (moc_fild18, moc_fild07, moc_fild11)  Garra de Ave, Arco [4], Gema Amarela, Flecha, Carne, Plumas de Ave, Laranja, Carta Condor
-Mandrágora: (mjolnir_02, mjolnir_05, mjolnir_11)  Vida Verdejante, Ranseur [4], Erva Verde, Broto, Trevo de Quatro Folhas, Chicote de Gaia, Carta Mandrágora
-Sapo de Rodda: (gef_fild01, gef_fild04, prt_fild04)  Pata Pegajosa, Ova de Sapo, Erva Verde, Esmeralda, Garrafa Vazia, Carta Sapo de Rodda
-Rocker: (prt_fild07, mjolnir_01, mjolnir_09)  Perna de Gafanhoto, Violão da Mãe Terra, Antenas Verdes, Azagaia [4], Folha de Hinalle, Boneco de Rocker, Hinalle, Carta Rocker
-Rabo de Verme: (pay_fild10, pay_fild01, prt_fild02)  Vida Verdejante, Emveretarcon, Escama Afiada, Pique [4], Erva Amarela, Esmeralda, Laço Verde, Carta Rabo de Verme
-Esporo: (pay_fild08, pay_fild01, mjolnir_09)  Esporo de Cogumelo, Erva Vermelha, Erva Azul, Boneco de Esporo, Chapéu, Esporo Venenoso, Morango, Carta Esporo
-Esqueleto: (pay_dun00, prt_fild01, prt_sew03)  Fracon, Osso, Jellopy, Erva Vermelha, Anel de Caveira, Carta Esqueleto
-Zumbi: (pay_dun00, prt_sew03, pay_dun01)  Unha Apodrecida, Rubi Amaldiçoado, Muco Pegajoso, Mandíbula Horrenda, Opala, Carta Zumbi
-Jibóia: (pay_fild02, pay_fild03, moc_fild12)  Escamas de Cobra, Erva Vermelha, Emveretarcon, Canino Venenoso, Escama Brilhante, Maçã, Carta Jibóia
-Bebê Selvagem: (pay_fild09, prt_fild03, prt_fild11)  Couro de Animal, Carne, Carne de Selvagem, Pluma, Fracon, Leite Doce, Carta Bebê Selvagem
-Filhote de Lobo: (moc_fild03, prt_fild02, prt_fild04)  Fracon, Couro de Animal, Túnica [1], Sangue de Lobo, Camisa de Algodão, Asura [3], Laranja, Carta Filhote de Lobo
-Escorpião: (moc_fild18, moc_fild11, moc_pyrd02)  Sangue Escarlate, Cauda de Escorpião, Minério de Elunium, Casca Rija, Torrão de Areia Fina, Erva Amarela, Ferro Enferrujado, Carta Escorpião
-Besouro-Ladrão: (prt_sew01, prt_sew02, prt_sew03)  Pele de Verme, Gibão, Gibão [1], Erva Vermelha, Jellopy, Minério de Ferro
-Ovo de Besouro-Ladrão: (prt_sew01, prt_sew02, prt_sew03)  Fracon, Crisálida, Muco Pegajoso, Gema Vermelha, Concha Preta, Minério de Ferro, Carta Ovo de Besouro-Ladrão
-Besouro-Ladrão Fêmea: (prt_sew02, prt_sew03, mjo_dun01)  Pele de Verme, Garleta, Antenas de Inseto, Erva Vermelha, Gema Vermelha, Minério de Ferro, Carta Besouro-Ladrão Fêmea
-Besouro-Ladrão Macho: (prt_sew02, prt_sew03, prt_sew04)  Emveretarcon, Antenas de Inseto, Pele de Verme, Espada Matadora [3], Erva Amarela, Zircônio, Kataná [3], Carta Besouro-Ladrão Macho
-Creamy: (gef_fild01, mjolnir_03, prt_fild04)  Pó de Borboleta, Manto de Seda [1], Mel, Asa de Borboleta, Florzinha, Flor, Relâmpago Nível 3, Carta Creamy
-Familiar: (pay_dun00, prt_sew01, prt_sew02)  Dente de Morcego, Alfanje [4], Laço [1], Uvas, Erva Vermelha, Poção da Concentração, Carta Familiar
-PecoPeco: (moc_fild01, moc_fild18, moc_fild02)  Bico de Ave, Sandálias [1], Erva Amarela, Erva Vermelha, Vareta [2], Laranja, Carta PecoPeco
-Zangão: (mjolnir_03, mjolnir_07, mjolnir_09)  Frescor do Vento, Ferrão de Abelha, Jellopy, Erva Verde, Mel, Carta Zangão
-Ambernite: (gef_fild09, mjolnir_01, prt_fild04)  Cristal Azul, Casco de Caramujo, Garleta, Casca, Casca Rija, Minério de Elunium, Minério de Ferro, Carta Ambernite
-Pé-Grande: (pay_fild07, pay_fild09, pay_fild01)  Pata de Urso, Chapéu Fedorento, Couro de Animal, Boneca de Pelúcia, Batata Doce, Mel, Minério de Oridecon, Carta Pé-Grande
-Caramelo: (mjolnir_01, mjolnir_03, prt_fild02)  Espinho de Porco-Espinho, Casaco [1], Couro de Animal, Glaive [3], Ranseur [4], Pique [4], Asa de Mosca, Carta Caramelo
-Percevejo: (mjolnir_01, mjolnir_10, prt_sew01)  Frescor do Vento, Emveretarcon, Casco Arco-Íris, Garleta, Minério de Elunium, Casca Rija, Minério de Ferro, Carta Percevejo
-Yoyo: (prt_fild03, pay_fild02, prt_fild11)  Rabo de Macaco, Cacau, Erva Amarela, Couro de Animal, Boneco de Yoyo, Morango, Laranja, Carta Yoyo
-Tarou: (prt_sew01, prt_sew02, pay_dun00)  Cauda de Rato, Couro de Animal, Pluma, Ração para Monstros, Armadilha para Insetos, Carta Tarou
-Muka: (moc_fild18, moc_fild01, moc_fild11)  Vida Verdejante, Espinho de Cacto, Garrafa Vazia, Erva Verde, Erva Vermelha, Guisarme [2], Minério de Ferro, Carta Muka
-Vitata: (moc_pyrd03, moc_pyrd01, moc_fild11)  Vida Verdejante, Pele de Verme, Scell, Mel, Geléia Real, Minério de Oridecon, Carta Vitata
-MONDB
+    my $drop_context = _readMonsterDropDbRaw();
+    return dropDbUnknownReply() unless $drop_context;
 
     my $prompt = AIChat::Config::get('prompt');
     my $combined_prompt = join "\n",
