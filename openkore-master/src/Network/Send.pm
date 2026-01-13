@@ -248,10 +248,7 @@ sub sendToServer {
 
 	# Packet Prefix Encryption Support
 	$self->encryptMessageID(\$msg);
-	
-	# Salvar o tamanho original para o log
-	my $original_length = length($msg);
-	
+
 	$net->serverSend($msg);
 	$bytesSent += length($msg);
 
@@ -259,7 +256,6 @@ sub sendToServer {
 		my $label = $packetDescriptions{Send}{$messageID} ?
 			"[$packetDescriptions{Send}{$messageID}]" : '';
 		if ($config{debugPacket_sent} == 1) {
-			# Usar o tamanho final do pacote (após hooks)
 			debug(sprintf("Sent packet    : %-4s    [%2d bytes]  %s\n", $messageID, length($msg), $label), "sendPacket", 0);
 		} else {
 			Misc::visualDump($msg, ">> Sent packet: $messageID  $label");
@@ -650,10 +646,6 @@ sub sendLook {
 	my ($self, $body, $head) = @_;
 	$self->sendToServer($self->reconstruct({switch => 'actor_look_at', body => $body, head => $head}));
 	debug "Sent look: $body $head\n", "sendPacket", 2;
-	if ($net->clientAlive()) {
-			my $msg = pack('v a4 v C', 0x009C, $accountID, $head, $body);
-			$net->clientSend($msg);
-	}
 	@{$char->{look}}{qw(body head)} = ($body, $head);
 }
 
@@ -1411,12 +1403,12 @@ sub sendTokenToServer {
 	my $len =  $length + 92;
 
 	my $password_rijndael = $self->encrypt_password($password);
-	my $ip = sprintf("192.168.%02d.%02d", (map { int(rand(255)) } 1..2));
-	my $mac = $config{macAddress} || sprintf("E0311E%02X%02X%02X", (map { int(rand(256)) } 1..3));
+	my $ip = '192.168.0.14';
+	my $mac = '20CF3095572A';
 	my $mac_hyphen_separated = join '-', $mac =~ /(..)/g;
 
 	$net->serverDisconnect();
-	$net->serverConnect($ip, $port); # OTP - One Time Password
+	$net->serverConnect($ip, $port);# OTP - One Time Password
 
 	my $msg = $self->reconstruct({
 		switch => 'token_login',
@@ -1445,7 +1437,7 @@ sub sendOtpToServer {
 
     $self->sendToServer($self->reconstruct({
         switch => 'send_otp_login',
-        otp => $otp,
+        otp    => $otp,
         padding => 0x00,
     }));
 

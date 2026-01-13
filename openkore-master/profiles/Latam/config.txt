@@ -10,17 +10,17 @@
 #   - XKore: 0 | 1 | 2 | 3
 #   - XKore_listenPort: 1024-65535
 #   - XKore_port: porta do DLL/hook (ex: 6901,6902,6903)
-#   - poseidonServer: IP ou hostname (ex: 0.0.0.0)
+#   - poseidonServer: IP ou hostname (ex: 172.65.175.75)
 #   - poseidonPort: porta TCP do Poseidon (ex: 24390,24391,24392)
-#   - XKore_proxyPublicIp:  IP ou hostname (ex: 0.0.0.0)
+#   - XKore_proxyPublicIp:  IP ou hostname (ex: 172.65.175.75)
 attackAuto_steal 1
 
-XKore 1
-XKore_port 6900
-XKore_proxyPort 6900
-poseidonServer 0.0.0.0
+XKore 3
+XKore_port 6901
+XKore_proxyPort 6901
+poseidonServer 172.65.175.75
 poseidonPort 24390
-XKore_proxyPublicIp 0.0.0.0
+XKore_proxyPublicIp 172.65.175.75
 ############################################################################
 
 ### 🔐 PROTEGIDO (NÃO MEXER) - SEPARADO ################################################
@@ -56,20 +56,20 @@ XKore_ID
 
 ######## Login options and server-specific options ########
 
-master LandVerse
+master Latam - ROla: Freya/Nidhogg/Yggdrasil
 server 0
-username
+username 
 password 
-loginPinCode
+loginPinCode 
 char 0
-otpSeed
+otpSeed 
 
 bindIp
 forceMapIP
 
 # It is not advised to set secureAdminPassword if you're using Xkore 2
 secureAdminPassword 1
-adminPassword geecline
+adminPassword clohofru
 callSign
 commandPrefix ;
 callSignGM 0
@@ -105,14 +105,14 @@ attackAuto_notWhile_buyAuto 1
 attackAuto_notWhile_sellAuto 1
 attackAuto_considerDamagedAggressive 0
 attackDistance 1
-attackDistanceAuto 7
-attackMaxDistance 1
+attackDistanceAuto 1
+attackMaxDistance 2
 attackMaxRouteTime 4
 attackMinPlayerDistance 2
 attackMinPortalDistance 4
 attackUseWeapon 1
-attackNoGiveup 1
-attackCanSnipe 1
+attackNoGiveup 0
+attackCanSnipe 0
 attackCheckLOS 1
 attackRouteMaxPathDistance 20
 attackLooters 0
@@ -185,7 +185,7 @@ followLostStep 12
 followSitAuto 0
 followBot 0
 
-itemsTakeAuto 0
+itemsTakeAuto 2
 itemsTakeAuto_party 0
 itemsGatherAuto 0
 itemsGatherAuto_notInTown 0
@@ -198,7 +198,7 @@ cartMaxWeight 7900
 itemsTakeGreed 0
 itemsCheckWeight 1
 
-lockMap ein_fild04
+lockMap ice_dun03
 lockMap_x
 lockMap_y
 lockMap_randX
@@ -233,7 +233,7 @@ runFromTarget_noAttackMethodFallback 0
 runFromTarget_noAttackMethodFallback_attackMaxDist 14
 runFromTarget_noAttackMethodFallback_minStep 8
 
-saveMap payon
+saveMap rachel
 saveMap_x
 saveMap_y
 saveMap_warpToBuyOrSell 1
@@ -251,7 +251,7 @@ buyerShopAuto_open 0
 buyerShop_random 0
 
 sitAuto_hp_lower 10
-sitAuto_hp_upper 30
+sitAuto_hp_upper 50
 sitAuto_sp_lower 0
 sitAuto_sp_upper 0
 sitAuto_follow 0
@@ -261,31 +261,31 @@ sitAuto_look
 sitAuto_look_from_wall
 sitTensionRelax 0
 
-statsAddAuto 0
-statsAddAuto_list 10 str, 10 agi, 10 dex, 30 agi, 30 str, 50 dex, 99 agi, 99 str, 99 dex
+statsAddAuto 1
+statsAddAuto_list agi 40, dex 60
 statsAddAuto_dontUseBonus 0
-statsAdd_over_99 0
+statsAdd_over_99 1
 
 skillsAddAuto 0
-skillsAddAuto_list Basic Skill 9
+skillsAddAuto_list Praefatio 10, Clementia 10, Canto Candidus 10
 
 tankMode 0
 tankModeTarget
 
-teleportAuto_hp 0
+teleportAuto_hp 10
 teleportAuto_sp 0
-teleportAuto_idle 0
+teleportAuto_idle 1
 teleportAuto_portal 0
 teleportAuto_search 0
 teleportAuto_minAggressives 0
 teleportAuto_minAggressivesInLock 0
 teleportAuto_onlyWhenSafe 0
-teleportAuto_maxDmg 0
+teleportAuto_maxDmg 2800
 teleportAuto_maxDmgInLock 0
 teleportAuto_deadly 1
 teleportAuto_useSkill 1
 teleportAuto_useChatCommand
-teleportAuto_allPlayers 0
+teleportAuto_allPlayers 1
 teleportAuto_notPlayers
 teleportAuto_atkCount
 teleportAuto_atkMiss 10
@@ -307,9 +307,9 @@ teleportAuto_item2
 dealAuto 0
 dealAuto_names
 partyAuto 0
-partyAutoShare 1
-partyAutoShareItem 1
-partyAutoShareItemDiv 1
+partyAutoShare 0
+partyAutoShareItem 0
+partyAutoShareItemDiv 0
 guildAutoDeny 1
 attendanceAuto 1
 
@@ -383,42 +383,34 @@ monster_filter
 
 ######## Autostorage/autosell ########
 
-#buyAuto Cenoura {
-#	npc rachel 65 80
-#	npc_steps b
-#	minAmount 1
-#	maxAmount 2
-#}
-#
-buyAuto Red Potion {
-	npc payon 159 96
+buyAuto Cenoura {
+	npc rachel 65 80
 	npc_steps b
-	minAmount 10
-	maxAmount 100
-	zeny > 5500
-}
-buyAuto Fly Wing {
-	npc payon 159 96
-	npc_steps b
-	minAmount 10
-	maxAmount 100
-	zeny > 5500
+	minAmount 1
+	maxAmount 2
 }
 
-sellAuto 0
-sellAuto_npc payon 159 96
+buyAuto Abóbora {
+	npc rachel 65 80
+	npc_steps b
+	minAmount 1
+	maxAmount 2
+}
+
+sellAuto 1
+sellAuto_npc rachel 65 80
 sellAuto_standpoint
 sellAuto_distance 2
 sellAuto_maxDistance 5
 sellAuto_npc_steps s e
 sellAuto_npc_type 1
-sellAuto_maxItemTypes 10
+sellAuto_maxItemTypes 1
 
 storageAuto 0
-storageAuto_npc payon 181 104
+storageAuto_npc geffen 203 123
 storageAuto_distance 5
 storageAuto_npc_type 3
-storageAuto_npc_steps r1
+storageAuto_npc_steps r2
 storageAuto_password 6336
 storageAuto_keepOpen 0
 storageAuto_useChatCommand
@@ -438,11 +430,11 @@ getAuto {
 
 ######## Debugging options; only useful for developers ########
 
-debug 1
-debugPacket_unparsed 1
-debugPacket_received 1
-debugPacket_ro_sent 1
-debugPacket_sent 1
+debug 0
+debugPacket_unparsed 0
+debugPacket_received 0
+debugPacket_ro_sent 0
+debugPacket_sent 0
 debugPacket_exclude
 debugPacket_include
 debugPacket_include_dumpMethod
@@ -455,31 +447,200 @@ history_max 200
 
 ########################
 
-useSelf_item 501,502,503,545,546,547,569,11501,11565,11567,11573,11574,512,515 {
+useSelf_item 501,502,503,$$504$$,545,546,547,569,11501,11565,11567,11573,11574 {
 	hp < 70%
+	whenStatusInactive
+	notWhileSitting 1
 	timeout 0
 }
-useSelf_item Laranja,Erva Amarela,Erva Vermelha,Leite,Erva Branca,Batata Doce, Mel {
+useSelf_item Laranja,Erva Amarela,Erva Vermelha,Leite,Erva Branca {
 	hp < 100%
+	whenStatusInactive
+	notWhileSitting 1
 	timeout 0
 }
 useSelf_item 505,506,578,Laranja {
 	sp < 70%
+	whenStatusInactive
+	notWhileSitting 1
 	timeout 0
 }
 
 useSelf_item Poção da Concentração {
 	whenStatusInactive Poção da Concentração
+	notWhileSitting 1
 	timeout 0
 }
 
+#################################################################
+#                  HABILIDADES - SUMO SACERDOTE (AB)            #
+#################################################################
 
-attackSkillSlot MG_FIREBOLT {
+attackSkillSlot Judex {
 	lvl 10
-	sp > 20
-	hp > 30%
-	whenStatusInactive
+	dist 5
+	sp > 40%
+	maxUses 3
+	stopWhenHit 1
+	monsters > 3
 }
+
+
+
+# ----------- AUTO HEAL -----------
+useSelf_skill AL_HEAL {
+	sp > 40        # Curar Lv10
+	hp < 70%
+}
+
+partySkill AL_HEAL {
+	sp > 40
+	target_hp < 75%
+}
+
+# ----------- BUFFS -----------
+
+useSelf_skill Renovatio {
+	sp > 45
+	whenStatusInactive Renovatio
+	stopWhenHit 1
+	notInTown 1
+}
+
+useSelf_skill Gemini Lumen {
+	sp > 45
+	whenStatusInactive EFST_DUPLELIGHT
+	maxUses 3
+	notInTown 1
+}
+
+useSelf_skill AL_INCAGI {
+	sp > 45        # Aumentar Agilidade Lv10
+	whenStatusInactive Aumentar Agilidade
+}
+
+useSelf_skill AL_INCAGI {
+	sp > 45
+	whenStatusActive Diminuir Agilidade
+	notInTown 1
+}
+
+useSelf_skill AL_BLESSING {
+	sp > 64        # Bênção Lv10
+	whenStatusInactive Bênção
+	notInTown 1
+}
+
+partySkill AL_BLESSING {
+	sp > 64
+	target_whenStatusInactive Bênção
+	notInTown 1
+}
+
+useSelf_skill AL_ANGELUS {
+	sp > 50        # Angelus Lv10
+	whenStatusInactive Angelus
+	notInTown 1
+}
+
+partySkill AL_ANGELUS {
+	sp > 50
+	whenStatusInactive Angelus
+	notInTown 1
+}
+
+useSelf_skill PR_GLORIA {
+	sp > 20        # Glória
+	whenStatusInactive Glória
+	notInTown 1
+}
+
+useSelf_skill PR_IMPOSITIO {
+	sp > 71        # Impositio Manus Lv5 (71 SP no renewal; se for pre-renewal use 25)
+	whenStatusInactive Impositio Manus
+	stopWhenHit 1
+	notInTown 1
+}
+
+useSelf_skill PR_SUFFRAGIUM {
+	sp > 8         # Suffragium
+	whenStatusInactive Suffragium
+	stopWhenHit 1
+	notInTown 1
+}
+
+useSelf_skill PR_MAGNIFICAT {
+	sp > 40        # Magnificat
+	whenStatusInactive Magnificat
+	stopWhenHit 1
+	notInTown 1
+}
+
+partySkill PR_MAGNIFICAT {
+	sp > 40        # Magnificat
+	whenStatusInactive Magnificat
+	stopWhenHit 1
+	notInTown 1
+}
+
+# ----------- PROTEÇÕES -----------
+useSelf_skill PR_KYRIE {
+	sp > 35        # Kyrie Eleison Lv10
+	whenStatusInactive Kyrie Eleison
+	notInTown 1
+}
+
+partySkill PR_KYRIE {
+	sp > 35
+	whenStatusInactive Kyrie Eleison
+	notInTown 1
+}
+
+useSelf_skill HP_ASSUMPTIO {
+	sp > 40        # Assumptio
+	whenStatusInactive Assumptio
+	stopWhenHit 1
+}
+
+useSelf_skill HP_BASILICA {
+	sp > 200       # Basílica
+	whenStatusInactive Basílica
+	stopWhenHit 1
+}
+
+# ----------- SUPORTE SITUACIONAL -----------
+useSelf_skill AL_CURE {
+	sp > 15        # Medicar
+	whenStatusActive Cegueira, Confusão, Silêncio
+	stopWhenHit 1
+}
+
+useSelf_skill PR_STRECOVERY {
+	sp > 5         # Graça Divina
+	whenStatusActive Atordoamento, Congelamento, Petrificação, Sono, Aprisionado
+	stopWhenHit 1
+}
+
+useSelf_skill PR_SLOWPOISON {
+	sp > 12        # Retardar Veneno
+	whenStatusActive Envenenamento
+	stopWhenHit 1
+}
+
+partySkill ALL_RESURRECTION {
+	sp > 60        # Ressuscitar Lv4
+	target_dead 1
+	stopWhenHit 1
+}
+
+useSelf_skill PR_SANCTUARY {
+	sp > 60        # Santuário
+	notInTown 1
+	hp < 60%
+	stopWhenHit 1
+}
+
+
 
 
 

@@ -6,17 +6,15 @@
 # except for when subservers were changed or reordered
 # in such a way it requires user confirmation to correctly select a subserver
 
-# http://openkore.com.br
-[OpenKore]
-ip 138.255.176.230
+[LandVerse]
+ip 103.234.239.1
 port 6900
-master_version 5
+master_version 1
 version 55
-serverType kRO_RagexeRE_2021_11_03
+serverType Landverse
 serverEncoding Western
-addTableFolders kRO/Ragexe_2021_11_03;iRO
-charBlockSize 175
-storageEncryptKey 0x050B6F79, 0x0202C179, 0x00E20120, 0x04FA43E3, 0x0179B6C8, 0x05973DF2, 0x07D8D6B, 0x08CB9ED9
+addTableFolders Landverse;translated/kRO_english
+charBlockSize 247
 charDeleteDateType 1
 blockingPlayerCancel 1
 rankingSystemType 1
