@@ -472,7 +472,7 @@ sub generateDropDbResponse {
         my $entry = $mondb->{$monster} || {};
         my $drops = $entry->{drops} || [];
         my $maps = $entry->{maps} || [];
-        return _unknownDropReply() unless @$drops || @$maps;
+        return undef unless @$drops || @$maps;
         my @parts;
         push @parts, "dropa: " . join(', ', @$drops) if @$drops;
         push @parts, "mapas: " . join(', ', @$maps) if @$maps;
@@ -481,7 +481,7 @@ sub generateDropDbResponse {
 
     if ($query_type && $query_type eq 'item') {
         my $monsters = $index->{item_to_monsters}{$item} || [];
-        return _unknownDropReply() unless @$monsters;
+        return undef unless @$monsters;
         my $entries = _formatListWithMaps($mondb, $monsters);
         return "$item dropa de $entries";
     }
@@ -489,14 +489,13 @@ sub generateDropDbResponse {
     if ($query_type && $query_type eq 'map') {
         my $monsters = $index->{map_to_monsters}{$map} || [];
         my $items = $index->{map_to_items}{$map} || [];
-        return _unknownDropReply() unless @$monsters || @$items;
+        return undef unless @$monsters || @$items;
         my @parts;
         push @parts, "monstros: " . join(', ', @$monsters) if @$monsters;
         push @parts, "itens: " . join(', ', @$items) if @$items;
         return "mapa $map: " . join(' | ', @parts);
     }
 
-    return _unknownDropReply() if $mentions_query || $mentions_where || $mentions_drop;
     return undef;
 }
 
