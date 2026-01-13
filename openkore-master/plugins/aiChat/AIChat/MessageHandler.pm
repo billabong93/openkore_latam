@@ -383,13 +383,36 @@ sub _hasToken {
 sub _unknownDropReply {
     my @options = (
         'nao sei',
-        'nao tenho essa info',
-        'nao encontrei isso no meu banco',
-        'nao achei no banco de drops',
-        'nao tenho certeza disso',
-        'nao sei dizer',
+        'nao conheco',
+        'sei nao',
+        'nao to ligado',
+        'desculpa nao sei',
+        'nao faço ideia',
+        'nao lembro',
     );
     return $options[int(rand(@options))];
+}
+
+sub _readMonsterDropDbRaw {
+    my $path = File::Spec->catfile($Plugins::current_plugin_folder, 'mondb.txt');
+    return undef unless -e $path;
+    my @lines;
+    if (open my $fh, '<:encoding(UTF-8)', $path) {
+        @lines = <$fh>;
+        close $fh;
+    }
+    return undef unless @lines;
+    my @filtered;
+    for my $line (@lines) {
+        my $raw = $line;
+        chomp $raw;
+        $raw =~ s/\r//g;
+        next if $raw =~ /^\s*#/;
+        next if $raw =~ /^\s*$/;
+        push @filtered, $raw;
+    }
+    return undef unless @filtered;
+    return join "\n", @filtered;
 }
 
 sub _formatListWithMaps {
@@ -485,7 +508,7 @@ sub generateDropDbChatResponse {
     my ($message, $sender) = @_;
     return dropDbUnknownReply() unless defined $message && $message ne '';
 
-    my $drop_context = _buildDropDbContext();
+    my $drop_context = _readMonsterDropDbRaw();
     return dropDbUnknownReply() unless $drop_context;
 
     my $prompt = AIChat::Config::get('prompt');
@@ -497,10 +520,11 @@ sub generateDropDbChatResponse {
         {
             role => "system",
             content => join "\n",
+                "Banco de dados de monstros e drops (formato: Monstro: (Mapa1, Mapa2) Drop1, Drop2):",
                 $drop_context,
-                "Responda somente usando as informacoes do banco acima.",
-                "Se nao houver informacao clara no banco, responda com uma frase curta de desconhecimento.",
-                "Exemplos de desconhecimento: nao sei, nao conheco, sei nao, nao to ligado, desculpa nao sei.",
+                "Use somente as informacoes do banco acima.",
+                "Se nao houver informacao clara, responda com uma frase curta de desconhecimento, como um player.",
+                "Exemplos: nao sei, nao conheco, sei nao, nao to ligado, desculpa nao sei.",
         },
         {
             role => "user",
