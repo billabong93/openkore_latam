@@ -188,6 +188,7 @@ sub _dedupeMirror {
     return $response unless defined $response && $sender_messages && ref $sender_messages eq 'ARRAY';
     my $normalized_response = _normalizeEchoText($response);
     return $response unless length $normalized_response;
+    return $response if length($normalized_response) < 4;
 
     for my $message (@$sender_messages) {
         next unless defined $message;
@@ -219,7 +220,7 @@ sub interpretCommand {
     my @messages = (
         {
             role => "system",
-            content => "Voce e um classificador de comandos do bot. Responda apenas com JSON valido no formato {\"action\":\"chat|emote|none\"}. Contexto: mapa atual=$map_name, lockMap=$lock_map_info, pedidos_emote_recentemente=$recent_emote_requests. Use o contexto recente se necessario. Marque \"emote\" quando pedirem para reproduzir um emoticon, mesmo em pedidos repetidos ou indiretos. Em sec_pri, nunca recuse pedidos de emoticon: use \"emote\" sempre que o pedido for de emoticon. Fora de sec_pri, aplique moderacao de spam somente quando estiver no lockMap (mapa atual == lockMap). Se estiverem importunando, voce pode recusar escolhendo \"chat\" para responder verbalmente. Marque \"chat\" quando for uma pergunta/comentario comum. Marque \"none\" quando nao houver acao clara. Nao inclua nenhum texto fora do JSON."
+            content => "Voce e um classificador de comandos do bot. Responda apenas com JSON valido no formato {\"action\":\"chat|emote|emote_random|none\"}. Contexto: mapa atual=$map_name, lockMap=$lock_map_info, pedidos_emote_recentemente=$recent_emote_requests. Use o contexto recente se necessario. Marque \"emote\" quando pedirem para reproduzir um emoticon, mesmo em pedidos repetidos ou indiretos. Marque \"emote_random\" quando pedirem um emoticon aleatorio, diferente, outro, ou variado. Em sec_pri, nunca recuse pedidos de emoticon: use \"emote\" ou \"emote_random\" quando o pedido for de emoticon. Fora de sec_pri, aplique moderacao de spam somente quando estiver no lockMap (mapa atual == lockMap). Se estiverem importunando, voce pode recusar escolhendo \"chat\" para responder verbalmente. Marque \"chat\" quando for uma pergunta/comentario comum. Marque \"none\" quando nao houver acao clara. Nao inclua nenhum texto fora do JSON."
         }
     );
 
@@ -258,6 +259,64 @@ sub interpretCommand {
     }
 
     return $parsed;
+}
+
+sub generateEmoteFollowup {
+    my ($sender, $context) = @_;
+    return undef unless defined $sender;
+
+    my $history = AIChat::ConversationHistory::getHistory($sender) || [];
+    my @recent = grep { $_->{role} ne "system" } @$history;
+    @recent = @recent[-6 .. -1] if @recent > 6;
+
+    my $prompt = AIChat::Config::get('prompt');
+    my $map_name = $context && defined $context->{map_name} ? $context->{map_name} : ($bot_character_data{map_name} // '');
+    if (defined $map_name && $map_name eq 'sec_pri') {
+        my $gm_prompt = AIChat::Config::get('prompt_gm');
+        $prompt = $gm_prompt if defined $gm_prompt && $gm_prompt ne '';
+    }
+
+    my @messages = (
+        {
+            role => "system",
+            content => $prompt
+        },
+        {
+            role => "system",
+            content => "Você acabou de exibir um emoticon a pedido de uma pessoa. Responda com uma mensagem curta, confirmando se era o que a pessoa queria. Não simule emoticons ou ações em hipotese alguma, apenas uma resposta curta com o estilo de confirmacao curto tipo \"ok?\", \"mais alguma coisa?\", \"ta bom?\", \"foi isso?\". Responda seriamente, mas não seja negativo. Mantenha entre 1 e 4 palavras. Nao use emoticon. Nao diga que nao vai fazer ou que esta ocupado, até porque se esse prompt está sendo ativado, é porque já fez o emoticon. Varie a frase e seja natural."
+        }
+    );
+
+    push @messages, map {
+        {
+            role => $_->{role},
+            content => $_->{content},
+        }
+    } @recent;
+
+    my $response;
+    eval {
+        $response = $api_client->callAPIWithMessages(\@messages, {
+            max_tokens => 40,
+            temperature => 0.7,
+        });
+    };
+    if ($@) {
+        warning "[aiChat] Erro ao gerar followup de emoticon: $@\n", "plugin";
+        return undef;
+    }
+
+    return undef unless defined $response && length $response;
+    $response =~ s/\s+/ /g;
+    $response =~ s/^\s+//;
+    $response =~ s/\s+$//;
+    return undef unless length $response;
+    my @words = split /\s+/, $response;
+    if (@words > 6) {
+        $response = join ' ', @words[0..5];
+    }
+    return $response if length $response;
+    return undef;
 }
 
 1;

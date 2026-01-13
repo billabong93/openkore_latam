@@ -490,11 +490,13 @@ sub _queueEmotionRequestIfNeeded {
     AIChat::ConversationHistory::addMessage($sender, "user", $message, "intent");
     _recordEmoteRequest($sender);
 
+    my $action = $intent && ref $intent eq 'HASH' ? ($intent->{action} // '') : '';
     $pending_emotion_request_by_sender{$sender_key} = {
         requested_at => time(),
         respond_at => time() + $delay,
         context => $context,
         sender_name => $sender,
+        mode => $action,
     };
     return 1;
 }
@@ -504,14 +506,14 @@ sub _isEmotionRequest {
     return unless defined $message && defined $sender;
     my $result = $intent || _interpretCommand($message, $sender, $context);
     return unless $result && ref $result eq 'HASH';
-    return $result->{action} && $result->{action} eq 'emote';
+    return $result->{action} && ($result->{action} eq 'emote' || $result->{action} eq 'emote_random');
 }
 
 sub _shouldRefuseEmoteRequest {
     my ($sender, $intent, $context) = @_;
     return unless defined $sender;
     return unless $intent && ref $intent eq 'HASH';
-    return unless $intent->{action} && $intent->{action} eq 'emote';
+    return unless $intent->{action} && ($intent->{action} eq 'emote' || $intent->{action} eq 'emote_random');
 
     my $map_name = $context && defined $context->{map_name} ? $context->{map_name} : '';
     return if $map_name eq 'sec_pri';
@@ -566,9 +568,14 @@ sub _processPendingEmotionRequests {
         next unless $respond_at;
         next unless $now >= $respond_at;
 
-        my $command = _getRecentEmotionForSender($sender_key, $now);
-        if (!$command) {
+        my $command;
+        if (($pending->{mode} // '') eq 'emote_random') {
             $command = _pickFallbackEmotionCommand();
+        } else {
+            $command = _getRecentEmotionForSender($sender_key, $now);
+            if (!$command) {
+                $command = _pickFallbackEmotionCommand();
+            }
         }
 
         _sendEmotionByCommand($command) if $command;
@@ -604,8 +611,8 @@ sub _sendEmotionByCommand {
 sub _queueEmotionFollowup {
     my ($sender_name, $context) = @_;
     return unless defined $sender_name;
-    return unless rand() < 0.4;
-    my $followup = _pickEmotionFollowup();
+    return unless rand() < 0.25;
+    my $followup = AIChat::MessageHandler::generateEmoteFollowup($sender_name, { map_name => $field ? $field->baseName : undef });
     return unless $followup;
 
     my $sender_key = _normalizeSenderKey($sender_name);
@@ -626,22 +633,6 @@ sub _queueEmotionFollowup {
         sender_name => $sender_name,
     };
     $suppress_reply_until_by_sender{$sender_key} = $send_at + 1;
-}
-
-sub _pickEmotionFollowup {
-    my @options = (
-        "fiz certo?",
-        "era esse emoticom?",
-        "to liberado?",
-        "ta bom pra vc?",
-        "mais alguma coisa?",
-        "ja posso ir?",
-        "foi isso mesmo?",
-        "precisa de mais?",
-        "beleza assim?",
-        "agora ta ok?",
-    );
-    return $options[int(rand(@options))];
 }
 
 sub _processPendingEmotionFollowups {
