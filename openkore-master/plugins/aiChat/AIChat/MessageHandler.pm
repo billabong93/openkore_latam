@@ -612,8 +612,19 @@ sub generateDropDbResponse {
         $mentions_drop = 1 unless $mentions_where;
     }
 
+    if (!$monster && !$item && !$map && $mentions_where) {
+        $monster = $last_context->{monster} if $last_context->{monster};
+        $item = $last_context->{item} if $last_context->{item};
+        $map = $last_context->{map} if $last_context->{map};
+    }
+
     if ($mentions_followup && $mentions_monster_query && $item) {
         $monster = undef;
+    }
+
+    if ($mentions_followup && $last_context->{item} && !$mentions_monster_query) {
+        $monster = undef;
+        $item = $last_context->{item} if !$item;
     }
 
     my $query_type;
