@@ -308,6 +308,7 @@ sub _buildMondbSearchIndex {
 
     my %monsters_by_key;
     my %items;
+    my %item_display_by_alias;
     my %maps;
     my %item_to_monsters;
     my %map_to_monsters;
@@ -316,6 +317,7 @@ sub _buildMondbSearchIndex {
     for my $monster (sort keys %$mondb) {
         my $entry = $mondb->{$monster} || {};
         my $drops = $entry->{drops} || [];
+        my $aliases = $entry->{drop_aliases} || $drops;
         my $maps = $entry->{maps} || [];
 
         if ($monster =~ /^Mapa\s+/i) {
@@ -344,11 +346,12 @@ sub _buildMondbSearchIndex {
             }
         }
 
-        next unless @$drops;
-        for my $drop (@$drops) {
-            next unless defined $drop && $drop ne '';
-            $items{$drop} = $drop;
-            push @{$item_to_monsters{$drop}}, $monster;
+        next unless @$aliases;
+        for my $alias (@$aliases) {
+            next unless defined $alias && $alias ne '';
+            $items{$alias} = $alias;
+            push @{$item_to_monsters{$alias}}, $monster;
+            $item_display_by_alias{$alias} = _translateItemName($alias);
         }
     }
 
@@ -357,6 +360,7 @@ sub _buildMondbSearchIndex {
         items => [sort keys %items],
         maps => [sort keys %maps],
         item_to_monsters => \%item_to_monsters,
+        item_display => \%item_display_by_alias,
         map_to_monsters => \%map_to_monsters,
         map_to_items => \%map_to_items,
     };
@@ -481,17 +485,18 @@ sub generateDropDbResponse {
     }
 
     if ($query_type && $query_type eq 'item') {
+        my $item_display = $index->{item_display}{$item} || $item;
         my $monsters = $index->{item_to_monsters}{$item} || [];
         return undef unless @$monsters;
         if ($mentions_where) {
             my $first_monster = $monsters->[0];
             my $entry = $mondb->{$first_monster} || {};
             my $maps = $entry->{maps} || [];
-            return "$item dropa de $first_monster em $maps->[0]" if @$maps;
-            return "$item dropa de $first_monster";
+            return "$item_display dropa de $first_monster em $maps->[0]" if @$maps;
+            return "$item_display dropa de $first_monster";
         }
         my $entries = _formatListWithMaps($mondb, $monsters);
-        return "$item dropa de $entries";
+        return "$item_display dropa de $entries";
     }
 
     if ($query_type && $query_type eq 'map') {
@@ -648,14 +653,22 @@ sub _loadMonsterDropDb {
                     $map;
                 } split /\s*,\s*/, $1;
             }
-            my @drops = map {
-                my $item = $_;
+            my (@drops, @aliases);
+            for my $raw_item (split /\s*,\s*/, $drop_text) {
+                my $item = $raw_item;
                 $item =~ s/^\s+//;
                 $item =~ s/\s+$//;
-                _translateItemName($item);
-            } split /\s*,\s*/, $drop_text;
-            @drops = grep { defined $_ && $_ ne '' } @drops;
-            $db{$monster} = { drops => \@drops, maps => \@maps } if @drops || @maps;
+                next unless defined $item && $item ne '';
+                my $translated = _translateItemName($item);
+                push @drops, $translated if defined $translated && $translated ne '';
+                push @aliases, $item;
+                push @aliases, $translated if defined $translated && $translated ne '' && $translated ne $item;
+            }
+            my %seen;
+            @drops = grep { defined $_ && $_ ne '' && !$seen{$_}++ } @drops;
+            %seen = ();
+            @aliases = grep { defined $_ && $_ ne '' && !$seen{$_}++ } @aliases;
+            $db{$monster} = { drops => \@drops, maps => \@maps, drop_aliases => \@aliases } if @drops || @maps;
         }
         close $fh;
     }
