@@ -69,8 +69,7 @@ my %pending_emotion_followup_by_sender;
 my %suppress_reply_until_by_sender;
 my %emote_request_times_by_sender;
 my %drop_db_question_count;
-my %drop_db_last_time;
-my %drop_db_refuse_until;
+my %drop_db_force_refusal;
 
 my @fallback_emotion_commands = qw(
     flg6
@@ -88,9 +87,7 @@ my @fallback_emotion_commands = qw(
 
 use constant {
     MAX_CHAT_LENGTH => 200,
-    DROP_DB_REFUSAL_THRESHOLD => 3,
-    DROP_DB_REFUSAL_WINDOW => 120,
-    DROP_DB_REFUSAL_COOLDOWN => 300,
+    DROP_DB_REFUSAL_THRESHOLD => 2,
 };
 
 sub _getBufferState {
@@ -456,8 +453,6 @@ sub onPrivateMessage {
     if (_isDropDbIntent($intent)) {
         _recordDropDbQuestion($sender);
         $force_drop_refusal = _shouldForceDropDbRefusal($sender);
-    } else {
-        _resetDropDbQuestions($sender);
     }
     _injectEmotionHint($sender);
     if (_shouldRefuseEmoteRequest($sender, $intent, $intent_context)) {
@@ -519,8 +514,6 @@ sub onPublicMessage {
     if (_isDropDbIntent($intent)) {
         _recordDropDbQuestion($sender);
         $force_drop_refusal = _shouldForceDropDbRefusal($sender);
-    } else {
-        _resetDropDbQuestions($sender);
     }
     _injectEmotionHint($sender);
     if (_shouldRefuseEmoteRequest($sender, $intent, $intent_context)) {
@@ -635,26 +628,10 @@ sub _recordDropDbQuestion {
     return unless defined $sender;
     my $key = _normalizeSenderKey($sender);
     return unless $key;
-    my $now = time();
-    my $last_time = $drop_db_last_time{$key} // 0;
-    if ($last_time && ($now - $last_time) > DROP_DB_REFUSAL_WINDOW) {
-        $drop_db_question_count{$key} = 0;
-    }
-    $drop_db_last_time{$key} = $now;
     $drop_db_question_count{$key} = ($drop_db_question_count{$key} // 0) + 1;
     if ($drop_db_question_count{$key} >= DROP_DB_REFUSAL_THRESHOLD) {
-        $drop_db_refuse_until{$key} = $now + DROP_DB_REFUSAL_COOLDOWN;
+        $drop_db_force_refusal{$key} = 1;
     }
-}
-
-sub _resetDropDbQuestions {
-    my ($sender) = @_;
-    return unless defined $sender;
-    my $key = _normalizeSenderKey($sender);
-    return unless $key;
-    delete $drop_db_question_count{$key};
-    delete $drop_db_last_time{$key};
-    delete $drop_db_refuse_until{$key};
 }
 
 sub _shouldForceDropDbRefusal {
@@ -662,14 +639,7 @@ sub _shouldForceDropDbRefusal {
     return unless defined $sender;
     my $key = _normalizeSenderKey($sender);
     return unless $key;
-    my $until = $drop_db_refuse_until{$key} // 0;
-    return 0 unless $until;
-    if (time() >= $until) {
-        delete $drop_db_refuse_until{$key};
-        $drop_db_question_count{$key} = 0;
-        return 0;
-    }
-    return 1;
+    return $drop_db_force_refusal{$key} ? 1 : 0;
 }
 
 sub _queueEmotionRequestIfNeeded {
