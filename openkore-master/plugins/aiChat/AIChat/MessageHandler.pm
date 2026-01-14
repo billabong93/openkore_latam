@@ -358,8 +358,8 @@ sub _pickVariant {
     return $options[int(rand(@options))];
 }
 
-sub _randomDropDbRefusal {
-    return _normalizeResponseText(_pickVariant(
+sub _dropDbRefusalReferences {
+    return (
         'nao to afim de responder isso',
         'nao sou tutor',
         'tenho cara de banco de dados',
@@ -371,7 +371,45 @@ sub _randomDropDbRefusal {
         'para de perturbar',
         'pesquisa ai',
         'vai atras disso ai',
-    ));
+        'nao sei disso nao',
+        'nao tenho essa info',
+        'sei la mano',
+        'nao manjo desse drop',
+        'nao faço ideia',
+        'nao sou wiki',
+        'nao to com tempo pra isso',
+        'da uma pesquisada',
+        've no google depois',
+        'pergunta no discord',
+        'pergunta no cla',
+        'da uma olhada na wiki',
+        'nao vou ficar listando drop',
+        'nao lembro disso',
+        'meu foco nao e drop',
+        'nao to afim de ficar respondendo drop',
+    );
+}
+
+sub _pickVariantAvoidingRecent {
+    my ($options, $recent_texts) = @_;
+    return '' unless $options && ref $options eq 'ARRAY' && @$options;
+    my @candidates = @$options;
+    if ($recent_texts && ref $recent_texts eq 'ARRAY' && @$recent_texts) {
+        my %recent = map { _normalizeEchoText($_ // '') => 1 } @$recent_texts;
+        @candidates = grep { !$recent{_normalizeEchoText($_)} } @candidates;
+    }
+    @candidates = @$options unless @candidates;
+    return $candidates[int(rand(@candidates))];
+}
+
+sub _randomDropDbRefusal {
+    my ($sender) = @_;
+    my $history = $sender ? (AIChat::ConversationHistory::getHistory($sender) || []) : [];
+    my @recent_assistant = grep { ($_->{role} // '') eq 'assistant' } @$history;
+    @recent_assistant = @recent_assistant[-5 .. -1] if @recent_assistant > 5;
+    my @recent_texts = map { $_->{content} // '' } @recent_assistant;
+    my @options = _dropDbRefusalReferences();
+    return _normalizeResponseText(_pickVariantAvoidingRecent(\@options, \@recent_texts));
 }
 
 sub _generateDropDbRefusalResponse {
@@ -384,6 +422,13 @@ sub _generateDropDbRefusalResponse {
     @recent_assistant = @recent_assistant[-5 .. -1] if @recent_assistant > 5;
     my @recent_texts = map { $_->{content} // '' } @recent_assistant;
     my $recent_block = join(' | ', grep { $_ ne '' } @recent_texts);
+    my @reference_pool = _dropDbRefusalReferences();
+    my @reference_samples;
+    for (1 .. 5) {
+        my $sample = _pickVariantAvoidingRecent(\@reference_pool, \@recent_texts);
+        push @reference_samples, $sample if defined $sample && $sample ne '';
+    }
+    my $reference_line = join(' | ', @reference_samples);
     my $system_prompt = join "\n",
         $prompt,
         "Voce precisa recusar responder perguntas de drops ou monstros agora.",
@@ -392,7 +437,8 @@ sub _generateDropDbRefusalResponse {
         "Pode usar frases como 'nao sei' ou 'procura no google', mas nao repita a mesma resposta muitas vezes seguidas.",
         "Evite fazer perguntas.",
         "Varie as respostas e nao repita as mesmas palavras.",
-        "Exemplos de recusas para inspirar: tenho cara de banco de dados? aa mano vai procurar na internet. sou teu professor? pergunta pra alguem que sabe.",
+        "Use as referencias abaixo como base e varie a escolha.",
+        "Referencias: $reference_line",
         ($recent_block ? "Respostas recentes para evitar repetir: $recent_block" : ());
 
     for my $attempt (1 .. 2) {
@@ -763,7 +809,7 @@ sub generateDropDbResponse {
     if (rand() < 0.5) {
         my $refusal = _generateDropDbRefusalResponse($message, $sender);
         return $refusal if defined $refusal && $refusal ne '';
-        return _randomDropDbRefusal();
+        return _randomDropDbRefusal($sender);
     }
 
     my $mondb = _loadMonsterDropDb();
@@ -989,10 +1035,10 @@ sub dropDbUnknownReply {
 
 sub generateDropDbRefusal {
     my ($message, $sender) = @_;
-    return _randomDropDbRefusal() unless defined $message && $message ne '';
+    return _randomDropDbRefusal($sender) unless defined $message && $message ne '';
     my $refusal = _generateDropDbRefusalResponse($message, $sender);
     return $refusal if defined $refusal && $refusal ne '';
-    return _randomDropDbRefusal();
+    return _randomDropDbRefusal($sender);
 }
 
 sub generateDropDbChatResponse {
