@@ -446,6 +446,26 @@ sub _getPreferredLocation {
     return undef;
 }
 
+sub _shouldForceDropDb {
+    my ($message) = @_;
+    return 0 unless defined $message && $message ne '';
+
+    my $index = _getMondbSearchIndex();
+    return 0 unless $index && %$index;
+
+    my $tokens = _tokenizeText($message);
+    return 0 unless $tokens && @$tokens;
+
+    my $monster = _findBestPhraseMatch($tokens, $index->{monsters});
+    my $item = _findBestPhraseMatch($tokens, $index->{items});
+    return 1 if $monster || $item;
+
+    my $map = _findBestPhraseMatch($tokens, $index->{maps});
+    return 0 unless $map;
+
+    return _hasToken($tokens, [qw(mapa map localizacao onde aonde)]);
+}
+
 sub generateDropDbResponse {
     my ($message) = @_;
     return undef unless defined $message && $message ne '';
@@ -913,6 +933,10 @@ sub _dedupeMirror {
 sub interpretCommand {
     my ($message, $sender, $context) = @_;
     return undef unless defined $message && defined $sender;
+
+    if (_shouldForceDropDb($message)) {
+        return { action => 'drop_db' };
+    }
 
     my $history = AIChat::ConversationHistory::getHistory($sender) || [];
     my @recent = grep { $_->{role} ne "system" } @$history;
