@@ -482,6 +482,13 @@ sub onPublicMessage {
     return unless defined $sender && defined $message;
     return if $char && defined $char->{name} && $sender eq $char->{name};
 
+    my $map_name = $field->baseName // '';
+    if ($map_name ne 'sec_pri') {
+        my $lock_map = $config{lockMap} // '';
+        my $allow_public = AIChat::Config::get('public_on_lockmap');
+        return unless $lock_map && $map_name eq $lock_map && $allow_public;
+    }
+
     my $intent_context = { map_name => $field ? $field->baseName : undef, lock_map => $config{lockMap} };
     my $intent;
     if (AIChat::MessageHandler::isDropDbFollowup($message, $sender)) {
@@ -510,12 +517,6 @@ sub onPublicMessage {
         return;
     }
 
-    my $map_name = $field->baseName // '';
-    if ($map_name ne 'sec_pri') {
-        my $lock_map = $config{lockMap} // '';
-        my $allow_public = AIChat::Config::get('public_on_lockmap');
-        return unless $lock_map && $map_name eq $lock_map && $allow_public;
-    }
     AIChat::Log::log_message(
         direction => 'in',
         visibility => 'public',
