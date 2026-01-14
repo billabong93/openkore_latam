@@ -985,7 +985,7 @@ sub _queueSpamRefusal {
     AIChat::ConversationHistory::addMessage(
         $sender,
         "system",
-        "Usuario fez varias perguntas seguidas. Responda curto e com frustracao, diga que vai ficar em silencio e nao responder mais. Seja rude, mas natural.",
+        "Usuario fez varias perguntas seguidas. Responda curto e com frustracao, corte o assunto e seja rude de forma natural sem dizer explicitamente que vai ficar em silencio.",
         "intent"
     );
     my $responses = AIChat::MessageHandler::processMessages([ $message ], $sender);
