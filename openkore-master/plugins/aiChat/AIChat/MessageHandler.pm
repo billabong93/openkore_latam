@@ -9,6 +9,7 @@ use Unicode::Normalize qw(NFD);
 # No direct Globals qw($char %jobs_lut $field) here.
 # Instead, we will rely on data populated by aiChat.pl
 
+use File::Basename qw(dirname);
 use File::Spec;
 use Plugins;
 
@@ -394,7 +395,7 @@ sub _unknownDropReply {
 }
 
 sub _readMonsterDropDbRaw {
-    my $path = File::Spec->catfile($Plugins::current_plugin_folder, 'mondb.txt');
+    my $path = File::Spec->catfile(_pluginBaseDir(), 'mondb.txt');
     return undef unless -e $path;
     my @lines;
     if (open my $fh, '<:encoding(UTF-8)', $path) {
@@ -623,7 +624,7 @@ sub _buildBasicDropContext {
 sub _loadMonsterDropDb {
     return $mondb_cache if $mondb_cache;
 
-    my $path = File::Spec->catfile($Plugins::current_plugin_folder, 'mondb.txt');
+    my $path = File::Spec->catfile(_pluginBaseDir(), 'mondb.txt');
     unless (-e $path) {
         $mondb_cache = {};
         return $mondb_cache;
@@ -677,7 +678,7 @@ sub updateMondbFromMap {
     return if defined $mondb_map_cache{$map_name} && $mondb_map_cache{$map_name} eq $signature;
     $mondb_map_cache{$map_name} = $signature;
 
-    my $path = File::Spec->catfile($Plugins::current_plugin_folder, 'mondb.txt');
+    my $path = File::Spec->catfile(_pluginBaseDir(), 'mondb.txt');
     return unless -e $path;
 
     my @lines = ();
@@ -759,7 +760,7 @@ sub _translateItemName {
 sub _loadItemTranslationMap {
     return $item_translation_cache if $item_translation_cache;
 
-    my $tables_dir = File::Spec->catfile($Plugins::current_plugin_folder, '..', '..', 'tables');
+    my $tables_dir = File::Spec->catfile(_pluginBaseDir(), '..', '..', 'tables');
     my $english_path = File::Spec->catfile($tables_dir, 'items.txt');
     $english_path = File::Spec->catfile($tables_dir, 'Old', 'items.txt') unless -e $english_path;
     my $translated_path = File::Spec->catfile($tables_dir, 'ROla', 'items.txt');
@@ -800,6 +801,16 @@ sub _loadItemTranslationMap {
 
     $item_translation_cache = \%map;
     return $item_translation_cache;
+}
+
+sub _pluginBaseDir {
+    my $base = $Plugins::current_plugin_folder;
+    if (defined $base && $base ne '' && -d $base) {
+        return $base;
+    }
+
+    my $module_dir = dirname(__FILE__);
+    return File::Spec->rel2abs(File::Spec->catdir($module_dir, '..'));
 }
 
 sub processMessage {
