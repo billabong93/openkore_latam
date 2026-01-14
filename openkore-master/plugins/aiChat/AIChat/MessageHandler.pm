@@ -298,6 +298,22 @@ sub _getLastDropDbContext {
     return {};
 }
 
+sub _pickLimitedList {
+    my ($items_ref, $max) = @_;
+    return [] unless $items_ref && ref $items_ref eq 'ARRAY';
+    my @items = grep { defined $_ && $_ ne '' } @$items_ref;
+    return [] unless @items;
+    $max = 2 unless defined $max && $max > 0;
+
+    my $limit = 1 + int(rand($max));
+    $limit = scalar @items if $limit > scalar @items;
+    my %picked;
+    while (scalar(keys %picked) < $limit && scalar(keys %picked) < scalar @items) {
+        $picked{$items[int(rand(@items))]} = 1;
+    }
+    return [sort keys %picked];
+}
+
 sub _tokenizeText {
     my ($text) = @_;
     my $normalized = _normalizeQueryText($text);
@@ -530,13 +546,17 @@ sub generateDropDbResponse {
             return $response;
         }
         if ($mentions_drop && @$drops) {
-            my $response = _normalizeResponseText("dropa " . join(', ', @$drops));
+            my $limited_drops = _pickLimitedList($drops, 2);
+            return undef unless @$limited_drops;
+            my $response = _normalizeResponseText("dropa " . join(', ', @$limited_drops));
             _setLastDropDbContext($sender, { monster => $monster, map => ($maps->[0] // '') });
             return $response;
         }
         if (@$drops) {
-            my $message = "dropa " . join(', ', @$drops);
-            $message .= " em $maps->[0]" if @$maps;
+            my $limited_drops = _pickLimitedList($drops, 2);
+            return undef unless @$limited_drops;
+            my $message = "dropa " . join(', ', @$limited_drops);
+            $message .= " em $maps->[0]" if @$maps && rand() < 0.5;
             my $response = _normalizeResponseText($message);
             _setLastDropDbContext($sender, { monster => $monster, map => ($maps->[0] // '') });
             return $response;
@@ -552,7 +572,9 @@ sub generateDropDbResponse {
         my $monsters = $index->{item_to_monsters}{$item} || [];
         return undef unless @$monsters;
         if ($mentions_where) {
-            my $first_monster = $monsters->[0];
+            my $limited_monsters = _pickLimitedList($monsters, 2);
+            return undef unless @$limited_monsters;
+            my $first_monster = $limited_monsters->[0];
             my $entry = $mondb->{$first_monster} || {};
             my $maps = $entry->{maps} || [];
             if (@$maps) {
@@ -564,8 +586,10 @@ sub generateDropDbResponse {
             _setLastDropDbContext($sender, { monster => $first_monster, item => $item });
             return $response;
         }
-        my $response = _normalizeResponseText("dropa de $monsters->[0]");
-        _setLastDropDbContext($sender, { monster => $monsters->[0], item => $item });
+        my $limited_monsters = _pickLimitedList($monsters, 2);
+        return undef unless @$limited_monsters;
+        my $response = _normalizeResponseText("dropa de " . join(', ', @$limited_monsters));
+        _setLastDropDbContext($sender, { monster => $limited_monsters->[0], item => $item });
         return $response;
     }
 
@@ -574,13 +598,17 @@ sub generateDropDbResponse {
         my $items = $index->{map_to_items}{$map} || [];
         return undef unless @$monsters || @$items;
         if (@$monsters) {
-            my $response = _normalizeResponseText("em $map tem $monsters->[0]");
-            _setLastDropDbContext($sender, { monster => $monsters->[0], map => $map });
+            my $limited_monsters = _pickLimitedList($monsters, 2);
+            return undef unless @$limited_monsters;
+            my $response = _normalizeResponseText("em $map tem " . join(', ', @$limited_monsters));
+            _setLastDropDbContext($sender, { monster => $limited_monsters->[0], map => $map });
             return $response;
         }
         if (@$items) {
-            my $response = _normalizeResponseText("em $map tem $items->[0]");
-            _setLastDropDbContext($sender, { item => $items->[0], map => $map });
+            my $limited_items = _pickLimitedList($items, 2);
+            return undef unless @$limited_items;
+            my $response = _normalizeResponseText("em $map tem " . join(', ', @$limited_items));
+            _setLastDropDbContext($sender, { item => $limited_items->[0], map => $map });
             return $response;
         }
     }
