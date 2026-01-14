@@ -374,7 +374,7 @@ sub _generateDropDbRefusalResponse {
     my $prompt = AIChat::Config::get('prompt');
     my $history = AIChat::ConversationHistory::getHistory($sender) || [];
     my @recent_assistant = grep { ($_->{role} // '') eq 'assistant' } @$history;
-    @recent_assistant = @recent_assistant[-3 .. -1] if @recent_assistant > 3;
+    @recent_assistant = @recent_assistant[-5 .. -1] if @recent_assistant > 5;
     my @recent_texts = map { $_->{content} // '' } @recent_assistant;
     my $recent_block = join(' | ', grep { $_ ne '' } @recent_texts);
     my $system_prompt = join "\n",
@@ -382,10 +382,9 @@ sub _generateDropDbRefusalResponse {
         "Voce precisa recusar responder perguntas de drops ou monstros agora.",
         "Seja curto, seco e educado o suficiente para parecer um player.",
         "Nao responda com informacoes do banco de dados.",
-        "Nao use frases como 'nao sei' ou 'nao conheco'.",
+        "Pode usar frases como 'nao sei' ou 'procura no google', mas nao repita a mesma resposta muitas vezes seguidas.",
         "Evite fazer perguntas.",
         "Varie as respostas e nao repita as mesmas palavras.",
-        "Nao use a palavra 'google'.",
         ($recent_block ? "Respostas recentes para evitar repetir: $recent_block" : ());
 
     for my $attempt (1 .. 2) {
@@ -415,19 +414,17 @@ sub _generateDropDbRefusalResponse {
         next unless defined $response && $response ne '';
         my $normalized = _normalizeResponseText($response);
         next unless $normalized ne '';
-        next if $normalized =~ /\bnao\s+sei\b/i;
         my $normalized_check = _normalizeEchoText($normalized);
-        my $is_repeat = 0;
+        my $repeat_count = 0;
         for my $recent (@recent_texts) {
             next unless defined $recent && $recent ne '';
             my $recent_norm = _normalizeEchoText($recent);
             next unless $recent_norm ne '';
             if ($normalized_check eq $recent_norm) {
-                $is_repeat = 1;
-                last;
+                $repeat_count++;
             }
         }
-        next if $is_repeat;
+        next if $repeat_count >= 2;
         return $normalized;
     }
 
