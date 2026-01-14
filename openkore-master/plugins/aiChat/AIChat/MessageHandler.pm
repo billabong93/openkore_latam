@@ -307,11 +307,7 @@ sub _pickLimitedList {
 
     my $limit = 1 + int(rand($max));
     $limit = scalar @items if $limit > scalar @items;
-    my %picked;
-    while (scalar(keys %picked) < $limit && scalar(keys %picked) < scalar @items) {
-        $picked{$items[int(rand(@items))]} = 1;
-    }
-    return [sort keys %picked];
+    return [@items[0 .. $limit - 1]];
 }
 
 sub _pickVariant {
