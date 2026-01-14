@@ -314,6 +314,46 @@ sub _pickLimitedList {
     return [sort keys %picked];
 }
 
+sub _pickVariant {
+    my (@options) = @_;
+    return '' unless @options;
+    return $options[int(rand(@options))];
+}
+
+sub _formatMonsterReply {
+    my ($monster) = @_;
+    return '' unless defined $monster && $monster ne '';
+    return _normalizeResponseText(_pickVariant(
+        "dropa de $monster",
+        "$monster",
+        "$monster dropa",
+    ));
+}
+
+sub _formatMapReply {
+    my ($map_name) = @_;
+    return '' unless defined $map_name && $map_name ne '';
+    return _normalizeResponseText(_pickVariant(
+        "$map_name",
+        "em $map_name",
+        "acho que $map_name",
+    ));
+}
+
+sub _formatMapListReply {
+    my ($maps_ref) = @_;
+    return '' unless $maps_ref && ref $maps_ref eq 'ARRAY';
+    return '' unless @$maps_ref;
+    return _formatMapReply($maps_ref->[0]) if @$maps_ref == 1;
+
+    my $joined = join(' ', @$maps_ref);
+    return _normalizeResponseText(_pickVariant(
+        $joined,
+        "em $maps_ref->[0]",
+        "pode ir em $maps_ref->[0]",
+    ));
+}
+
 sub isDropDbFollowup {
     my ($message, $sender) = @_;
     return 0 unless defined $message && defined $sender;
@@ -387,6 +427,7 @@ sub _buildMondbSearchIndex {
     my %items;
     my %maps;
     my %item_to_monsters;
+    my %item_to_monsters_by_priority;
     my %map_to_monsters;
     my %map_to_items;
 
@@ -422,11 +463,26 @@ sub _buildMondbSearchIndex {
         }
 
         next unless @$drops;
-        for my $drop (@$drops) {
+        for my $drop_index (0 .. $#$drops) {
+            my $drop = $drops->[$drop_index];
             next unless defined $drop && $drop ne '';
             $items{$drop} = $drop;
             push @{$item_to_monsters{$drop}}, $monster;
+            push @{$item_to_monsters_by_priority{$drop}[$drop_index]}, $monster;
         }
+    }
+
+    for my $item (keys %item_to_monsters_by_priority) {
+        my %seen;
+        my @ordered;
+        for my $bucket (@{$item_to_monsters_by_priority{$item}}) {
+            next unless $bucket && ref $bucket eq 'ARRAY';
+            for my $monster (@$bucket) {
+                next if $seen{$monster}++;
+                push @ordered, $monster;
+            }
+        }
+        $item_to_monsters{$item} = \@ordered if @ordered;
     }
 
     return {
@@ -529,6 +585,7 @@ sub generateDropDbResponse {
     my $mentions_drop = _hasToken($tokens, [qw(drop drops dropa dropar drope loot caiu cai)]);
     my $mentions_query = _hasToken($tokens, [qw(monstro monster monstros itens item drop drops dropa dropar mapa map)]);
     my $mentions_followup = _hasToken($tokens, [qw(mais outra outro outras outros alguma algum coisa)]);
+    my $mentions_map_question = _hasToken($tokens, [qw(mapa mapas)]) && _hasToken($tokens, [qw(qual quais)]);
 
     if (!$monster && !$item && !$map && ($mentions_pronoun || $mentions_followup)) {
         $monster = $last_context->{monster} if $last_context->{monster};
@@ -563,8 +620,10 @@ sub generateDropDbResponse {
         my $maps = $entry->{maps} || [];
         return undef unless @$drops || @$maps;
         if ($mentions_where && @$maps) {
-            my $response = _normalizeResponseText("tem $monster em $maps->[0]");
-            _setLastDropDbContext($sender, { monster => $monster, map => $maps->[0] });
+            my $limited_maps = _pickLimitedList($maps, 2);
+            return undef unless @$limited_maps;
+            my $response = _formatMapListReply($limited_maps);
+            _setLastDropDbContext($sender, { monster => $monster, map => $limited_maps->[0] });
             return $response;
         }
         if ($mentions_drop && @$drops) {
@@ -584,8 +643,10 @@ sub generateDropDbResponse {
             return $response;
         }
         if (@$maps) {
-            my $response = _normalizeResponseText("tem $monster em $maps->[0]");
-            _setLastDropDbContext($sender, { monster => $monster, map => $maps->[0] });
+            my $limited_maps = _pickLimitedList($maps, 2);
+            return undef unless @$limited_maps;
+            my $response = _formatMapListReply($limited_maps);
+            _setLastDropDbContext($sender, { monster => $monster, map => $limited_maps->[0] });
             return $response;
         }
     }
@@ -600,17 +661,21 @@ sub generateDropDbResponse {
             my $entry = $mondb->{$first_monster} || {};
             my $maps = $entry->{maps} || [];
             if (@$maps) {
-                my $response = _normalizeResponseText("pega $item no $first_monster em $maps->[0]");
-                _setLastDropDbContext($sender, { monster => $first_monster, item => $item, map => $maps->[0] });
+                my $limited_maps = _pickLimitedList($maps, 2);
+                return undef unless @$limited_maps;
+                my $response = $mentions_map_question
+                    ? _formatMapListReply($limited_maps)
+                    : _formatMonsterReply($first_monster);
+                _setLastDropDbContext($sender, { monster => $first_monster, item => $item, map => $limited_maps->[0] });
                 return $response;
             }
-            my $response = _normalizeResponseText("pega $item no $first_monster");
+            my $response = _formatMonsterReply($first_monster);
             _setLastDropDbContext($sender, { monster => $first_monster, item => $item });
             return $response;
         }
         my $limited_monsters = _pickLimitedList($monsters, 2);
         return undef unless @$limited_monsters;
-        my $response = _normalizeResponseText("dropa de " . join(', ', @$limited_monsters));
+        my $response = _formatMonsterReply($limited_monsters->[0]);
         _setLastDropDbContext($sender, { monster => $limited_monsters->[0], item => $item });
         return $response;
     }
@@ -622,14 +687,18 @@ sub generateDropDbResponse {
         if (@$monsters) {
             my $limited_monsters = _pickLimitedList($monsters, 2);
             return undef unless @$limited_monsters;
-            my $response = _normalizeResponseText("em $map tem " . join(', ', @$limited_monsters));
+            my $response = $mentions_map_question
+                ? _formatMapReply($map)
+                : _normalizeResponseText("em $map tem " . join(', ', @$limited_monsters));
             _setLastDropDbContext($sender, { monster => $limited_monsters->[0], map => $map });
             return $response;
         }
         if (@$items) {
             my $limited_items = _pickLimitedList($items, 2);
             return undef unless @$limited_items;
-            my $response = _normalizeResponseText("em $map tem " . join(', ', @$limited_items));
+            my $response = $mentions_map_question
+                ? _formatMapReply($map)
+                : _normalizeResponseText("em $map tem " . join(', ', @$limited_items));
             _setLastDropDbContext($sender, { item => $limited_items->[0], map => $map });
             return $response;
         }
