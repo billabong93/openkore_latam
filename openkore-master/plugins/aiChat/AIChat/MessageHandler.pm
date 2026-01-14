@@ -265,6 +265,39 @@ sub _normalizeResponseText {
     return $normalized;
 }
 
+sub _setLastDropDbContext {
+    my ($sender, $context) = @_;
+    return unless defined $sender;
+    return unless $context && ref $context eq 'HASH';
+
+    my @parts;
+    push @parts, "monster=$context->{monster}" if defined $context->{monster} && $context->{monster} ne '';
+    push @parts, "item=$context->{item}" if defined $context->{item} && $context->{item} ne '';
+    push @parts, "map=$context->{map}" if defined $context->{map} && $context->{map} ne '';
+    return unless @parts;
+
+    AIChat::ConversationHistory::addMessage($sender, "system", join('|', @parts), "drop_db_last");
+}
+
+sub _getLastDropDbContext {
+    my ($sender) = @_;
+    return {} unless defined $sender;
+    my $history = AIChat::ConversationHistory::getHistory($sender) || [];
+    for (my $i = @$history - 1; $i >= 0; $i--) {
+        my $entry = $history->[$i];
+        next unless $entry->{type} && $entry->{type} eq 'drop_db_last';
+        next unless defined $entry->{content};
+        my %context;
+        for my $part (split /\|/, $entry->{content}) {
+            my ($key, $value) = split /=/, $part, 2;
+            next unless defined $key && defined $value;
+            $context{$key} = $value;
+        }
+        return \%context if %context;
+    }
+    return {};
+}
+
 sub _tokenizeText {
     my ($text) = @_;
     my $normalized = _normalizeQueryText($text);
@@ -440,7 +473,7 @@ sub _formatListWithMaps {
 }
 
 sub generateDropDbResponse {
-    my ($message) = @_;
+    my ($message, $sender) = @_;
     return undef unless defined $message && $message ne '';
 
     my $mondb = _loadMonsterDropDb();
@@ -456,9 +489,18 @@ sub generateDropDbResponse {
     my $item = _findBestPhraseMatch($tokens, $index->{items});
     my $map = _findBestPhraseMatch($tokens, $index->{maps});
 
+    my $last_context = _getLastDropDbContext($sender);
+    my $mentions_pronoun = _hasToken($tokens, [qw(ele ela esse essa dele dela)]);
+
     my $mentions_where = _hasToken($tokens, [qw(onde aonde pego pegar pega encontro encontrar mapa map)]);
     my $mentions_drop = _hasToken($tokens, [qw(drop drops dropa dropar drope loot caiu cai)]);
     my $mentions_query = _hasToken($tokens, [qw(monstro monster monstros itens item drop drops dropa dropar mapa map)]);
+
+    if (!$monster && !$item && !$map && $mentions_pronoun) {
+        $monster = $last_context->{monster} if $last_context->{monster};
+        $item = $last_context->{item} if $last_context->{item};
+        $map = $last_context->{map} if $last_context->{map};
+    }
 
     my $query_type;
     if ($monster && !$item) {
@@ -483,17 +525,27 @@ sub generateDropDbResponse {
         my $maps = $entry->{maps} || [];
         return undef unless @$drops || @$maps;
         if ($mentions_where && @$maps) {
-            return _normalizeResponseText("tem $monster em $maps->[0]");
+            my $response = _normalizeResponseText("tem $monster em $maps->[0]");
+            _setLastDropDbContext($sender, { monster => $monster, map => $maps->[0] });
+            return $response;
         }
         if ($mentions_drop && @$drops) {
-            return _normalizeResponseText("dropa " . join(', ', @$drops));
+            my $response = _normalizeResponseText("dropa " . join(', ', @$drops));
+            _setLastDropDbContext($sender, { monster => $monster, map => ($maps->[0] // '') });
+            return $response;
         }
         if (@$drops) {
             my $message = "dropa " . join(', ', @$drops);
             $message .= " em $maps->[0]" if @$maps;
-            return _normalizeResponseText($message);
+            my $response = _normalizeResponseText($message);
+            _setLastDropDbContext($sender, { monster => $monster, map => ($maps->[0] // '') });
+            return $response;
         }
-        return _normalizeResponseText("tem $monster em $maps->[0]") if @$maps;
+        if (@$maps) {
+            my $response = _normalizeResponseText("tem $monster em $maps->[0]");
+            _setLastDropDbContext($sender, { monster => $monster, map => $maps->[0] });
+            return $response;
+        }
     }
 
     if ($query_type && $query_type eq 'item') {
@@ -503,10 +555,18 @@ sub generateDropDbResponse {
             my $first_monster = $monsters->[0];
             my $entry = $mondb->{$first_monster} || {};
             my $maps = $entry->{maps} || [];
-            return _normalizeResponseText("pega $item no $first_monster em $maps->[0]") if @$maps;
-            return _normalizeResponseText("pega $item no $first_monster");
+            if (@$maps) {
+                my $response = _normalizeResponseText("pega $item no $first_monster em $maps->[0]");
+                _setLastDropDbContext($sender, { monster => $first_monster, item => $item, map => $maps->[0] });
+                return $response;
+            }
+            my $response = _normalizeResponseText("pega $item no $first_monster");
+            _setLastDropDbContext($sender, { monster => $first_monster, item => $item });
+            return $response;
         }
-        return _normalizeResponseText("dropa de $monsters->[0]");
+        my $response = _normalizeResponseText("dropa de $monsters->[0]");
+        _setLastDropDbContext($sender, { monster => $monsters->[0], item => $item });
+        return $response;
     }
 
     if ($query_type && $query_type eq 'map') {
@@ -514,9 +574,15 @@ sub generateDropDbResponse {
         my $items = $index->{map_to_items}{$map} || [];
         return undef unless @$monsters || @$items;
         if (@$monsters) {
-            return _normalizeResponseText("em $map tem $monsters->[0]");
+            my $response = _normalizeResponseText("em $map tem $monsters->[0]");
+            _setLastDropDbContext($sender, { monster => $monsters->[0], map => $map });
+            return $response;
         }
-        return _normalizeResponseText("em $map tem $items->[0]") if @$items;
+        if (@$items) {
+            my $response = _normalizeResponseText("em $map tem $items->[0]");
+            _setLastDropDbContext($sender, { item => $items->[0], map => $map });
+            return $response;
+        }
     }
 
     return undef;
