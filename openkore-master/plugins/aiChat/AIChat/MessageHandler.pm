@@ -972,6 +972,14 @@ sub dropDbUnknownReply {
     return _unknownDropReply();
 }
 
+sub generateDropDbRefusal {
+    my ($message, $sender) = @_;
+    return _randomDropDbRefusal() unless defined $message && $message ne '';
+    my $refusal = _generateDropDbRefusalResponse($message, $sender);
+    return $refusal if defined $refusal && $refusal ne '';
+    return _randomDropDbRefusal();
+}
+
 sub generateDropDbChatResponse {
     my ($message, $sender) = @_;
     return dropDbUnknownReply() unless defined $message && $message ne '';
