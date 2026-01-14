@@ -33,3 +33,6 @@ aiChat_buffer_delay 2
 
 # Habilita responder chat público no lockMap
 aiChat_public_on_lockmap 1
+
+# Habilita respostas usando o banco de dados de monstros/drops (0 para sempre recusar)
+aiChat_mob_database 1

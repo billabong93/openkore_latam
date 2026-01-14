@@ -32,6 +32,7 @@ Configure as opções no `plugins/aiChat/config.txt` ou via console do OpenKore 
 *   `aiChat_max_tokens`: Máx. tokens na resposta (padrão: `150`)
 *   `aiChat_temperature`: Criatividade da IA (0.0-1.0, padrão: `0.6`)
 *   `aiChat_typing_speed`: Velocidade de digitação em caracteres/segundo (padrão: `20`)
+*   `aiChat_mob_database`: Habilita respostas usando o banco de dados de monstros/drops (`1` para habilitar, `0` para sempre recusar).
 
 ### B. No Proxy Node.js (`api_proxy.js`)
 

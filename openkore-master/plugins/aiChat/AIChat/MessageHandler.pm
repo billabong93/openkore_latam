@@ -802,6 +802,11 @@ sub generateDropDbResponse {
     my ($message, $sender) = @_;
     return undef unless defined $message && $message ne '';
 
+    my $mob_database_enabled = AIChat::Config::get('mob_database');
+    if (!defined $mob_database_enabled || !$mob_database_enabled) {
+        return generateDropDbRefusal($message, $sender);
+    }
+
     if (_isRepeatedDropDbQuestion($sender, $message)) {
         return _randomDropDbRepeatReply();
     }
@@ -1044,6 +1049,11 @@ sub generateDropDbRefusal {
 sub generateDropDbChatResponse {
     my ($message, $sender) = @_;
     return dropDbUnknownReply() unless defined $message && $message ne '';
+
+    my $mob_database_enabled = AIChat::Config::get('mob_database');
+    if (!defined $mob_database_enabled || !$mob_database_enabled) {
+        return generateDropDbRefusal($message, $sender);
+    }
 
     my $drop_context = _readMonsterDropDbRaw();
     return dropDbUnknownReply() unless $drop_context;

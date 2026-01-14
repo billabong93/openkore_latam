@@ -596,6 +596,11 @@ sub _queueDropDbResponseIfNeeded {
     return unless $intent && ref $intent eq 'HASH';
     return unless ($intent->{action} // '') eq 'drop_db';
 
+    my $mob_database_enabled = AIChat::Config::get('mob_database');
+    if (!defined $mob_database_enabled || !$mob_database_enabled) {
+        $force_refusal = 1;
+    }
+
     my $response;
     if ($force_refusal) {
         $response = AIChat::MessageHandler::generateDropDbRefusal($message, $sender);
