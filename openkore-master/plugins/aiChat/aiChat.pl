@@ -454,16 +454,6 @@ sub onPrivateMessage {
     my $sender = bytesToString($args->{privMsgUser});
     my $message = bytesToString($args->{privMsg});
 
-    if (_handleSpamCheck($sender, $message, 'private')) {
-        AIChat::Log::log_message(
-            direction => 'in',
-            visibility => 'private',
-            sender => $sender,
-            message => $message,
-        );
-        return;
-    }
-
     my $intent_context = { map_name => $field ? $field->baseName : undef, lock_map => $config{lockMap} };
     my $intent;
     if (AIChat::MessageHandler::isDropDbFollowup($message, $sender)) {
@@ -473,6 +463,15 @@ sub onPrivateMessage {
     }
     if ((!$intent || ($intent->{action} // '') ne 'drop_db') && AIChat::MessageHandler::looksLikeDropDbQuery($message)) {
         $intent = { action => 'drop_db' };
+    }
+    if (_handleSpamCheck($sender, $message, 'private', $intent)) {
+        AIChat::Log::log_message(
+            direction => 'in',
+            visibility => 'private',
+            sender => $sender,
+            message => $message,
+        );
+        return;
     }
     my $force_drop_refusal = 0;
     if (_isDropDbIntent($intent)) {
@@ -525,16 +524,6 @@ sub onPublicMessage {
         return unless $lock_map && $map_name eq $lock_map && $allow_public;
     }
 
-    if (_handleSpamCheck($sender, $message, 'public')) {
-        AIChat::Log::log_message(
-            direction => 'in',
-            visibility => 'public',
-            sender => $sender,
-            message => $message,
-        );
-        return;
-    }
-
     my $intent_context = { map_name => $field ? $field->baseName : undef, lock_map => $config{lockMap} };
     my $intent;
     if (AIChat::MessageHandler::isDropDbFollowup($message, $sender)) {
@@ -544,6 +533,15 @@ sub onPublicMessage {
     }
     if ((!$intent || ($intent->{action} // '') ne 'drop_db') && AIChat::MessageHandler::looksLikeDropDbQuery($message)) {
         $intent = { action => 'drop_db' };
+    }
+    if (_handleSpamCheck($sender, $message, 'public', $intent)) {
+        AIChat::Log::log_message(
+            direction => 'in',
+            visibility => 'public',
+            sender => $sender,
+            message => $message,
+        );
+        return;
     }
     my $force_drop_refusal = 0;
     if (_isDropDbIntent($intent)) {
@@ -946,7 +944,7 @@ sub _resetQuestionStreak {
 }
 
 sub _handleSpamCheck {
-    my ($sender, $message, $context) = @_;
+    my ($sender, $message, $context, $intent) = @_;
     return unless defined $sender && defined $message;
     my $sender_key = _normalizeSenderKey($sender);
     return unless $sender_key;
@@ -963,8 +961,8 @@ sub _handleSpamCheck {
         return 1;
     }
 
-    my $is_question = _isQuestionMessage($message);
-    if (!$is_question) {
+    my $should_count = _shouldCountSpamQuestion($intent);
+    if (!$should_count) {
         _resetQuestionStreak($sender);
         return;
     }
@@ -1049,12 +1047,10 @@ sub _blockSender {
     $blocked_by_sender{$sender_key} = 1;
 }
 
-sub _isQuestionMessage {
-    my ($message) = @_;
-    return unless defined $message;
-    return 1 if $message =~ /\?/;
-    return 1 if $message =~ /\b(oq|o que|pq|por que|porque|qual|quais|quando|onde|quem|como|cad[êe])\b/i;
-    return;
+sub _shouldCountSpamQuestion {
+    my ($intent) = @_;
+    return unless $intent && ref $intent eq 'HASH';
+    return ($intent->{action} // '') eq 'chat';
 }
 
 sub _injectEmotionHint {
