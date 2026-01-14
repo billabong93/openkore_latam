@@ -448,7 +448,7 @@ sub onPrivateMessage {
     } else {
         $intent = _interpretCommand($message, $sender, $intent_context);
     }
-    if (!$intent && AIChat::MessageHandler::looksLikeDropDbQuery($message)) {
+    if ((!$intent || ($intent->{action} // '') ne 'drop_db') && AIChat::MessageHandler::looksLikeDropDbQuery($message)) {
         $intent = { action => 'drop_db' };
     }
     my $force_drop_refusal = 0;
@@ -509,7 +509,7 @@ sub onPublicMessage {
     } else {
         $intent = _interpretCommand($message, $sender, $intent_context);
     }
-    if (!$intent && AIChat::MessageHandler::looksLikeDropDbQuery($message)) {
+    if ((!$intent || ($intent->{action} // '') ne 'drop_db') && AIChat::MessageHandler::looksLikeDropDbQuery($message)) {
         $intent = { action => 'drop_db' };
     }
     my $force_drop_refusal = 0;

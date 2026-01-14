@@ -793,6 +793,18 @@ sub generateDropDbResponse {
     my $mentions_map_question = $mentions_map && _hasToken($tokens, [qw(qual quais)]);
     my $prefer_map_codes = $mentions_map ? 1 : 0;
 
+    if ($mentions_map_question && !$map) {
+        if ($fallback_context{monster}) {
+            $monster = $fallback_context{monster};
+            $mentions_where = 1;
+        } elsif ($fallback_context{item}) {
+            $item = $fallback_context{item};
+            $mentions_where = 1;
+        } elsif ($fallback_context{map}) {
+            $map = $fallback_context{map};
+        }
+    }
+
     if (!$monster && !$item && !$map && ($mentions_pronoun || $mentions_followup)) {
         $monster = $fallback_context{monster} if $fallback_context{monster};
         $item = $fallback_context{item} if $fallback_context{item};
