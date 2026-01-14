@@ -359,8 +359,12 @@ sub _randomDropDbRefusal {
     return _normalizeResponseText(_pickVariant(
         'nao to afim de responder isso',
         'nao sou tutor',
+        'tenho cara de banco de dados',
+        'sou teu professor',
         'vai ver no banco de dados',
+        'pergunta pra alguem que sabe',
         'procura no banco de dados',
+        'aa mano vai procurar na internet',
         'para de perturbar',
         'pesquisa ai',
         'vai atras disso ai',
@@ -385,6 +389,7 @@ sub _generateDropDbRefusalResponse {
         "Pode usar frases como 'nao sei' ou 'procura no google', mas nao repita a mesma resposta muitas vezes seguidas.",
         "Evite fazer perguntas.",
         "Varie as respostas e nao repita as mesmas palavras.",
+        "Exemplos de recusas para inspirar: tenho cara de banco de dados? aa mano vai procurar na internet. sou teu professor? pergunta pra alguem que sabe.",
         ($recent_block ? "Respostas recentes para evitar repetir: $recent_block" : ());
 
     for my $attempt (1 .. 2) {
