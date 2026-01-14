@@ -367,6 +367,46 @@ sub _randomDropDbRefusal {
     ));
 }
 
+sub _generateDropDbRefusalResponse {
+    my ($message, $sender) = @_;
+    return undef unless defined $message && $message ne '';
+
+    my $prompt = AIChat::Config::get('prompt');
+    my $system_prompt = join "\n",
+        $prompt,
+        "Voce precisa recusar responder perguntas de drops ou monstros agora.",
+        "Seja curto, seco e educado o suficiente para parecer um player.",
+        "Nao responda com informacoes do banco de dados.",
+        "Nao use frases como 'nao sei' ou 'nao conheco'.",
+        "Evite fazer perguntas.";
+
+    my @messages = (
+        {
+            role => "system",
+            content => $system_prompt,
+        },
+        {
+            role => "user",
+            content => $message,
+        },
+    );
+
+    my $response;
+    eval {
+        $response = $api_client->callAPIWithMessages(\@messages, {
+            max_tokens => 60,
+            temperature => 0.7,
+        });
+    };
+    if ($@) {
+        warning "[aiChat] Erro ao gerar recusa de drop DB: $@\n", "plugin";
+        return undef;
+    }
+
+    return undef unless defined $response && $response ne '';
+    return _normalizeResponseText($response);
+}
+
 sub _randomDropDbRepeatReply {
     return _normalizeResponseText(_pickVariant(
         'po ta de brincadeira',
@@ -688,7 +728,11 @@ sub generateDropDbResponse {
         return _randomDropDbRepeatReply();
     }
 
-    return _randomDropDbRefusal() if rand() < 0.5;
+    if (rand() < 0.5) {
+        my $refusal = _generateDropDbRefusalResponse($message, $sender);
+        return $refusal if defined $refusal && $refusal ne '';
+        return _randomDropDbRefusal();
+    }
 
     my $mondb = _loadMonsterDropDb();
     return undef unless $mondb && %$mondb;
