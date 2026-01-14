@@ -443,6 +443,9 @@ sub onPrivateMessage {
     } else {
         $intent = _interpretCommand($message, $sender, $intent_context);
     }
+    if (!$intent && AIChat::MessageHandler::looksLikeDropDbQuery($message)) {
+        $intent = { action => 'drop_db' };
+    }
     _injectEmotionHint($sender);
     if (_shouldRefuseEmoteRequest($sender, $intent, $intent_context)) {
         _injectEmoteSpamRefusalHint($sender);
@@ -495,6 +498,9 @@ sub onPublicMessage {
         $intent = { action => 'drop_db' };
     } else {
         $intent = _interpretCommand($message, $sender, $intent_context);
+    }
+    if (!$intent && AIChat::MessageHandler::looksLikeDropDbQuery($message)) {
+        $intent = { action => 'drop_db' };
     }
     _injectEmotionHint($sender);
     if (_shouldRefuseEmoteRequest($sender, $intent, $intent_context)) {

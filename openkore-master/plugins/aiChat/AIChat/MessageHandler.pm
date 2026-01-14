@@ -470,6 +470,26 @@ sub isDropDbFollowup {
     return 0;
 }
 
+sub looksLikeDropDbQuery {
+    my ($message) = @_;
+    return 0 unless defined $message;
+    my $tokens = _tokenizeText($message);
+    return 0 unless $tokens && @$tokens;
+
+    my $index = _getMondbSearchIndex();
+    if ($index && %$index) {
+        my $monster = _findBestPhraseMatch($tokens, $index->{monsters});
+        my $item = _findBestPhraseMatch($tokens, $index->{items});
+        my $map = _findBestPhraseMatch($tokens, $index->{maps});
+        return 1 if $monster || $item || $map;
+    }
+
+    my $mentions_query = _hasToken($tokens, [qw(monstro monster monstros mob mobs drop drops dropa dropar item itens mapa mapas card carta)]);
+    my $mentions_where = _hasToken($tokens, [qw(onde aonde pego pegar pega acho achar encontro encontrar)]);
+    return 1 if $mentions_query || $mentions_where;
+    return 0;
+}
+
 sub _tokenizeText {
     my ($text) = @_;
     my $normalized = _normalizeQueryText($text);
@@ -667,8 +687,6 @@ sub generateDropDbResponse {
     if (_isRepeatedDropDbQuestion($sender, $message)) {
         return _randomDropDbRepeatReply();
     }
-
-    return _randomDropDbRefusal() if rand() < 0.5;
 
     my $mondb = _loadMonsterDropDb();
     return undef unless $mondb && %$mondb;
