@@ -298,6 +298,31 @@ sub _getLastDropDbContext {
     return {};
 }
 
+sub _inferDropDbContextFromHistory {
+    my ($sender, $index) = @_;
+    return {} unless defined $sender;
+    return {} unless $index && ref $index eq 'HASH';
+    my $history = AIChat::ConversationHistory::getHistory($sender) || [];
+    return {} unless @$history;
+
+    my %context;
+    for my $entry (@$history) {
+        next unless $entry->{role} && ($entry->{role} eq 'user' || $entry->{role} eq 'assistant');
+        next unless defined $entry->{content} && $entry->{content} ne '';
+        my $tokens = _tokenizeText($entry->{content});
+        next unless $tokens && @$tokens;
+
+        my $monster = _findBestPhraseMatch($tokens, $index->{monsters});
+        my $item = _findBestPhraseMatch($tokens, $index->{items});
+        my $map = _findBestPhraseMatch($tokens, $index->{maps});
+        $context{monster} = $monster if $monster;
+        $context{item} = $item if $item;
+        $context{map} = $map if $map;
+    }
+
+    return \%context;
+}
+
 sub _pickLimitedList {
     my ($items_ref, $max, $start_at) = @_;
     return [] unless $items_ref && ref $items_ref eq 'ARRAY';
@@ -593,6 +618,11 @@ sub generateDropDbResponse {
     my $map = _findBestPhraseMatch($tokens, $index->{maps});
 
     my $last_context = _getLastDropDbContext($sender);
+    my $history_context = _inferDropDbContextFromHistory($sender, $index);
+    my %fallback_context = (
+        %{ $history_context || {} },
+        %{ $last_context || {} },
+    );
     my $mentions_pronoun = _hasToken($tokens, [qw(ele ela esse essa dele dela)]);
 
     my $mentions_where = _hasToken($tokens, [qw(onde aonde pego pegar pega encontro encontrar mapa map)]);
@@ -603,9 +633,9 @@ sub generateDropDbResponse {
     my $mentions_map_question = _hasToken($tokens, [qw(mapa mapas)]) && _hasToken($tokens, [qw(qual quais)]);
 
     if (!$monster && !$item && !$map && ($mentions_pronoun || $mentions_followup)) {
-        $monster = $last_context->{monster} if $last_context->{monster};
-        $item = $last_context->{item} if $last_context->{item};
-        $map = $last_context->{map} if $last_context->{map};
+        $monster = $fallback_context{monster} if $fallback_context{monster};
+        $item = $fallback_context{item} if $fallback_context{item};
+        $map = $fallback_context{map} if $fallback_context{map};
     }
 
     if ($mentions_followup && $monster) {
@@ -613,18 +643,18 @@ sub generateDropDbResponse {
     }
 
     if (!$monster && !$item && !$map && $mentions_where) {
-        $monster = $last_context->{monster} if $last_context->{monster};
-        $item = $last_context->{item} if $last_context->{item};
-        $map = $last_context->{map} if $last_context->{map};
+        $monster = $fallback_context{monster} if $fallback_context{monster};
+        $item = $fallback_context{item} if $fallback_context{item};
+        $map = $fallback_context{map} if $fallback_context{map};
     }
 
     if ($mentions_followup && $mentions_monster_query && $item) {
         $monster = undef;
     }
 
-    if ($mentions_followup && $last_context->{item} && !$mentions_monster_query) {
+    if ($mentions_followup && $fallback_context{item} && !$mentions_monster_query) {
         $monster = undef;
-        $item = $last_context->{item} if !$item;
+        $item = $fallback_context{item} if !$item;
     }
 
     my $query_type;
