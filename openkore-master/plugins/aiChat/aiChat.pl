@@ -456,14 +456,7 @@ sub onPrivateMessage {
 
     my $intent_context = { map_name => $field ? $field->baseName : undef, lock_map => $config{lockMap} };
     my $intent;
-    if (AIChat::MessageHandler::isDropDbFollowup($message, $sender)) {
-        $intent = { action => 'drop_db' };
-    } else {
-        $intent = _interpretCommand($message, $sender, $intent_context);
-    }
-    if ((!$intent || ($intent->{action} // '') ne 'drop_db') && AIChat::MessageHandler::looksLikeDropDbQuery($message)) {
-        $intent = { action => 'drop_db' };
-    }
+    $intent = _interpretCommand($message, $sender, $intent_context);
     if (_handleSpamCheck($sender, $message, 'private', $intent)) {
         AIChat::Log::log_message(
             direction => 'in',
@@ -526,14 +519,7 @@ sub onPublicMessage {
 
     my $intent_context = { map_name => $field ? $field->baseName : undef, lock_map => $config{lockMap} };
     my $intent;
-    if (AIChat::MessageHandler::isDropDbFollowup($message, $sender)) {
-        $intent = { action => 'drop_db' };
-    } else {
-        $intent = _interpretCommand($message, $sender, $intent_context);
-    }
-    if ((!$intent || ($intent->{action} // '') ne 'drop_db') && AIChat::MessageHandler::looksLikeDropDbQuery($message)) {
-        $intent = { action => 'drop_db' };
-    }
+    $intent = _interpretCommand($message, $sender, $intent_context);
     if (_handleSpamCheck($sender, $message, 'public', $intent)) {
         AIChat::Log::log_message(
             direction => 'in',
@@ -636,7 +622,7 @@ sub _queueDropDbResponseIfNeeded {
     if ($force_refusal) {
         $response = AIChat::MessageHandler::generateDropDbRefusal($message, $sender);
     } else {
-        $response = AIChat::MessageHandler::generateDropDbResponse($message, $sender);
+        $response = AIChat::MessageHandler::generateDropDbChatResponse($message, $sender);
     }
     $response = AIChat::MessageHandler::dropDbUnknownReply() unless defined $response && $response ne '';
     AIChat::ConversationHistory::addMessage($sender, "user", $message, "intent");

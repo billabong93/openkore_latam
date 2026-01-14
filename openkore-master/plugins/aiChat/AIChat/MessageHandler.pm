@@ -24,7 +24,6 @@ my $api_client;
 my $mondb_cache;
 my $item_translation_cache;
 my %mondb_map_cache;
-my $mondb_search_cache;
 
 BEGIN {
     $api_client = AIChat::APIClient->new();
@@ -268,90 +267,6 @@ sub _normalizeResponseText {
     return $normalized;
 }
 
-sub _setLastDropDbContext {
-    my ($sender, $context) = @_;
-    return unless defined $sender;
-    return unless $context && ref $context eq 'HASH';
-
-    my @parts;
-    push @parts, "monster=$context->{monster}" if defined $context->{monster} && $context->{monster} ne '';
-    push @parts, "item=$context->{item}" if defined $context->{item} && $context->{item} ne '';
-    push @parts, "map=$context->{map}" if defined $context->{map} && $context->{map} ne '';
-    return unless @parts;
-
-    AIChat::ConversationHistory::addMessage($sender, "system", join('|', @parts), "drop_db_last");
-}
-
-sub _getLastDropDbContext {
-    my ($sender) = @_;
-    return {} unless defined $sender;
-    my $history = AIChat::ConversationHistory::getHistory($sender) || [];
-    for (my $i = @$history - 1; $i >= 0; $i--) {
-        my $entry = $history->[$i];
-        next unless $entry->{type} && $entry->{type} eq 'drop_db_last';
-        next unless defined $entry->{content};
-        my %context;
-        for my $part (split /\|/, $entry->{content}) {
-            my ($key, $value) = split /=/, $part, 2;
-            next unless defined $key && defined $value;
-            $context{$key} = $value;
-        }
-        return \%context if %context;
-    }
-    return {};
-}
-
-sub _inferDropDbContextFromHistory {
-    my ($sender, $index) = @_;
-    return {} unless defined $sender;
-    return {} unless $index && ref $index eq 'HASH';
-    my $history = AIChat::ConversationHistory::getHistory($sender) || [];
-    return {} unless @$history;
-
-    my %context;
-    for my $entry (@$history) {
-        next unless $entry->{role} && ($entry->{role} eq 'user' || $entry->{role} eq 'assistant');
-        next unless defined $entry->{content} && $entry->{content} ne '';
-        my $tokens = _tokenizeText($entry->{content});
-        next unless $tokens && @$tokens;
-
-        my $monster = _findBestPhraseMatch($tokens, $index->{monsters});
-        my $item = _findBestPhraseMatch($tokens, $index->{items});
-        my $map = _findBestPhraseMatch($tokens, $index->{maps});
-        $context{monster} = $monster if $monster;
-        $context{item} = $item if $item;
-        $context{map} = $map if $map;
-    }
-
-    return \%context;
-}
-
-sub _pickLimitedList {
-    my ($items_ref, $max, $start_at) = @_;
-    return [] unless $items_ref && ref $items_ref eq 'ARRAY';
-    my @items = grep { defined $_ && $_ ne '' } @$items_ref;
-    return [] unless @items;
-    $max = 2 unless defined $max && $max > 0;
-
-    my $limit = 1 + int(rand($max));
-    $limit = scalar @items if $limit > scalar @items;
-    $start_at = 0 unless defined $start_at && $start_at >= 0;
-    return [] if $start_at > $#items;
-    my $end_at = $start_at + $limit - 1;
-    $end_at = $#items if $end_at > $#items;
-    return [@items[$start_at .. $end_at]];
-}
-
-sub _findListIndex {
-    my ($items_ref, $value) = @_;
-    return undef unless $items_ref && ref $items_ref eq 'ARRAY';
-    return undef unless defined $value && $value ne '';
-    for my $i (0 .. $#$items_ref) {
-        return $i if $items_ref->[$i] eq $value;
-    }
-    return undef;
-}
-
 sub _pickVariant {
     my (@options) = @_;
     return '' unless @options;
@@ -516,240 +431,6 @@ sub _isRepeatedDropDbQuestion {
     return 0;
 }
 
-sub _formatMonsterReply {
-    my ($monster) = @_;
-    return '' unless defined $monster && $monster ne '';
-    return _normalizeResponseText(_pickVariant(
-        "dropa de $monster",
-        "$monster",
-        "$monster dropa",
-        "vem de $monster",
-        "cai do $monster",
-        "e $monster",
-        "mata $monster",
-    ));
-}
-
-sub _formatMapReply {
-    my ($map_name) = @_;
-    return '' unless defined $map_name && $map_name ne '';
-    return _normalizeResponseText(_pickVariant(
-        "$map_name",
-        "em $map_name",
-        "acho que $map_name",
-    ));
-}
-
-sub _formatMapListReply {
-    my ($maps_ref) = @_;
-    return '' unless $maps_ref && ref $maps_ref eq 'ARRAY';
-    return '' unless @$maps_ref;
-    return _formatMapReply($maps_ref->[0]) if @$maps_ref == 1;
-
-    my $joined = join(' ', @$maps_ref);
-    return _normalizeResponseText(_pickVariant(
-        $joined,
-        "em $maps_ref->[0]",
-        "pode ir em $maps_ref->[0]",
-    ));
-}
-
-sub _filterMapCodes {
-    my ($maps_ref) = @_;
-    return [] unless $maps_ref && ref $maps_ref eq 'ARRAY';
-    my @codes = grep { defined $_ && $_ =~ /^[a-z0-9]+_[a-z0-9]+$/i } @$maps_ref;
-    return \@codes;
-}
-
-sub _selectMapCandidates {
-    my ($maps_ref, $prefer_codes) = @_;
-    return [] unless $maps_ref && ref $maps_ref eq 'ARRAY';
-    if ($prefer_codes) {
-        my $codes = _filterMapCodes($maps_ref);
-        return $codes if @$codes;
-    }
-    return $maps_ref;
-}
-
-sub isDropDbFollowup {
-    my ($message, $sender) = @_;
-    return 0 unless defined $message && defined $sender;
-    my $tokens = _tokenizeText($message);
-    return 0 unless $tokens && @$tokens;
-
-    my $last_context = _getLastDropDbContext($sender);
-    return 0 unless $last_context && (%$last_context);
-
-    my $mentions_followup = _hasToken($tokens, [qw(mais outra outro outras outros alguma algum coisa)]);
-    my $mentions_where = _hasToken($tokens, [qw(onde aonde mapa mapas qual quais)]);
-
-    return 1 if $mentions_followup;
-    return 1 if $mentions_where && ($last_context->{monster} || $last_context->{item} || $last_context->{map});
-    return 0;
-}
-
-sub looksLikeDropDbQuery {
-    my ($message) = @_;
-    return 0 unless defined $message;
-    my $tokens = _tokenizeText($message);
-    return 0 unless $tokens && @$tokens;
-
-    my $index = _getMondbSearchIndex();
-    if ($index && %$index) {
-        my $monster = _findBestPhraseMatch($tokens, $index->{monsters});
-        my $item = _findBestPhraseMatch($tokens, $index->{items});
-        my $map = _findBestPhraseMatch($tokens, $index->{maps});
-        return 1 if $monster || $item || $map;
-    }
-
-    my $mentions_query = _hasToken($tokens, [qw(monstro monster monstros mob mobs drop drops dropa dropar item itens mapa mapas card carta)]);
-    my $mentions_where = _hasToken($tokens, [qw(onde aonde pego pegar pega acho achar encontro encontrar)]);
-    return 1 if $mentions_query || $mentions_where;
-    return 0;
-}
-
-sub _tokenizeText {
-    my ($text) = @_;
-    my $normalized = _normalizeQueryText($text);
-    return [] unless length $normalized;
-    return [split / /, $normalized];
-}
-
-sub _containsTokenSequence {
-    my ($tokens, $phrase_tokens) = @_;
-    return 0 unless $tokens && $phrase_tokens;
-    my $token_count = scalar @$tokens;
-    my $phrase_count = scalar @$phrase_tokens;
-    return 0 unless $token_count && $phrase_count;
-    return 0 if $phrase_count > $token_count;
-
-    for (my $i = 0; $i <= $token_count - $phrase_count; $i++) {
-        my $matched = 1;
-        for (my $j = 0; $j < $phrase_count; $j++) {
-            if ($tokens->[$i + $j] ne $phrase_tokens->[$j]) {
-                $matched = 0;
-                last;
-            }
-        }
-        return 1 if $matched;
-    }
-
-    return 0;
-}
-
-sub _findBestPhraseMatch {
-    my ($tokens, $candidates) = @_;
-    return unless $tokens && $candidates;
-    my $best;
-    my $best_len = 0;
-
-    for my $candidate (@$candidates) {
-        next unless defined $candidate && $candidate ne '';
-        my $phrase_tokens = _tokenizeText($candidate);
-        next unless @$phrase_tokens;
-        next if scalar(@$phrase_tokens) < $best_len;
-        next unless _containsTokenSequence($tokens, $phrase_tokens);
-        $best = $candidate;
-        $best_len = scalar @$phrase_tokens;
-    }
-
-    return $best;
-}
-
-sub _buildMondbSearchIndex {
-    my ($mondb) = @_;
-    return {} unless $mondb && %$mondb;
-
-    my %monsters_by_key;
-    my %items;
-    my %maps;
-    my %item_to_monsters;
-    my %item_to_monsters_by_priority;
-    my %map_to_monsters;
-    my %map_to_items;
-
-    for my $monster (sort keys %$mondb) {
-        my $entry = $mondb->{$monster} || {};
-        my $drops = $entry->{drops} || [];
-        my $maps = $entry->{maps} || [];
-
-        if ($monster =~ /^Mapa\s+/i) {
-            if (@$maps) {
-                for my $map (@$maps) {
-                    $maps{$map} = $map if defined $map && $map ne '';
-                }
-            }
-            if (@$drops) {
-                my ($map_name) = $monster =~ /^Mapa\s+(.+)/i;
-                if (defined $map_name && $map_name ne '') {
-                    $map_to_items{$map_name} = $drops;
-                    $maps{$map_name} = $map_name;
-                }
-            }
-            next;
-        }
-
-        $monsters_by_key{$monster} = $monster;
-
-        if (@$maps) {
-            for my $map (@$maps) {
-                next unless defined $map && $map ne '';
-                $maps{$map} = $map;
-                push @{$map_to_monsters{$map}}, $monster;
-            }
-        }
-
-        next unless @$drops;
-        for my $drop_index (0 .. $#$drops) {
-            my $drop = $drops->[$drop_index];
-            next unless defined $drop && $drop ne '';
-            $items{$drop} = $drop;
-            push @{$item_to_monsters{$drop}}, $monster;
-            push @{$item_to_monsters_by_priority{$drop}[$drop_index]}, $monster;
-        }
-    }
-
-    for my $item (keys %item_to_monsters_by_priority) {
-        my %seen;
-        my @ordered;
-        for my $bucket (@{$item_to_monsters_by_priority{$item}}) {
-            next unless $bucket && ref $bucket eq 'ARRAY';
-            for my $monster (@$bucket) {
-                next if $seen{$monster}++;
-                push @ordered, $monster;
-            }
-        }
-        $item_to_monsters{$item} = \@ordered if @ordered;
-    }
-
-    return {
-        monsters => [sort keys %monsters_by_key],
-        items => [sort keys %items],
-        maps => [sort keys %maps],
-        item_to_monsters => \%item_to_monsters,
-        map_to_monsters => \%map_to_monsters,
-        map_to_items => \%map_to_items,
-    };
-}
-
-sub _getMondbSearchIndex {
-    my $mondb = _loadMonsterDropDb();
-    return {} unless $mondb && %$mondb;
-    return $mondb_search_cache if $mondb_search_cache;
-    $mondb_search_cache = _buildMondbSearchIndex($mondb);
-    return $mondb_search_cache;
-}
-
-sub _hasToken {
-    my ($tokens, $needles) = @_;
-    return 0 unless $tokens && $needles;
-    my %token_lookup = map { $_ => 1 } @$tokens;
-    for my $needle (@$needles) {
-        return 1 if $token_lookup{$needle};
-    }
-    return 0;
-}
-
 sub _unknownDropReply {
     my @options = (
         'nao sei',
@@ -817,221 +498,47 @@ sub generateDropDbResponse {
         return _randomDropDbRefusal($sender);
     }
 
-    my $mondb = _loadMonsterDropDb();
-    return undef unless $mondb && %$mondb;
+    my $prompt = AIChat::Config::get('prompt');
+    my $history = AIChat::ConversationHistory::getHistory($sender) || [];
+    my @recent = grep { $_->{role} && $_->{role} ne 'system' } @$history;
+    @recent = @recent[-6 .. -1] if @recent > 6;
 
-    my $index = _getMondbSearchIndex();
-    return undef unless $index && %$index;
-
-    my $tokens = _tokenizeText($message);
-    return undef unless $tokens && @$tokens;
-
-    my $monster = _findBestPhraseMatch($tokens, $index->{monsters});
-    my $item = _findBestPhraseMatch($tokens, $index->{items});
-    my $map = _findBestPhraseMatch($tokens, $index->{maps});
-
-    my $last_context = _getLastDropDbContext($sender);
-    my $history_context = _inferDropDbContextFromHistory($sender, $index);
-    my %fallback_context = (
-        %{ $history_context || {} },
-        %{ $last_context || {} },
+    my @messages = (
+        {
+            role => "system",
+            content => $prompt
+        },
+        {
+            role => "system",
+            content => "Responda usando apenas o banco de drops conhecido no historico. Seja curto, direto e com linguagem de player. Se nao tiver informacao, diga que nao sabe."
+        }
     );
-    my $mentions_pronoun = _hasToken($tokens, [qw(ele ela esse essa dele dela)]);
 
-    my $mentions_where = _hasToken($tokens, [qw(onde aonde pego pegar pega encontro encontrar mapa map)]);
-    my $mentions_drop = _hasToken($tokens, [qw(drop drops dropa dropar drope loot caiu cai)]);
-    my $mentions_query = _hasToken($tokens, [qw(monstro monster monstros itens item drop drops dropa dropar mapa map)]);
-    my $mentions_monster_query = _hasToken($tokens, [qw(monstro monster monstros mob mobs)]);
-    my $mentions_followup = _hasToken($tokens, [qw(mais outra outro outras outros alguma algum coisa)]);
-    my $mentions_map = _hasToken($tokens, [qw(mapa mapas)]);
-    my $mentions_map_question = $mentions_map && _hasToken($tokens, [qw(qual quais)]);
-    my $prefer_map_codes = $mentions_map ? 1 : 0;
-
-    if ($mentions_map_question && !$map) {
-        if ($fallback_context{monster}) {
-            $monster = $fallback_context{monster};
-            $mentions_where = 1;
-        } elsif ($fallback_context{item}) {
-            $item = $fallback_context{item};
-            $mentions_where = 1;
-        } elsif ($fallback_context{map}) {
-            $map = $fallback_context{map};
+    push @messages, map {
+        {
+            role => $_->{role},
+            content => $_->{content},
         }
+    } @recent;
+
+    push @messages, {
+        role => "user",
+        content => $message,
+    };
+
+    my $response;
+    eval {
+        $response = $api_client->callAPIWithMessages(\@messages, {
+            max_tokens => 120,
+            temperature => 0.7,
+        });
+    };
+    if ($@ || !defined $response || $response eq '') {
+        return dropDbUnknownReply();
     }
 
-    if (!$monster && !$item && !$map && ($mentions_pronoun || $mentions_followup)) {
-        $monster = $fallback_context{monster} if $fallback_context{monster};
-        $item = $fallback_context{item} if $fallback_context{item};
-        $map = $fallback_context{map} if $fallback_context{map};
-    }
-
-    if (!$monster && !$item && !$map && $mentions_monster_query && $fallback_context{item}) {
-        $item = $fallback_context{item};
-    }
-
-    if ($mentions_followup && $monster) {
-        $mentions_drop = 1 unless $mentions_where;
-    }
-
-    if (!$monster && !$item && !$map && $mentions_where) {
-        $monster = $fallback_context{monster} if $fallback_context{monster};
-        $item = $fallback_context{item} if $fallback_context{item};
-        $map = $fallback_context{map} if $fallback_context{map};
-    }
-
-    if ($mentions_followup && $mentions_monster_query && $item && !$monster) {
-        $monster = undef;
-    }
-
-    if (!$monster && !$item && $mentions_followup && $fallback_context{item} && !$mentions_monster_query) {
-        $monster = undef;
-        $item = $fallback_context{item} if !$item;
-    }
-
-    my $query_type;
-    if ($monster && !$item) {
-        $query_type = 'monster';
-    } elsif ($item && !$monster) {
-        $query_type = 'item';
-    } elsif ($monster && $item) {
-        if ($mentions_where) {
-            $query_type = 'item';
-        } elsif ($mentions_drop) {
-            $query_type = 'monster';
-        } else {
-            $query_type = 'monster';
-        }
-    } elsif ($map) {
-        $query_type = 'map';
-    }
-
-    if ($query_type && $query_type eq 'monster') {
-        my $entry = $mondb->{$monster} || {};
-        my $drops = $entry->{drops} || [];
-        my $maps = $entry->{maps} || [];
-        return undef unless @$drops || @$maps;
-        if ($mentions_where && @$maps) {
-            my $map_pool = _selectMapCandidates($maps, $prefer_map_codes);
-            my $limited_maps;
-            if ($mentions_followup && $last_context->{map}) {
-                my $last_index = _findListIndex($map_pool, $last_context->{map});
-                if (defined $last_index) {
-                    $limited_maps = _pickLimitedList($map_pool, 2, $last_index + 1);
-                }
-            }
-            $limited_maps ||= _pickLimitedList($map_pool, 2);
-            return undef unless @$limited_maps;
-            my $response = _formatMapListReply($limited_maps);
-            _setLastDropDbContext($sender, { monster => $monster, map => $limited_maps->[0] });
-            return $response;
-        }
-        if ($mentions_drop && @$drops) {
-            my $limited_drops;
-            if ($mentions_followup && $last_context->{item}) {
-                my $last_index = _findListIndex($drops, $last_context->{item});
-                if (defined $last_index) {
-                    $limited_drops = _pickLimitedList($drops, 2, $last_index + 1);
-                }
-            }
-            $limited_drops ||= _pickLimitedList($drops, 2);
-            return undef unless @$limited_drops;
-            my $response = _normalizeResponseText("dropa " . join(', ', @$limited_drops));
-            _setLastDropDbContext($sender, { monster => $monster, item => $limited_drops->[0], map => ($maps->[0] // '') });
-            return $response;
-        }
-        if (@$drops) {
-            my $limited_drops = _pickLimitedList($drops, 2);
-            return undef unless @$limited_drops;
-            my $message = "dropa " . join(', ', @$limited_drops);
-            $message .= " em $maps->[0]" if @$maps && rand() < 0.5;
-            my $response = _normalizeResponseText($message);
-            _setLastDropDbContext($sender, { monster => $monster, item => $limited_drops->[0], map => ($maps->[0] // '') });
-            return $response;
-        }
-        if (@$maps) {
-            my $map_pool = _selectMapCandidates($maps, $prefer_map_codes);
-            my $limited_maps;
-            if ($mentions_followup && $last_context->{map}) {
-                my $last_index = _findListIndex($map_pool, $last_context->{map});
-                if (defined $last_index) {
-                    $limited_maps = _pickLimitedList($map_pool, 2, $last_index + 1);
-                }
-            }
-            $limited_maps ||= _pickLimitedList($map_pool, 2);
-            return undef unless @$limited_maps;
-            my $response = _formatMapListReply($limited_maps);
-            _setLastDropDbContext($sender, { monster => $monster, map => $limited_maps->[0] });
-            return $response;
-        }
-    }
-
-    if ($query_type && $query_type eq 'item') {
-        my $monsters = $index->{item_to_monsters}{$item} || [];
-        return undef unless @$monsters;
-        if ($mentions_where) {
-            my $limited_monsters = _pickLimitedList($monsters, 2);
-            return undef unless @$limited_monsters;
-            my $first_monster = $limited_monsters->[0];
-            my $entry = $mondb->{$first_monster} || {};
-            my $maps = $entry->{maps} || [];
-            if (@$maps) {
-                my $map_pool = _selectMapCandidates($maps, $prefer_map_codes);
-                my $limited_maps;
-                if ($mentions_followup && $last_context->{map} && $last_context->{monster} && $last_context->{monster} eq $first_monster) {
-                    my $last_index = _findListIndex($map_pool, $last_context->{map});
-                    if (defined $last_index) {
-                        $limited_maps = _pickLimitedList($map_pool, 2, $last_index + 1);
-                    }
-                }
-                $limited_maps ||= _pickLimitedList($map_pool, 2);
-                return undef unless @$limited_maps;
-                my $response = _formatMapListReply($limited_maps);
-                _setLastDropDbContext($sender, { monster => $first_monster, item => $item, map => $limited_maps->[0] });
-                return $response;
-            }
-            my $response = _formatMonsterReply($first_monster);
-            _setLastDropDbContext($sender, { monster => $first_monster, item => $item });
-            return $response;
-        }
-        my $limited_monsters;
-        if ($mentions_followup && $last_context->{monster}) {
-            my $last_index = _findListIndex($monsters, $last_context->{monster});
-            if (defined $last_index) {
-                $limited_monsters = _pickLimitedList($monsters, 2, $last_index + 1);
-            }
-        }
-        $limited_monsters ||= _pickLimitedList($monsters, 2);
-        return undef unless @$limited_monsters;
-        my $response = _formatMonsterReply($limited_monsters->[0]);
-        _setLastDropDbContext($sender, { monster => $limited_monsters->[0], item => $item });
-        return $response;
-    }
-
-    if ($query_type && $query_type eq 'map') {
-        my $monsters = $index->{map_to_monsters}{$map} || [];
-        my $items = $index->{map_to_items}{$map} || [];
-        return undef unless @$monsters || @$items;
-        if (@$monsters) {
-            my $limited_monsters = _pickLimitedList($monsters, 2);
-            return undef unless @$limited_monsters;
-            my $response = $mentions_map_question
-                ? _formatMapReply($map)
-                : _normalizeResponseText("em $map tem " . join(', ', @$limited_monsters));
-            _setLastDropDbContext($sender, { monster => $limited_monsters->[0], map => $map });
-            return $response;
-        }
-        if (@$items) {
-            my $limited_items = _pickLimitedList($items, 2);
-            return undef unless @$limited_items;
-            my $response = $mentions_map_question
-                ? _formatMapReply($map)
-                : _normalizeResponseText("em $map tem " . join(', ', @$limited_items));
-            _setLastDropDbContext($sender, { item => $limited_items->[0], map => $map });
-            return $response;
-        }
-    }
-
-    return undef;
+    $response = _normalizeResponseText($response);
+    return $response ne '' ? $response : dropDbUnknownReply();
 }
 
 sub dropDbUnknownReply {
@@ -1201,7 +708,6 @@ sub _loadMonsterDropDb {
     }
 
     $mondb_cache = \%db;
-    $mondb_search_cache = undef;
     return $mondb_cache;
 }
 
@@ -1280,7 +786,6 @@ sub updateMondbFromMap {
         print $fh @lines;
         close $fh;
         $mondb_cache = undef;
-        $mondb_search_cache = undef;
     }
 }
 
