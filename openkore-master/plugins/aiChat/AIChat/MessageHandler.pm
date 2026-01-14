@@ -684,17 +684,31 @@ sub generateDropDbResponse {
         my $maps = $entry->{maps} || [];
         return undef unless @$drops || @$maps;
         if ($mentions_where && @$maps) {
-            my $limited_maps = _pickLimitedList($maps, 2);
+            my $limited_maps;
+            if ($mentions_followup && $last_context->{map}) {
+                my $last_index = _findListIndex($maps, $last_context->{map});
+                if (defined $last_index) {
+                    $limited_maps = _pickLimitedList($maps, 2, $last_index + 1);
+                }
+            }
+            $limited_maps ||= _pickLimitedList($maps, 2);
             return undef unless @$limited_maps;
             my $response = _formatMapListReply($limited_maps);
             _setLastDropDbContext($sender, { monster => $monster, map => $limited_maps->[0] });
             return $response;
         }
         if ($mentions_drop && @$drops) {
-            my $limited_drops = _pickLimitedList($drops, 2);
+            my $limited_drops;
+            if ($mentions_followup && $last_context->{item}) {
+                my $last_index = _findListIndex($drops, $last_context->{item});
+                if (defined $last_index) {
+                    $limited_drops = _pickLimitedList($drops, 2, $last_index + 1);
+                }
+            }
+            $limited_drops ||= _pickLimitedList($drops, 2);
             return undef unless @$limited_drops;
             my $response = _normalizeResponseText("dropa " . join(', ', @$limited_drops));
-            _setLastDropDbContext($sender, { monster => $monster, map => ($maps->[0] // '') });
+            _setLastDropDbContext($sender, { monster => $monster, item => $limited_drops->[0], map => ($maps->[0] // '') });
             return $response;
         }
         if (@$drops) {
@@ -703,11 +717,18 @@ sub generateDropDbResponse {
             my $message = "dropa " . join(', ', @$limited_drops);
             $message .= " em $maps->[0]" if @$maps && rand() < 0.5;
             my $response = _normalizeResponseText($message);
-            _setLastDropDbContext($sender, { monster => $monster, map => ($maps->[0] // '') });
+            _setLastDropDbContext($sender, { monster => $monster, item => $limited_drops->[0], map => ($maps->[0] // '') });
             return $response;
         }
         if (@$maps) {
-            my $limited_maps = _pickLimitedList($maps, 2);
+            my $limited_maps;
+            if ($mentions_followup && $last_context->{map}) {
+                my $last_index = _findListIndex($maps, $last_context->{map});
+                if (defined $last_index) {
+                    $limited_maps = _pickLimitedList($maps, 2, $last_index + 1);
+                }
+            }
+            $limited_maps ||= _pickLimitedList($maps, 2);
             return undef unless @$limited_maps;
             my $response = _formatMapListReply($limited_maps);
             _setLastDropDbContext($sender, { monster => $monster, map => $limited_maps->[0] });
@@ -725,7 +746,14 @@ sub generateDropDbResponse {
             my $entry = $mondb->{$first_monster} || {};
             my $maps = $entry->{maps} || [];
             if (@$maps) {
-                my $limited_maps = _pickLimitedList($maps, 2);
+                my $limited_maps;
+                if ($mentions_followup && $last_context->{map} && $last_context->{monster} && $last_context->{monster} eq $first_monster) {
+                    my $last_index = _findListIndex($maps, $last_context->{map});
+                    if (defined $last_index) {
+                        $limited_maps = _pickLimitedList($maps, 2, $last_index + 1);
+                    }
+                }
+                $limited_maps ||= _pickLimitedList($maps, 2);
                 return undef unless @$limited_maps;
                 my $response = _formatMapListReply($limited_maps);
                 _setLastDropDbContext($sender, { monster => $first_monster, item => $item, map => $limited_maps->[0] });
