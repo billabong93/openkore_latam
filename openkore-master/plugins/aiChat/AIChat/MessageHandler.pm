@@ -638,6 +638,10 @@ sub generateDropDbResponse {
         $map = $fallback_context{map} if $fallback_context{map};
     }
 
+    if (!$monster && !$item && !$map && $mentions_monster_query && $fallback_context{item}) {
+        $item = $fallback_context{item};
+    }
+
     if ($mentions_followup && $monster) {
         $mentions_drop = 1 unless $mentions_where;
     }
