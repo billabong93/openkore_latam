@@ -971,7 +971,7 @@ sub _handleSpamCheck {
 
     $question_streak_by_sender{$sender_key} = ($question_streak_by_sender{$sender_key} // 0) + 1;
     if ($question_streak_by_sender{$sender_key} >= SPAM_QUESTION_LIMIT) {
-        _queueSpamRefusal($sender, $context);
+        _queueSpamRefusal($sender, $message, $context);
         _markSilenceAfterResponse($sender);
         return 1;
     }
@@ -980,14 +980,22 @@ sub _handleSpamCheck {
 }
 
 sub _queueSpamRefusal {
-    my ($sender, $context) = @_;
-    return unless defined $sender;
-    my $message = _pickSpamRefusalMessage();
+    my ($sender, $message, $context) = @_;
+    return unless defined $sender && defined $message;
+    AIChat::ConversationHistory::addMessage(
+        $sender,
+        "system",
+        "Usuario fez varias perguntas seguidas. Responda curto e com frustracao, diga que vai ficar em silencio e nao responder mais. Seja rude, mas natural.",
+        "intent"
+    );
+    my $responses = AIChat::MessageHandler::processMessages([ $message ], $sender);
+    my $message = $responses && ref $responses eq 'ARRAY' ? $responses->[0] : undef;
+    $message = _pickSpamRefusalReference() unless defined $message && $message ne '';
     return unless defined $message && $message ne '';
     _queueDirectResponse($sender, $message, { type => $context });
 }
 
-sub _pickSpamRefusalMessage {
+sub _pickSpamRefusalReference {
     my @messages = (
         "Chega. Para de spammar perguntas. Vou ficar em silencio.",
         "Ja deu. Chega de pergunta em sequencia. Vou me calar.",
