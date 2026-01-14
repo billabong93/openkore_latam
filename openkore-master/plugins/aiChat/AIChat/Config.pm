@@ -21,6 +21,7 @@ use constant {
     DEFAULT_SPLIT_CHANCE => 0.2, # Chance de dividir resposta em duas mensagens
     DEFAULT_BUFFER_DELAY => 2, # Segundos para aguardar novas mensagens antes de responder
     DEFAULT_PUBLIC_ON_LOCKMAP => 1, # Permitir respostas no chat publico quando estiver no lockMap
+    DEFAULT_MOB_DATABASE => 1, # Habilitar respostas usando o banco de dados de monstros
 };
 
 # Use a lexically scoped variable for the package's internal config
@@ -38,6 +39,7 @@ my %_file_key_map = (
     aiChat_split_chance => 'split_chance',
     aiChat_buffer_delay => 'buffer_delay',
     aiChat_public_on_lockmap => 'public_on_lockmap',
+    aiChat_mob_database => 'mob_database',
 );
 
 sub _configFilePath {
@@ -59,6 +61,7 @@ sub _loadFromConfigHash {
         'aiChat_split_chance',
         'aiChat_buffer_delay',
         'aiChat_public_on_lockmap',
+        'aiChat_mob_database',
     );
 
     for my $file_key (@load_order) {
@@ -93,6 +96,8 @@ sub _applyValue {
         return unless $value =~ /^\d+(?:\.\d+)?$/;
     } elsif ($key eq 'public_on_lockmap') {
         return unless $value =~ /^(?:0|1)$/;
+    } elsif ($key eq 'mob_database') {
+        return unless $value =~ /^(?:0|1)$/;
     }
 
     $_aiChatConfig{$key} = $value;
@@ -113,6 +118,7 @@ BEGIN {
         split_chance => DEFAULT_SPLIT_CHANCE,
         buffer_delay => DEFAULT_BUFFER_DELAY,
         public_on_lockmap => DEFAULT_PUBLIC_ON_LOCKMAP,
+        mob_database => DEFAULT_MOB_DATABASE,
     );
 }
 
@@ -151,6 +157,7 @@ sub save {
     print $fh "aiChat_split_chance $_aiChatConfig{split_chance}\n";
     print $fh "aiChat_buffer_delay $_aiChatConfig{buffer_delay}\n";
     print $fh "aiChat_public_on_lockmap $_aiChatConfig{public_on_lockmap}\n";
+    print $fh "aiChat_mob_database $_aiChatConfig{mob_database}\n";
     close $fh or warning "[aiChat] Não foi possível fechar $config_file: $!\n", "plugin";
 }
 
