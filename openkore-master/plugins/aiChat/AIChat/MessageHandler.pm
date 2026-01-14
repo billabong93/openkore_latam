@@ -372,39 +372,66 @@ sub _generateDropDbRefusalResponse {
     return undef unless defined $message && $message ne '';
 
     my $prompt = AIChat::Config::get('prompt');
+    my $history = AIChat::ConversationHistory::getHistory($sender) || [];
+    my @recent_assistant = grep { ($_->{role} // '') eq 'assistant' } @$history;
+    @recent_assistant = @recent_assistant[-3 .. -1] if @recent_assistant > 3;
+    my @recent_texts = map { $_->{content} // '' } @recent_assistant;
+    my $recent_block = join(' | ', grep { $_ ne '' } @recent_texts);
     my $system_prompt = join "\n",
         $prompt,
         "Voce precisa recusar responder perguntas de drops ou monstros agora.",
         "Seja curto, seco e educado o suficiente para parecer um player.",
         "Nao responda com informacoes do banco de dados.",
         "Nao use frases como 'nao sei' ou 'nao conheco'.",
-        "Evite fazer perguntas.";
+        "Evite fazer perguntas.",
+        "Varie as respostas e nao repita as mesmas palavras.",
+        "Nao use a palavra 'google'.",
+        ($recent_block ? "Respostas recentes para evitar repetir: $recent_block" : ());
 
-    my @messages = (
-        {
-            role => "system",
-            content => $system_prompt,
-        },
-        {
-            role => "user",
-            content => $message,
-        },
-    );
+    for my $attempt (1 .. 2) {
+        my @messages = (
+            {
+                role => "system",
+                content => $system_prompt,
+            },
+            {
+                role => "user",
+                content => $message,
+            },
+        );
 
-    my $response;
-    eval {
-        $response = $api_client->callAPIWithMessages(\@messages, {
-            max_tokens => 60,
-            temperature => 0.7,
-        });
-    };
-    if ($@) {
-        warning "[aiChat] Erro ao gerar recusa de drop DB: $@\n", "plugin";
-        return undef;
+        my $response;
+        eval {
+            $response = $api_client->callAPIWithMessages(\@messages, {
+                max_tokens => 60,
+                temperature => $attempt == 1 ? 0.9 : 1.1,
+            });
+        };
+        if ($@) {
+            warning "[aiChat] Erro ao gerar recusa de drop DB: $@\n", "plugin";
+            return undef;
+        }
+
+        next unless defined $response && $response ne '';
+        my $normalized = _normalizeResponseText($response);
+        next unless $normalized ne '';
+        next if $normalized =~ /\bnao\s+sei\b/i;
+        my $normalized_check = _normalizeEchoText($normalized);
+        my $is_repeat = 0;
+        for my $recent (@recent_texts) {
+            next unless defined $recent && $recent ne '';
+            my $recent_norm = _normalizeEchoText($recent);
+            next unless $recent_norm ne '';
+            if ($normalized_check eq $recent_norm) {
+                $is_repeat = 1;
+                last;
+            }
+        }
+        next if $is_repeat;
+        return $normalized;
     }
 
-    return undef unless defined $response && $response ne '';
-    return _normalizeResponseText($response);
+    return undef;
 }
 
 sub _randomDropDbRepeatReply {
@@ -1359,7 +1386,7 @@ sub interpretCommand {
         $parsed = decode_json($response);
     };
     if ($@ || !ref $parsed) {
-        warning "[aiChat] Resposta invalida ao interpretar comando: $response\n", "plugin";
+        debug "[aiChat] Resposta invalida ao interpretar comando: $response\n", "plugin";
         return undef;
     }
 
