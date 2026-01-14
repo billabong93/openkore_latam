@@ -723,9 +723,7 @@ sub generateDropDbResponse {
             if (@$maps) {
                 my $limited_maps = _pickLimitedList($maps, 2);
                 return undef unless @$limited_maps;
-                my $response = $mentions_map_question
-                    ? _formatMapListReply($limited_maps)
-                    : _formatMonsterReply($first_monster);
+                my $response = _formatMapListReply($limited_maps);
                 _setLastDropDbContext($sender, { monster => $first_monster, item => $item, map => $limited_maps->[0] });
                 return $response;
             }
