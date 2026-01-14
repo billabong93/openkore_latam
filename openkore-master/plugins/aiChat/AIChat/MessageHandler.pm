@@ -357,12 +357,12 @@ sub _pickVariant {
 
 sub _randomDropDbRefusal {
     return _normalizeResponseText(_pickVariant(
-        'nao sei',
-        'sei nao',
-        'nao to ligado',
-        'procura na internet',
-        'perturba nao',
-        'nao faço ideia',
+        'nao to afim de responder isso',
+        'nao sou tutor',
+        'vai ver no banco de dados',
+        'procura no banco de dados',
+        'para de perturbar',
+        'pesquisa ai',
         'vai atras disso ai',
     ));
 }
@@ -687,6 +687,8 @@ sub generateDropDbResponse {
     if (_isRepeatedDropDbQuestion($sender, $message)) {
         return _randomDropDbRepeatReply();
     }
+
+    return _randomDropDbRefusal() if rand() < 0.5;
 
     my $mondb = _loadMonsterDropDb();
     return undef unless $mondb && %$mondb;
