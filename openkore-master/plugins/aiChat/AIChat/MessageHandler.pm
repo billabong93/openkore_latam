@@ -355,6 +355,49 @@ sub _pickVariant {
     return $options[int(rand(@options))];
 }
 
+sub _randomDropDbRefusal {
+    return _normalizeResponseText(_pickVariant(
+        'nao sei',
+        'sei nao',
+        'nao to ligado',
+        'procura na internet',
+        'perturba nao',
+        'nao faço ideia',
+        'vai atras disso ai',
+    ));
+}
+
+sub _randomDropDbRepeatReply {
+    return _normalizeResponseText(_pickVariant(
+        'po ta de brincadeira',
+        'denovo isso',
+        'ja falei isso',
+        'vai ficar perguntando a mesma coisa',
+        'ta de sacanagem',
+        'ta repetindo',
+    ));
+}
+
+sub _isRepeatedDropDbQuestion {
+    my ($sender, $message) = @_;
+    return 0 unless defined $sender && defined $message && $message ne '';
+    my $normalized = _normalizeQueryText($message);
+    return 0 unless $normalized ne '';
+    my $history = AIChat::ConversationHistory::getHistory($sender) || [];
+    my $seen = 0;
+    for (my $i = @$history - 1; $i >= 0; $i--) {
+        my $entry = $history->[$i];
+        next unless $entry->{role} && $entry->{role} eq 'user';
+        next unless defined $entry->{content} && $entry->{content} ne '';
+        my $entry_normalized = _normalizeQueryText($entry->{content});
+        next unless $entry_normalized ne '';
+        $seen++;
+        return 1 if $entry_normalized eq $normalized;
+        last if $seen >= 6;
+    }
+    return 0;
+}
+
 sub _formatMonsterReply {
     my ($monster) = @_;
     return '' unless defined $monster && $monster ne '';
@@ -620,6 +663,12 @@ sub _formatListWithMaps {
 sub generateDropDbResponse {
     my ($message, $sender) = @_;
     return undef unless defined $message && $message ne '';
+
+    if (_isRepeatedDropDbQuestion($sender, $message)) {
+        return _randomDropDbRepeatReply();
+    }
+
+    return _randomDropDbRefusal() if rand() < 0.5;
 
     my $mondb = _loadMonsterDropDb();
     return undef unless $mondb && %$mondb;
