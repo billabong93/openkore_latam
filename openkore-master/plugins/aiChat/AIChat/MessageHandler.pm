@@ -483,6 +483,8 @@ sub generateDropDbResponse {
     my ($message, $sender) = @_;
     return undef unless defined $message && $message ne '';
 
+    _ensureDropDbContext($sender);
+
     my $mob_database_enabled = AIChat::Config::get('mob_database');
     if (!defined $mob_database_enabled || !$mob_database_enabled) {
         return generateDropDbRefusal($message, $sender);
