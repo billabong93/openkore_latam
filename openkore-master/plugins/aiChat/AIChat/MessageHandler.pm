@@ -474,8 +474,12 @@ sub generateDropDbResponse {
         my $entry = $mondb->{$monster} || {};
         my $drops = $entry->{drops} || [];
         my $maps = $entry->{maps} || [];
+        my $location = $entry->{location};
         return undef unless @$drops || @$maps;
         if ($mentions_where && @$maps) {
+            if (defined $location && $location ne '') {
+                return "$monster fica em $location";
+            }
             return "$monster fica em $maps->[0]";
         }
         my @parts;
@@ -492,6 +496,10 @@ sub generateDropDbResponse {
             my $first_monster = $monsters->[0];
             my $entry = $mondb->{$first_monster} || {};
             my $maps = $entry->{maps} || [];
+            my $location = $entry->{location};
+            if (defined $location && $location ne '') {
+                return "$item_display dropa de $first_monster em $location";
+            }
             return "$item_display dropa de $first_monster em $maps->[0]" if @$maps;
             return "$item_display dropa de $first_monster";
         }
@@ -526,11 +534,11 @@ sub generateDropDbChatResponse {
     my $prompt = AIChat::Config::get('prompt');
     my $combined_prompt = join "\n",
         $prompt,
-        "Banco de dados de monstros e drops (formato: Monstro: (Mapa1, Mapa2) Drop1, Drop2):",
+        "Banco de dados de monstros e drops (formato: Monstro: (Localizacao, Mapa1, Mapa2) Drop1, Drop2):",
         $drop_context,
         "Use somente as informacoes do banco acima.",
-        "Quando perguntarem onde fica um monstro, use o primeiro mapa da lista.",
-        "Quando perguntarem onde pega um item, use o primeiro monstro que dropa e o primeiro mapa desse monstro.",
+        "Quando perguntarem onde fica um monstro, use a localizacao (primeiro item).",
+        "Quando perguntarem onde pega um item, use o primeiro monstro que dropa e a localizacao desse monstro.",
         "Se nao houver informacao clara, responda com uma frase curta de desconhecimento, como um player.",
         "Exemplos: nao sei, nao conheco, sei nao, nao to ligado, desculpa nao sei.";
     my @messages = (
@@ -645,13 +653,18 @@ sub _loadMonsterDropDb {
             my ($monster, $drop_text) = split /\s*:\s*/, $line, 2;
             next unless defined $monster && defined $drop_text;
             my @maps;
+            my $location;
             if ($drop_text =~ s/^\(\s*([^)]+)\s*\)\s*//) {
-                @maps = map {
+                my @raw_maps = map {
                     my $map = $_;
                     $map =~ s/^\s+//;
                     $map =~ s/\s+$//;
                     $map;
                 } split /\s*,\s*/, $1;
+                if (@raw_maps) {
+                    $location = shift @raw_maps;
+                    @maps = @raw_maps;
+                }
             }
             my (@drops, @aliases);
             for my $raw_item (split /\s*,\s*/, $drop_text) {
@@ -668,7 +681,12 @@ sub _loadMonsterDropDb {
             @drops = grep { defined $_ && $_ ne '' && !$seen{$_}++ } @drops;
             %seen = ();
             @aliases = grep { defined $_ && $_ ne '' && !$seen{$_}++ } @aliases;
-            $db{$monster} = { drops => \@drops, maps => \@maps, drop_aliases => \@aliases } if @drops || @maps;
+            $db{$monster} = {
+                drops => \@drops,
+                maps => \@maps,
+                location => $location,
+                drop_aliases => \@aliases,
+            } if @drops || @maps || defined $location;
         }
         close $fh;
     }
