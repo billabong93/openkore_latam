@@ -357,14 +357,83 @@ sub _pickVariant {
 
 sub _randomDropDbRefusal {
     return _normalizeResponseText(_pickVariant(
-        'nao sei',
-        'sei nao',
-        'nao to ligado',
-        'procura na internet',
-        'perturba nao',
-        'nao faço ideia',
+        'nao to afim de responder isso',
+        'nao sou tutor',
+        'tenho cara de banco de dados',
+        'sou teu professor',
+        'vai ver no banco de dados',
+        'pergunta pra alguem que sabe',
+        'procura no banco de dados',
+        'aa mano vai procurar na internet',
+        'para de perturbar',
+        'pesquisa ai',
         'vai atras disso ai',
     ));
+}
+
+sub _generateDropDbRefusalResponse {
+    my ($message, $sender) = @_;
+    return undef unless defined $message && $message ne '';
+
+    my $prompt = AIChat::Config::get('prompt');
+    my $history = AIChat::ConversationHistory::getHistory($sender) || [];
+    my @recent_assistant = grep { ($_->{role} // '') eq 'assistant' } @$history;
+    @recent_assistant = @recent_assistant[-5 .. -1] if @recent_assistant > 5;
+    my @recent_texts = map { $_->{content} // '' } @recent_assistant;
+    my $recent_block = join(' | ', grep { $_ ne '' } @recent_texts);
+    my $system_prompt = join "\n",
+        $prompt,
+        "Voce precisa recusar responder perguntas de drops ou monstros agora.",
+        "Seja curto, seco e educado o suficiente para parecer um player.",
+        "Nao responda com informacoes do banco de dados.",
+        "Pode usar frases como 'nao sei' ou 'procura no google', mas nao repita a mesma resposta muitas vezes seguidas.",
+        "Evite fazer perguntas.",
+        "Varie as respostas e nao repita as mesmas palavras.",
+        "Exemplos de recusas para inspirar: tenho cara de banco de dados? aa mano vai procurar na internet. sou teu professor? pergunta pra alguem que sabe.",
+        ($recent_block ? "Respostas recentes para evitar repetir: $recent_block" : ());
+
+    for my $attempt (1 .. 2) {
+        my @messages = (
+            {
+                role => "system",
+                content => $system_prompt,
+            },
+            {
+                role => "user",
+                content => $message,
+            },
+        );
+
+        my $response;
+        eval {
+            $response = $api_client->callAPIWithMessages(\@messages, {
+                max_tokens => 60,
+                temperature => $attempt == 1 ? 0.9 : 1.1,
+            });
+        };
+        if ($@) {
+            warning "[aiChat] Erro ao gerar recusa de drop DB: $@\n", "plugin";
+            return undef;
+        }
+
+        next unless defined $response && $response ne '';
+        my $normalized = _normalizeResponseText($response);
+        next unless $normalized ne '';
+        my $normalized_check = _normalizeEchoText($normalized);
+        my $repeat_count = 0;
+        for my $recent (@recent_texts) {
+            next unless defined $recent && $recent ne '';
+            my $recent_norm = _normalizeEchoText($recent);
+            next unless $recent_norm ne '';
+            if ($normalized_check eq $recent_norm) {
+                $repeat_count++;
+            }
+        }
+        next if $repeat_count >= 2;
+        return $normalized;
+    }
+
+    return undef;
 }
 
 sub _randomDropDbRepeatReply {
@@ -467,6 +536,26 @@ sub isDropDbFollowup {
 
     return 1 if $mentions_followup;
     return 1 if $mentions_where && ($last_context->{monster} || $last_context->{item} || $last_context->{map});
+    return 0;
+}
+
+sub looksLikeDropDbQuery {
+    my ($message) = @_;
+    return 0 unless defined $message;
+    my $tokens = _tokenizeText($message);
+    return 0 unless $tokens && @$tokens;
+
+    my $index = _getMondbSearchIndex();
+    if ($index && %$index) {
+        my $monster = _findBestPhraseMatch($tokens, $index->{monsters});
+        my $item = _findBestPhraseMatch($tokens, $index->{items});
+        my $map = _findBestPhraseMatch($tokens, $index->{maps});
+        return 1 if $monster || $item || $map;
+    }
+
+    my $mentions_query = _hasToken($tokens, [qw(monstro monster monstros mob mobs drop drops dropa dropar item itens mapa mapas card carta)]);
+    my $mentions_where = _hasToken($tokens, [qw(onde aonde pego pegar pega acho achar encontro encontrar)]);
+    return 1 if $mentions_query || $mentions_where;
     return 0;
 }
 
@@ -668,7 +757,11 @@ sub generateDropDbResponse {
         return _randomDropDbRepeatReply();
     }
 
-    return _randomDropDbRefusal() if rand() < 0.5;
+    if (rand() < 0.5) {
+        my $refusal = _generateDropDbRefusalResponse($message, $sender);
+        return $refusal if defined $refusal && $refusal ne '';
+        return _randomDropDbRefusal();
+    }
 
     my $mondb = _loadMonsterDropDb();
     return undef unless $mondb && %$mondb;
@@ -877,6 +970,14 @@ sub generateDropDbResponse {
 
 sub dropDbUnknownReply {
     return _unknownDropReply();
+}
+
+sub generateDropDbRefusal {
+    my ($message, $sender) = @_;
+    return _randomDropDbRefusal() unless defined $message && $message ne '';
+    my $refusal = _generateDropDbRefusalResponse($message, $sender);
+    return $refusal if defined $refusal && $refusal ne '';
+    return _randomDropDbRefusal();
 }
 
 sub generateDropDbChatResponse {
@@ -1295,7 +1396,7 @@ sub interpretCommand {
         $parsed = decode_json($response);
     };
     if ($@ || !ref $parsed) {
-        warning "[aiChat] Resposta invalida ao interpretar comando: $response\n", "plugin";
+        debug "[aiChat] Resposta invalida ao interpretar comando: $response\n", "plugin";
         return undef;
     }
 

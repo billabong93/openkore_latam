@@ -68,6 +68,9 @@ my %pending_emotion_request_by_sender;
 my %pending_emotion_followup_by_sender;
 my %suppress_reply_until_by_sender;
 my %emote_request_times_by_sender;
+my %drop_db_question_count;
+my %drop_db_force_refusal;
+my %drop_db_refusal_limit;
 
 my @fallback_emotion_commands = qw(
     flg6
@@ -85,6 +88,8 @@ my @fallback_emotion_commands = qw(
 
 use constant {
     MAX_CHAT_LENGTH => 200,
+    DROP_DB_REFUSAL_MIN => 2,
+    DROP_DB_REFUSAL_MAX => 4,
 };
 
 sub _getBufferState {
@@ -443,6 +448,14 @@ sub onPrivateMessage {
     } else {
         $intent = _interpretCommand($message, $sender, $intent_context);
     }
+    if (!$intent && AIChat::MessageHandler::looksLikeDropDbQuery($message)) {
+        $intent = { action => 'drop_db' };
+    }
+    my $force_drop_refusal = 0;
+    if (_isDropDbIntent($intent)) {
+        _recordDropDbQuestion($sender);
+        $force_drop_refusal = _shouldForceDropDbRefusal($sender);
+    }
     _injectEmotionHint($sender);
     if (_shouldRefuseEmoteRequest($sender, $intent, $intent_context)) {
         _injectEmoteSpamRefusalHint($sender);
@@ -454,7 +467,7 @@ sub onPrivateMessage {
             message => $message,
         );
         return;
-    } elsif (_queueDropDbResponseIfNeeded($sender, $message, 'private', $intent)) {
+    } elsif (_queueDropDbResponseIfNeeded($sender, $message, 'private', $intent, $force_drop_refusal)) {
         AIChat::Log::log_message(
             direction => 'in',
             visibility => 'private',
@@ -482,12 +495,27 @@ sub onPublicMessage {
     return unless defined $sender && defined $message;
     return if $char && defined $char->{name} && $sender eq $char->{name};
 
+    my $map_name = $field->baseName // '';
+    if ($map_name ne 'sec_pri') {
+        my $lock_map = $config{lockMap} // '';
+        my $allow_public = AIChat::Config::get('public_on_lockmap');
+        return unless $lock_map && $map_name eq $lock_map && $allow_public;
+    }
+
     my $intent_context = { map_name => $field ? $field->baseName : undef, lock_map => $config{lockMap} };
     my $intent;
     if (AIChat::MessageHandler::isDropDbFollowup($message, $sender)) {
         $intent = { action => 'drop_db' };
     } else {
         $intent = _interpretCommand($message, $sender, $intent_context);
+    }
+    if (!$intent && AIChat::MessageHandler::looksLikeDropDbQuery($message)) {
+        $intent = { action => 'drop_db' };
+    }
+    my $force_drop_refusal = 0;
+    if (_isDropDbIntent($intent)) {
+        _recordDropDbQuestion($sender);
+        $force_drop_refusal = _shouldForceDropDbRefusal($sender);
     }
     _injectEmotionHint($sender);
     if (_shouldRefuseEmoteRequest($sender, $intent, $intent_context)) {
@@ -500,7 +528,7 @@ sub onPublicMessage {
             message => $message,
         );
         return;
-    } elsif (_queueDropDbResponseIfNeeded($sender, $message, 'public', $intent)) {
+    } elsif (_queueDropDbResponseIfNeeded($sender, $message, 'public', $intent, $force_drop_refusal)) {
         AIChat::Log::log_message(
             direction => 'in',
             visibility => 'public',
@@ -510,12 +538,6 @@ sub onPublicMessage {
         return;
     }
 
-    my $map_name = $field->baseName // '';
-    if ($map_name ne 'sec_pri') {
-        my $lock_map = $config{lockMap} // '';
-        my $allow_public = AIChat::Config::get('public_on_lockmap');
-        return unless $lock_map && $map_name eq $lock_map && $allow_public;
-    }
     AIChat::Log::log_message(
         direction => 'in',
         visibility => 'public',
@@ -569,19 +591,29 @@ sub _extractEmotionCommand {
 }
 
 sub _queueDropDbResponseIfNeeded {
-    my ($sender, $message, $context, $intent) = @_;
+    my ($sender, $message, $context, $intent, $force_refusal) = @_;
     return unless defined $sender && defined $message;
     return unless $intent && ref $intent eq 'HASH';
     return unless ($intent->{action} // '') eq 'drop_db';
 
-    my $response = AIChat::MessageHandler::generateDropDbResponse($message, $sender);
-    if (!defined $response || $response eq '') {
-        $response = AIChat::MessageHandler::generateDropDbChatResponse($message, $sender);
+    my $response;
+    if ($force_refusal) {
+        $response = AIChat::MessageHandler::generateDropDbRefusal($message, $sender);
+    } else {
+        $response = AIChat::MessageHandler::generateDropDbResponse($message, $sender);
+        if (!defined $response || $response eq '') {
+            $response = AIChat::MessageHandler::generateDropDbChatResponse($message, $sender);
+        }
     }
     $response = AIChat::MessageHandler::dropDbUnknownReply() unless defined $response && $response ne '';
     AIChat::ConversationHistory::addMessage($sender, "user", $message, "intent");
     _queueDirectResponse($sender, $response, { type => $context });
     return 1;
+}
+
+sub _isDropDbIntent {
+    my ($intent) = @_;
+    return $intent && ref $intent eq 'HASH' && ($intent->{action} // '') eq 'drop_db';
 }
 
 sub _normalizeSenderKey {
@@ -591,6 +623,27 @@ sub _normalizeSenderKey {
     $key =~ s/^\s+//;
     $key =~ s/\s+$//;
     return lc $key;
+}
+
+sub _recordDropDbQuestion {
+    my ($sender) = @_;
+    return unless defined $sender;
+    my $key = _normalizeSenderKey($sender);
+    return unless $key;
+    $drop_db_question_count{$key} = ($drop_db_question_count{$key} // 0) + 1;
+    $drop_db_refusal_limit{$key} = DROP_DB_REFUSAL_MIN + int(rand(DROP_DB_REFUSAL_MAX - DROP_DB_REFUSAL_MIN + 1))
+        unless defined $drop_db_refusal_limit{$key};
+    if ($drop_db_question_count{$key} >= $drop_db_refusal_limit{$key}) {
+        $drop_db_force_refusal{$key} = 1;
+    }
+}
+
+sub _shouldForceDropDbRefusal {
+    my ($sender) = @_;
+    return unless defined $sender;
+    my $key = _normalizeSenderKey($sender);
+    return unless $key;
+    return $drop_db_force_refusal{$key} ? 1 : 0;
 }
 
 sub _queueEmotionRequestIfNeeded {
