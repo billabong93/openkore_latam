@@ -75,6 +75,7 @@ my %question_streak_by_sender;
 my %silenced_by_sender;
 my %silence_message_count_by_sender;
 my %blocked_by_sender;
+my %silence_after_response_by_sender;
 
 my @fallback_emotion_commands = qw(
     flg6
@@ -191,7 +192,7 @@ sub _sendQueuedResponse {
     return if _hasPendingEmotionRequest($sender);
     return if _hasPendingEmotionFollowup($sender);
     return if _isReplySuppressed($sender);
-    return if _isSilenced($sender);
+    return if _isSilenced($sender) && !_shouldAllowSilenceResponse($sender);
     return if _isBlockedSender($sender);
 
     my $response = $state->{response_queue}[0];
@@ -260,6 +261,7 @@ sub _sendQueuedResponse {
     _resetQuestionStreak($sender);
     $state->{typing_until} = 0;
     $state->{response_started} = 0 unless @{$state->{response_queue}};
+    _finalizeSilenceIfNeeded($sender);
 }
 
 sub onTick {
@@ -919,6 +921,14 @@ sub _isSilenced {
     return $silenced_by_sender{$sender_key} ? 1 : 0;
 }
 
+sub _shouldAllowSilenceResponse {
+    my ($sender) = @_;
+    return unless defined $sender;
+    my $sender_key = _normalizeSenderKey($sender);
+    return unless $sender_key;
+    return $silence_after_response_by_sender{$sender_key} ? 1 : 0;
+}
+
 sub _isBlockedSender {
     my ($sender) = @_;
     return unless defined $sender;
@@ -953,42 +963,58 @@ sub _handleSpamCheck {
         return 1;
     }
 
+    my $is_question = _isQuestionMessage($message);
+    if (!$is_question) {
+        _resetQuestionStreak($sender);
+        return;
+    }
+
     $question_streak_by_sender{$sender_key} = ($question_streak_by_sender{$sender_key} // 0) + 1;
     if ($question_streak_by_sender{$sender_key} >= SPAM_QUESTION_LIMIT) {
-        _sendSpamRefusal($sender, $context);
-        _silenceSender($sender);
+        _queueSpamRefusal($sender, $context);
+        _markSilenceAfterResponse($sender);
         return 1;
     }
 
     return;
 }
 
-sub _sendSpamRefusal {
+sub _queueSpamRefusal {
     my ($sender, $context) = @_;
     return unless defined $sender;
-    my $message = "Chega. Para de spammar perguntas. Vou ficar em silencio.";
-    my $clean_message = _sanitizeOutgoingMessage($message);
-    return unless $clean_message;
+    my $message = _pickSpamRefusalMessage();
+    return unless defined $message && $message ne '';
+    _queueDirectResponse($sender, $message, { type => $context });
+}
 
-    if ($context && $context eq 'public') {
-        $messageSender->sendChat($clean_message);
-        AIChat::Log::log_message(
-            direction => 'out',
-            visibility => 'public',
-            sender => 'Public',
-            message => $clean_message,
-        );
-    } else {
-        $messageSender->sendPrivateMsg($sender, $clean_message);
-        AIChat::Log::log_message(
-            direction => 'out',
-            visibility => 'private',
-            sender => $sender,
-            message => $clean_message,
-        );
-    }
+sub _pickSpamRefusalMessage {
+    my @messages = (
+        "Chega. Para de spammar perguntas. Vou ficar em silencio.",
+        "Ja deu. Chega de pergunta em sequencia. Vou me calar.",
+        "Ei, sem spam. Vou ficar quieto agora.",
+        "Cansei. Para com a enxurrada de perguntas.",
+        "Nao vou responder mais. Segura a ansiedade.",
+    );
+    return $messages[int(rand(@messages))];
+}
 
-    AIChat::ConversationHistory::addMessage($sender, "assistant", $clean_message);
+sub _markSilenceAfterResponse {
+    my ($sender) = @_;
+    return unless defined $sender;
+    my $sender_key = _normalizeSenderKey($sender);
+    return unless $sender_key;
+    $silence_after_response_by_sender{$sender_key} = 1;
+    $silence_message_count_by_sender{$sender_key} = 0;
+    $question_streak_by_sender{$sender_key} = 0;
+}
+
+sub _finalizeSilenceIfNeeded {
+    my ($sender) = @_;
+    return unless defined $sender;
+    my $sender_key = _normalizeSenderKey($sender);
+    return unless $sender_key;
+    return unless delete $silence_after_response_by_sender{$sender_key};
+    _silenceSender($sender);
 }
 
 sub _silenceSender {
@@ -1013,6 +1039,14 @@ sub _blockSender {
     return if $blocked_by_sender{$sender_key};
     Commands::run("ignore 1 $sender");
     $blocked_by_sender{$sender_key} = 1;
+}
+
+sub _isQuestionMessage {
+    my ($message) = @_;
+    return unless defined $message;
+    return 1 if $message =~ /\?/;
+    return 1 if $message =~ /\b(oq|o que|pq|por que|porque|qual|quais|quando|onde|quem|como|cad[êe])\b/i;
+    return;
 }
 
 sub _injectEmotionHint {
