@@ -299,7 +299,7 @@ sub _getLastDropDbContext {
 }
 
 sub _pickLimitedList {
-    my ($items_ref, $max) = @_;
+    my ($items_ref, $max, $start_at) = @_;
     return [] unless $items_ref && ref $items_ref eq 'ARRAY';
     my @items = grep { defined $_ && $_ ne '' } @$items_ref;
     return [] unless @items;
@@ -307,7 +307,21 @@ sub _pickLimitedList {
 
     my $limit = 1 + int(rand($max));
     $limit = scalar @items if $limit > scalar @items;
-    return [@items[0 .. $limit - 1]];
+    $start_at = 0 unless defined $start_at && $start_at >= 0;
+    return [] if $start_at > $#items;
+    my $end_at = $start_at + $limit - 1;
+    $end_at = $#items if $end_at > $#items;
+    return [@items[$start_at .. $end_at]];
+}
+
+sub _findListIndex {
+    my ($items_ref, $value) = @_;
+    return undef unless $items_ref && ref $items_ref eq 'ARRAY';
+    return undef unless defined $value && $value ne '';
+    for my $i (0 .. $#$items_ref) {
+        return $i if $items_ref->[$i] eq $value;
+    }
+    return undef;
 }
 
 sub _pickVariant {
@@ -669,7 +683,14 @@ sub generateDropDbResponse {
             _setLastDropDbContext($sender, { monster => $first_monster, item => $item });
             return $response;
         }
-        my $limited_monsters = _pickLimitedList($monsters, 2);
+        my $limited_monsters;
+        if ($mentions_followup && $last_context->{monster}) {
+            my $last_index = _findListIndex($monsters, $last_context->{monster});
+            if (defined $last_index) {
+                $limited_monsters = _pickLimitedList($monsters, 2, $last_index + 1);
+            }
+        }
+        $limited_monsters ||= _pickLimitedList($monsters, 2);
         return undef unless @$limited_monsters;
         my $response = _formatMonsterReply($limited_monsters->[0]);
         _setLastDropDbContext($sender, { monster => $limited_monsters->[0], item => $item });
