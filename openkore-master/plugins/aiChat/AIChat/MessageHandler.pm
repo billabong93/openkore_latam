@@ -258,7 +258,11 @@ sub _tokenizeText {
     my ($text) = @_;
     my $normalized = _normalizeQueryText($text);
     return [] unless length $normalized;
-    return [split / /, $normalized];
+    my @tokens = split / /, $normalized;
+    return \@tokens if @tokens && $tokens[0] eq 'dropo';
+    return \@tokens unless @tokens && $tokens[0] eq 'dropo';
+    $tokens[0] = 'dropa';
+    return \@tokens;
 }
 
 sub _containsTokenSequence {
