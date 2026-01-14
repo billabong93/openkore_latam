@@ -29,7 +29,7 @@ Familiar: (Pirâmide, moc_pryd01, prt_sewb1, pay_dun00)  Dente de Morcego, Alfan
 PecoPeco: (Deserto de Morroc, moc_fild02, moc_fild01)  Bico de Ave, Sandálias [1], Erva Amarela, Erva Vermelha, Vareta [2], Laranja, Carta PecoPeco
 Zangão: (Arredores de Prontera, prt_fild05, mjolnir_03, mjolnir_09)  Frescor do Vento, Ferrão de Abelha, Jellopy, Erva Verde, Mel, Carta Zangão
 Ambernite: (Arredores de Prontera, prt_fild04, gef_fild09, prt_fild00)  Cristal Azul, Casco de Caramujo, Garleta, Casca, Casca Rija, Minério de Elunium, Minério de Ferro, Carta Ambernite
-Pé-Grande: (Floresta de Payon, pay_fild09, pay_fild07)  Pata de Urso, Chapéu Fedorento, Couro de Animal, Boneca de Pelúcia, Batata Doce, Mel, Minério de Oridecon, Carta Pé-Grande
+Pé-Grande: (Floresta de Payon, pay_fild09, pay_fild07)  Pata de Urso, Mel, Chapéu Fedorento, Couro de Animal, Boneca de Pelúcia, Batata Doce, Minério de Oridecon, Carta Pé-Grande
 Caramelo: (Monte Mjolnir, mjolnir_01, pay_fild07, mjolnir_06)  Espinho de Porco-Espinho, Casaco [1], Couro de Animal, Glaive [3], Ranseur [4], Pique [4], Asa de Mosca, Carta Caramelo
 Percevejo: (Arredores de Prontera, prt_fild00, prt_fild02, prt_fild07)  Frescor do Vento, Emveretarcon, Casco Arco-Íris, Garleta, Minério de Elunium, Casca Rija, Minério de Ferro, Carta Percevejo
 Yoyo: (Arredores de Prontera, prt_fild03)  Rabo de Macaco, Cacau, Erva Amarela, Couro de Animal, Boneco de Yoyo, Morango, Laranja, Carta Yoyo
