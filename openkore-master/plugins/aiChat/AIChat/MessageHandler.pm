@@ -255,6 +255,16 @@ sub _normalizeQueryText {
     return $normalized;
 }
 
+sub _normalizeResponseText {
+    my ($text) = @_;
+    return '' unless defined $text;
+    my $normalized = _normalizeQueryText($text);
+    $normalized =~ s/\s+/ /g;
+    $normalized =~ s/^\s+//;
+    $normalized =~ s/\s+$//;
+    return $normalized;
+}
+
 sub _tokenizeText {
     my ($text) = @_;
     my $normalized = _normalizeQueryText($text);
@@ -473,12 +483,17 @@ sub generateDropDbResponse {
         my $maps = $entry->{maps} || [];
         return undef unless @$drops || @$maps;
         if ($mentions_where && @$maps) {
-            return "$monster fica em $maps->[0]";
+            return _normalizeResponseText("tem $monster em $maps->[0]");
         }
-        my @parts;
-        push @parts, "dropa: " . join(', ', @$drops) if @$drops;
-        push @parts, "mapas: " . join(', ', @$maps) if @$maps;
-        return join ' | ', $monster, @parts;
+        if ($mentions_drop && @$drops) {
+            return _normalizeResponseText("dropa " . join(', ', @$drops));
+        }
+        if (@$drops) {
+            my $message = "dropa " . join(', ', @$drops);
+            $message .= " em $maps->[0]" if @$maps;
+            return _normalizeResponseText($message);
+        }
+        return _normalizeResponseText("tem $monster em $maps->[0]") if @$maps;
     }
 
     if ($query_type && $query_type eq 'item') {
@@ -488,21 +503,20 @@ sub generateDropDbResponse {
             my $first_monster = $monsters->[0];
             my $entry = $mondb->{$first_monster} || {};
             my $maps = $entry->{maps} || [];
-            return "$item dropa de $first_monster em $maps->[0]" if @$maps;
-            return "$item dropa de $first_monster";
+            return _normalizeResponseText("pega $item no $first_monster em $maps->[0]") if @$maps;
+            return _normalizeResponseText("pega $item no $first_monster");
         }
-        my $entries = _formatListWithMaps($mondb, $monsters);
-        return "$item dropa de $entries";
+        return _normalizeResponseText("dropa de $monsters->[0]");
     }
 
     if ($query_type && $query_type eq 'map') {
         my $monsters = $index->{map_to_monsters}{$map} || [];
         my $items = $index->{map_to_items}{$map} || [];
         return undef unless @$monsters || @$items;
-        my @parts;
-        push @parts, "monstros: " . join(', ', @$monsters) if @$monsters;
-        push @parts, "itens: " . join(', ', @$items) if @$items;
-        return "mapa $map: " . join(' | ', @parts);
+        if (@$monsters) {
+            return _normalizeResponseText("em $map tem $monsters->[0]");
+        }
+        return _normalizeResponseText("em $map tem $items->[0]") if @$items;
     }
 
     return undef;
