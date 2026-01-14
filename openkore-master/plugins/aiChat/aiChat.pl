@@ -435,7 +435,12 @@ sub onPrivateMessage {
     my $message = bytesToString($args->{privMsg});
 
     my $intent_context = { map_name => $field ? $field->baseName : undef, lock_map => $config{lockMap} };
-    my $intent = _interpretCommand($message, $sender, $intent_context);
+    my $intent;
+    if (AIChat::MessageHandler::isDropDbFollowup($message, $sender)) {
+        $intent = { action => 'drop_db' };
+    } else {
+        $intent = _interpretCommand($message, $sender, $intent_context);
+    }
     _injectEmotionHint($sender);
     if (_shouldRefuseEmoteRequest($sender, $intent, $intent_context)) {
         _injectEmoteSpamRefusalHint($sender);
@@ -476,7 +481,12 @@ sub onPublicMessage {
     return if $char && defined $char->{name} && $sender eq $char->{name};
 
     my $intent_context = { map_name => $field ? $field->baseName : undef, lock_map => $config{lockMap} };
-    my $intent = _interpretCommand($message, $sender, $intent_context);
+    my $intent;
+    if (AIChat::MessageHandler::isDropDbFollowup($message, $sender)) {
+        $intent = { action => 'drop_db' };
+    } else {
+        $intent = _interpretCommand($message, $sender, $intent_context);
+    }
     _injectEmotionHint($sender);
     if (_shouldRefuseEmoteRequest($sender, $intent, $intent_context)) {
         _injectEmoteSpamRefusalHint($sender);

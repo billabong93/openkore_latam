@@ -314,6 +314,23 @@ sub _pickLimitedList {
     return [sort keys %picked];
 }
 
+sub isDropDbFollowup {
+    my ($message, $sender) = @_;
+    return 0 unless defined $message && defined $sender;
+    my $tokens = _tokenizeText($message);
+    return 0 unless $tokens && @$tokens;
+
+    my $last_context = _getLastDropDbContext($sender);
+    return 0 unless $last_context && (%$last_context);
+
+    my $mentions_followup = _hasToken($tokens, [qw(mais outra outro outras outros alguma algum coisa)]);
+    my $mentions_where = _hasToken($tokens, [qw(onde aonde mapa mapas qual quais)]);
+
+    return 1 if $mentions_followup;
+    return 1 if $mentions_where && ($last_context->{monster} || $last_context->{item} || $last_context->{map});
+    return 0;
+}
+
 sub _tokenizeText {
     my ($text) = @_;
     my $normalized = _normalizeQueryText($text);
@@ -511,11 +528,16 @@ sub generateDropDbResponse {
     my $mentions_where = _hasToken($tokens, [qw(onde aonde pego pegar pega encontro encontrar mapa map)]);
     my $mentions_drop = _hasToken($tokens, [qw(drop drops dropa dropar drope loot caiu cai)]);
     my $mentions_query = _hasToken($tokens, [qw(monstro monster monstros itens item drop drops dropa dropar mapa map)]);
+    my $mentions_followup = _hasToken($tokens, [qw(mais outra outro outras outros alguma algum coisa)]);
 
-    if (!$monster && !$item && !$map && $mentions_pronoun) {
+    if (!$monster && !$item && !$map && ($mentions_pronoun || $mentions_followup)) {
         $monster = $last_context->{monster} if $last_context->{monster};
         $item = $last_context->{item} if $last_context->{item};
         $map = $last_context->{map} if $last_context->{map};
+    }
+
+    if ($mentions_followup && $monster) {
+        $mentions_drop = 1 unless $mentions_where;
     }
 
     my $query_type;
