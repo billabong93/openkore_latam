@@ -601,9 +601,6 @@ sub _queueDropDbResponseIfNeeded {
         $response = AIChat::MessageHandler::generateDropDbRefusal($message, $sender);
     } else {
         $response = AIChat::MessageHandler::generateDropDbResponse($message, $sender);
-        if (!defined $response || $response eq '') {
-            $response = AIChat::MessageHandler::generateDropDbChatResponse($message, $sender);
-        }
     }
     $response = AIChat::MessageHandler::dropDbUnknownReply() unless defined $response && $response ne '';
     AIChat::ConversationHistory::addMessage($sender, "user", $message, "intent");

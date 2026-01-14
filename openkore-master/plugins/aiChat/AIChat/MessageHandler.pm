@@ -258,7 +258,10 @@ sub _normalizeQueryText {
 sub _normalizeResponseText {
     my ($text) = @_;
     return '' unless defined $text;
-    my $normalized = _normalizeQueryText($text);
+    my $normalized = NFD($text);
+    $normalized =~ s/\pM//g;
+    $normalized = lc $normalized;
+    $normalized =~ s/[^\pL\pN_]+/ /g;
     $normalized =~ s/\s+/ /g;
     $normalized =~ s/^\s+//;
     $normalized =~ s/\s+$//;
