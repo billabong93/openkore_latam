@@ -141,7 +141,9 @@ sub _queueDirectResponse {
     my $state = _getBufferState($sender);
     $state->{messages} = [];
     $state->{response_queue} = [];
-    $state->{buffer_deadline} = 0;
+    my $buffer_delay = AIChat::Config::get('buffer_delay');
+    $buffer_delay = 2 unless defined $buffer_delay;
+    $state->{buffer_deadline} = time() + $buffer_delay;
     $state->{typing_until} = 0;
     $state->{response_started} = 0;
     $state->{context} = $context;
