@@ -144,7 +144,13 @@ sub _queueDirectResponse {
     my $buffer_delay = AIChat::Config::get('buffer_delay');
     $buffer_delay = 2 unless defined $buffer_delay;
     $state->{buffer_deadline} = time() + $buffer_delay;
-    $state->{typing_until} = 0;
+    my $typing_speed = AIChat::Config::get('typing_speed');
+    my $typing_delay = 3;
+    if ($typing_speed && $typing_speed > 0) {
+        $typing_delay = length($response) / $typing_speed;
+        $typing_delay = 3 if $typing_delay < 3;
+    }
+    $state->{typing_until} = time() + $buffer_delay + $typing_delay;
     $state->{response_started} = 0;
     $state->{context} = $context;
     push @{$state->{response_queue}}, $response;
