@@ -337,6 +337,10 @@ sub _formatMonsterReply {
         "dropa de $monster",
         "$monster",
         "$monster dropa",
+        "vem de $monster",
+        "cai do $monster",
+        "e $monster",
+        "mata $monster",
     ));
 }
 
@@ -594,6 +598,7 @@ sub generateDropDbResponse {
     my $mentions_where = _hasToken($tokens, [qw(onde aonde pego pegar pega encontro encontrar mapa map)]);
     my $mentions_drop = _hasToken($tokens, [qw(drop drops dropa dropar drope loot caiu cai)]);
     my $mentions_query = _hasToken($tokens, [qw(monstro monster monstros itens item drop drops dropa dropar mapa map)]);
+    my $mentions_monster_query = _hasToken($tokens, [qw(monstro monster monstros mob mobs)]);
     my $mentions_followup = _hasToken($tokens, [qw(mais outra outro outras outros alguma algum coisa)]);
     my $mentions_map_question = _hasToken($tokens, [qw(mapa mapas)]) && _hasToken($tokens, [qw(qual quais)]);
 
@@ -605,6 +610,10 @@ sub generateDropDbResponse {
 
     if ($mentions_followup && $monster) {
         $mentions_drop = 1 unless $mentions_where;
+    }
+
+    if ($mentions_followup && $mentions_monster_query && $item) {
+        $monster = undef;
     }
 
     my $query_type;
