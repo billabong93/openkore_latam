@@ -990,7 +990,7 @@ sub _queueSpamRefusal {
     AIChat::ConversationHistory::addMessage(
         $sender,
         "system",
-        "Usuario fez varias perguntas seguidas. Responda curto e com frustracao, corte o assunto e seja rude de forma natural sem dizer explicitamente que vai ficar em silencio.",
+        "Usuario fez varias perguntas seguidas. Responda curto e com frustracao, corte o assunto e seja rude de forma natural. Nao diga que vai ficar em silencio, apenas corte.",
         "intent"
     );
     my $responses = AIChat::MessageHandler::processMessages([ $message ], $sender);
@@ -1002,11 +1002,18 @@ sub _queueSpamRefusal {
 
 sub _pickSpamRefusalReference {
     my @messages = (
-        "Chega. Para de spammar perguntas. Vou ficar em silencio.",
-        "Ja deu. Chega de pergunta em sequencia. Vou me calar.",
-        "Ei, sem spam. Vou ficar quieto agora.",
-        "Cansei. Para com a enxurrada de perguntas.",
-        "Nao vou responder mais. Segura a ansiedade.",
+        "chega disso ja",
+        "para de encher com pergunta",
+        "ta de boa ja",
+        "sem spam mano",
+        "nao enche",
+        "deixa quieto",
+        "ja foi",
+        "sem paciencia pra isso",
+        "diminui ai",
+        "para com essa chuva de pergunta",
+        "ja respondi o suficiente",
+        "para de insistir",
     );
     return $messages[int(rand(@messages))];
 }
