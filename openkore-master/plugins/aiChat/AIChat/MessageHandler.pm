@@ -512,7 +512,7 @@ sub generateDropDbResponse {
         },
         {
             role => "system",
-            content => "Responda usando apenas o banco de drops conhecido no historico. Seja curto, direto e com linguagem de player. Se nao tiver informacao, diga que nao sabe. Nunca invente monstros, itens ou mapas. Se a pergunta for \"onde\" responda com a localizacao (nome do lugar). Se a pergunta for \"qual mapa\" ou \"mapa?\" responda com o codigo do mapa (o que estiver entre parenteses). Se a pessoa insistir na mesma pergunta depois de voce ja responder a localizacao, responda com o codigo do mapa."
+            content => "Responda usando apenas o banco de drops conhecido no historico. Seja curto, direto e com linguagem de player. Varie as frases e o jeito de responder, sem ficar engessado. Se nao tiver informacao, diga que nao sabe. Nunca invente monstros, itens ou mapas. Se a pergunta for \"onde\" responda com a localizacao (nome do lugar). Se a pergunta for \"qual mapa\" ou \"mapa?\" responda com o codigo do mapa (o que estiver entre parenteses). Se a pessoa insistir na mesma pergunta depois de voce ja responder a localizacao, responda com o codigo do mapa."
         }
     );
 
@@ -573,6 +573,7 @@ sub generateDropDbChatResponse {
         "Banco de dados de monstros e drops (formato: Monstro: (Mapa1, Mapa2) Drop1, Drop2):",
         $drop_context,
         "Use somente as informacoes do banco acima.",
+        "Varie o jeito de responder para nao ficar engessado, como player de MMO.",
         "Nunca invente monstros, itens ou mapas.",
         "Quando perguntarem onde fica um monstro, use o primeiro mapa da lista.",
         "Quando perguntarem onde pega um item, use o primeiro monstro que dropa e o primeiro mapa desse monstro.",
@@ -594,6 +595,11 @@ sub generateDropDbChatResponse {
     my $response;
     my $max_tokens = AIChat::Config::get('max_tokens');
     my $temperature = AIChat::Config::get('temperature');
+    if (rand() < 0.5) {
+        my $refusal = _generateDropDbRefusalResponse($message, $sender);
+        return $refusal if defined $refusal && $refusal ne '';
+        return _randomDropDbRefusal($sender);
+    }
     eval {
         $response = $api_client->callAPIWithMessages(\@messages, {
             max_tokens => $max_tokens,

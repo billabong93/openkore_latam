@@ -258,7 +258,6 @@ sub _sendQueuedResponse {
     }
 
     AIChat::ConversationHistory::addMessage($sender, "assistant", $response);
-    _resetQuestionStreak($sender);
     $state->{typing_until} = 0;
     $state->{response_started} = 0 unless @{$state->{response_queue}};
     _finalizeSilenceIfNeeded($sender);
@@ -865,7 +864,6 @@ sub _processPendingEmotionFollowups {
         }
 
         AIChat::ConversationHistory::addMessage($sender_name, "assistant", $message);
-        _resetQuestionStreak($sender_name);
         delete $pending_emotion_followup_by_sender{$sender_key};
     }
 }
