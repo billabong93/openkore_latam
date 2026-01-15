@@ -440,6 +440,19 @@ sub _unknownDropReply {
         'desculpa nao sei',
         'nao faço ideia',
         'nao lembro',
+        'desculpa n sei',
+        'vou ficar te devendo',
+        'sei la',
+        'sei la mano',
+        'sei la velho',
+        'n to ligado',
+        'nem ideia',
+        'n sei nao',
+        'nao faço a menor ideia',
+        'nao lembro disso',
+        'nao sei dizer',
+        'n conheco isso',
+        'nem sei',
     );
     return $options[int(rand(@options))];
 }
