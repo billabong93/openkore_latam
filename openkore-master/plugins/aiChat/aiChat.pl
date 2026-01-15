@@ -976,8 +976,9 @@ sub _handleSpamCheck {
 
     $question_streak_by_sender{$sender_key} = ($question_streak_by_sender{$sender_key} // 0) + 1;
     if ($question_streak_by_sender{$sender_key} >= SPAM_QUESTION_LIMIT) {
-        _queueSpamRefusal($sender, $message, $context);
-        _markSilenceAfterResponse($sender);
+        my $queued = _queueSpamRefusal($sender, $message, $context);
+        $queued = _queueSpamRefusalFallback($sender, $context) unless $queued;
+        _markSilenceAfterResponse($sender) if $queued;
         return 1;
     }
 
@@ -998,6 +999,16 @@ sub _queueSpamRefusal {
     $message = _pickSpamRefusalReference() unless defined $message && $message ne '';
     return unless defined $message && $message ne '';
     _queueDirectResponse($sender, $message, { type => $context });
+    return 1;
+}
+
+sub _queueSpamRefusalFallback {
+    my ($sender, $context) = @_;
+    return unless defined $sender;
+    my $message = _pickSpamRefusalReference();
+    return unless defined $message && $message ne '';
+    _queueDirectResponse($sender, $message, { type => $context });
+    return 1;
 }
 
 sub _pickSpamRefusalReference {
