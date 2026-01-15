@@ -71,6 +71,11 @@ my %emote_request_times_by_sender;
 my %drop_db_question_count;
 my %drop_db_force_refusal;
 my %drop_db_refusal_limit;
+my %question_streak_by_sender;
+my %silenced_by_sender;
+my %silence_message_count_by_sender;
+my %blocked_by_sender;
+my %silence_after_response_by_sender;
 
 my @fallback_emotion_commands = qw(
     flg6
@@ -90,6 +95,8 @@ use constant {
     MAX_CHAT_LENGTH => 200,
     DROP_DB_REFUSAL_MIN => 2,
     DROP_DB_REFUSAL_MAX => 4,
+    SPAM_QUESTION_LIMIT => 3,
+    SILENCE_BLOCK_THRESHOLD => 2,
 };
 
 sub _getBufferState {
@@ -185,6 +192,8 @@ sub _sendQueuedResponse {
     return if _hasPendingEmotionRequest($sender);
     return if _hasPendingEmotionFollowup($sender);
     return if _isReplySuppressed($sender);
+    return if _isSilenced($sender) && !_shouldAllowSilenceResponse($sender);
+    return if _isBlockedSender($sender);
 
     my $response = $state->{response_queue}[0];
     my $emotion_command = _extractEmotionCommand($response);
@@ -249,8 +258,10 @@ sub _sendQueuedResponse {
     }
 
     AIChat::ConversationHistory::addMessage($sender, "assistant", $response);
+    _resetQuestionStreak($sender);
     $state->{typing_until} = 0;
     $state->{response_started} = 0 unless @{$state->{response_queue}};
+    _finalizeSilenceIfNeeded($sender);
 }
 
 sub onTick {
@@ -265,6 +276,8 @@ sub onTick {
         next if _hasPendingEmotionRequest($sender);
         next if _hasPendingEmotionFollowup($sender);
         next if _isReplySuppressed($sender);
+        next if _isSilenced($sender);
+        next if _isBlockedSender($sender);
 
         if (_hasAggressiveMonsters()) {
             if (@{$state->{messages}} && $state->{buffer_deadline} && $now >= $state->{buffer_deadline}) {
@@ -443,13 +456,15 @@ sub onPrivateMessage {
 
     my $intent_context = { map_name => $field ? $field->baseName : undef, lock_map => $config{lockMap} };
     my $intent;
-    if (AIChat::MessageHandler::isDropDbFollowup($message, $sender)) {
-        $intent = { action => 'drop_db' };
-    } else {
-        $intent = _interpretCommand($message, $sender, $intent_context);
-    }
-    if ((!$intent || ($intent->{action} // '') ne 'drop_db') && AIChat::MessageHandler::looksLikeDropDbQuery($message)) {
-        $intent = { action => 'drop_db' };
+    $intent = _interpretCommand($message, $sender, $intent_context);
+    if (_handleSpamCheck($sender, $message, 'private', $intent)) {
+        AIChat::Log::log_message(
+            direction => 'in',
+            visibility => 'private',
+            sender => $sender,
+            message => $message,
+        );
+        return;
     }
     my $force_drop_refusal = 0;
     if (_isDropDbIntent($intent)) {
@@ -504,13 +519,15 @@ sub onPublicMessage {
 
     my $intent_context = { map_name => $field ? $field->baseName : undef, lock_map => $config{lockMap} };
     my $intent;
-    if (AIChat::MessageHandler::isDropDbFollowup($message, $sender)) {
-        $intent = { action => 'drop_db' };
-    } else {
-        $intent = _interpretCommand($message, $sender, $intent_context);
-    }
-    if ((!$intent || ($intent->{action} // '') ne 'drop_db') && AIChat::MessageHandler::looksLikeDropDbQuery($message)) {
-        $intent = { action => 'drop_db' };
+    $intent = _interpretCommand($message, $sender, $intent_context);
+    if (_handleSpamCheck($sender, $message, 'public', $intent)) {
+        AIChat::Log::log_message(
+            direction => 'in',
+            visibility => 'public',
+            sender => $sender,
+            message => $message,
+        );
+        return;
     }
     my $force_drop_refusal = 0;
     if (_isDropDbIntent($intent)) {
@@ -605,7 +622,7 @@ sub _queueDropDbResponseIfNeeded {
     if ($force_refusal) {
         $response = AIChat::MessageHandler::generateDropDbRefusal($message, $sender);
     } else {
-        $response = AIChat::MessageHandler::generateDropDbResponse($message, $sender);
+        $response = AIChat::MessageHandler::generateDropDbChatResponse($message, $sender);
     }
     $response = AIChat::MessageHandler::dropDbUnknownReply() unless defined $response && $response ne '';
     AIChat::ConversationHistory::addMessage($sender, "user", $message, "intent");
@@ -755,6 +772,7 @@ sub _processPendingEmotionRequests {
         }
 
         _sendEmotionByCommand($command) if $command;
+        _resetQuestionStreak($pending->{sender_name});
         _queueEmotionFollowup($pending->{sender_name}, $pending->{context});
         delete $pending_emotion_request_by_sender{$sender_key};
     }
@@ -847,6 +865,7 @@ sub _processPendingEmotionFollowups {
         }
 
         AIChat::ConversationHistory::addMessage($sender_name, "assistant", $message);
+        _resetQuestionStreak($sender_name);
         delete $pending_emotion_followup_by_sender{$sender_key};
     }
 }
@@ -877,6 +896,152 @@ sub _isReplySuppressed {
     delete $suppress_reply_until_by_sender{$sender_key} if $until;
     return;
 }
+
+sub _isSilenced {
+    my ($sender) = @_;
+    return unless defined $sender;
+    my $sender_key = _normalizeSenderKey($sender);
+    return unless $sender_key;
+    return $silenced_by_sender{$sender_key} ? 1 : 0;
+}
+
+sub _shouldAllowSilenceResponse {
+    my ($sender) = @_;
+    return unless defined $sender;
+    my $sender_key = _normalizeSenderKey($sender);
+    return unless $sender_key;
+    return $silence_after_response_by_sender{$sender_key} ? 1 : 0;
+}
+
+sub _isBlockedSender {
+    my ($sender) = @_;
+    return unless defined $sender;
+    my $sender_key = _normalizeSenderKey($sender);
+    return unless $sender_key;
+    return $blocked_by_sender{$sender_key} ? 1 : 0;
+}
+
+sub _resetQuestionStreak {
+    my ($sender) = @_;
+    return unless defined $sender;
+    my $sender_key = _normalizeSenderKey($sender);
+    return unless $sender_key;
+    $question_streak_by_sender{$sender_key} = 0;
+}
+
+sub _handleSpamCheck {
+    my ($sender, $message, $context, $intent) = @_;
+    return unless defined $sender && defined $message;
+    my $sender_key = _normalizeSenderKey($sender);
+    return unless $sender_key;
+
+    if (_isBlockedSender($sender)) {
+        return 1;
+    }
+
+    if (_isSilenced($sender)) {
+        $silence_message_count_by_sender{$sender_key} = ($silence_message_count_by_sender{$sender_key} // 0) + 1;
+        if ($silence_message_count_by_sender{$sender_key} >= SILENCE_BLOCK_THRESHOLD) {
+            _blockSender($sender);
+        }
+        return 1;
+    }
+
+    my $should_count = _shouldCountSpamQuestion($intent);
+    if (!$should_count) {
+        _resetQuestionStreak($sender);
+        return;
+    }
+
+    $question_streak_by_sender{$sender_key} = ($question_streak_by_sender{$sender_key} // 0) + 1;
+    if ($question_streak_by_sender{$sender_key} >= SPAM_QUESTION_LIMIT) {
+        _queueSpamRefusal($sender, $message, $context);
+        _markSilenceAfterResponse($sender);
+        return 1;
+    }
+
+    return;
+}
+
+sub _queueSpamRefusal {
+    my ($sender, $message, $context) = @_;
+    return unless defined $sender && defined $message;
+    AIChat::ConversationHistory::addMessage(
+        $sender,
+        "system",
+        "Usuario fez varias perguntas seguidas. Responda curto e com frustracao, corte o assunto e seja rude de forma natural sem dizer explicitamente que vai ficar em silencio.",
+        "intent"
+    );
+    my $responses = AIChat::MessageHandler::processMessages([ $message ], $sender);
+    my $message = $responses && ref $responses eq 'ARRAY' ? $responses->[0] : undef;
+    $message = _pickSpamRefusalReference() unless defined $message && $message ne '';
+    return unless defined $message && $message ne '';
+    _queueDirectResponse($sender, $message, { type => $context });
+}
+
+sub _pickSpamRefusalReference {
+    my @messages = (
+        "Chega. Para de spammar perguntas. Vou ficar em silencio.",
+        "Ja deu. Chega de pergunta em sequencia. Vou me calar.",
+        "Ei, sem spam. Vou ficar quieto agora.",
+        "Cansei. Para com a enxurrada de perguntas.",
+        "Nao vou responder mais. Segura a ansiedade.",
+    );
+    return $messages[int(rand(@messages))];
+}
+
+sub _markSilenceAfterResponse {
+    my ($sender) = @_;
+    return unless defined $sender;
+    my $sender_key = _normalizeSenderKey($sender);
+    return unless $sender_key;
+    $silence_after_response_by_sender{$sender_key} = 1;
+    $silence_message_count_by_sender{$sender_key} = 0;
+    $question_streak_by_sender{$sender_key} = 0;
+}
+
+sub _finalizeSilenceIfNeeded {
+    my ($sender) = @_;
+    return unless defined $sender;
+    my $sender_key = _normalizeSenderKey($sender);
+    return unless $sender_key;
+    return unless delete $silence_after_response_by_sender{$sender_key};
+    _silenceSender($sender);
+}
+
+sub _silenceSender {
+    my ($sender) = @_;
+    return unless defined $sender;
+    my $sender_key = _normalizeSenderKey($sender);
+    return unless $sender_key;
+    $silenced_by_sender{$sender_key} = 1;
+    $silence_message_count_by_sender{$sender_key} = 0;
+    $question_streak_by_sender{$sender_key} = 0;
+    delete $message_buffers{$sender};
+    delete $pending_emotion_request_by_sender{$sender_key};
+    delete $pending_emotion_followup_by_sender{$sender_key};
+    delete $suppress_reply_until_by_sender{$sender_key};
+}
+
+sub _blockSender {
+    my ($sender) = @_;
+    return unless defined $sender;
+    my $sender_key = _normalizeSenderKey($sender);
+    return unless $sender_key;
+    return if $blocked_by_sender{$sender_key};
+    Commands::run("ignore 1 $sender");
+    $blocked_by_sender{$sender_key} = 1;
+}
+
+sub _shouldCountSpamQuestion {
+    my ($intent) = @_;
+    return unless $intent && ref $intent eq 'HASH';
+    my $action = $intent->{action} // '';
+    return 1 if $action eq 'chat';
+    return 1 if $action eq 'drop_db';
+    return;
+}
+
 sub _injectEmotionHint {
     my ($sender) = @_;
     return unless defined $sender;
