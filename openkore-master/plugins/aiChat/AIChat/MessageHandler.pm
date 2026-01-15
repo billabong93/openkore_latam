@@ -553,6 +553,7 @@ sub generateDropDbResponse {
     }
 
     $response = _normalizeResponseText($response);
+    $response = _limitDropDbList($response);
     return $response ne '' ? $response : dropDbUnknownReply();
 }
 
@@ -628,7 +629,23 @@ sub generateDropDbChatResponse {
     $response =~ s/\s+/ /g;
     $response =~ s/^\s+//;
     $response =~ s/\s+$//;
+    $response = _limitDropDbList($response);
     return $response ne '' ? $response : dropDbUnknownReply();
+}
+
+sub _limitDropDbList {
+    my ($response) = @_;
+    return '' unless defined $response;
+    my @chunks = split /\s*\|\|\s*/, $response;
+    @chunks = map {
+        my $chunk = $_;
+        my @parts = map { my $p = $_; $p =~ s/^\s+//; $p =~ s/\s+$//; $p } split /\s*,\s*/, $chunk;
+        if (@parts > 2) {
+            $chunk = join(', ', @parts[0, 1]);
+        }
+        $chunk;
+    } @chunks;
+    return join(' || ', @chunks);
 }
 
 sub _buildWorldContext {
