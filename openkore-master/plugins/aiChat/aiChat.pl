@@ -625,7 +625,30 @@ sub _queueDropDbResponseIfNeeded {
     }
     $response = AIChat::MessageHandler::dropDbUnknownReply() unless defined $response && $response ne '';
     AIChat::ConversationHistory::addMessage($sender, "user", $message, "intent");
-    _queueDirectResponse($sender, $response, { type => $context });
+    if ($response =~ /\|\|/) {
+        my @parts = grep { defined $_ && length $_ } map {
+            my $part = $_;
+            $part =~ s/^\s+//;
+            $part =~ s/\s+$//;
+            $part;
+        } split /\s*\|\|\s*/, $response;
+        if (@parts) {
+            my $state = _getBufferState($sender);
+            $state->{messages} = [];
+            $state->{response_queue} = [];
+            my $buffer_delay = AIChat::Config::get('buffer_delay');
+            $buffer_delay = 2 unless defined $buffer_delay;
+            $state->{buffer_deadline} = time() + $buffer_delay;
+            $state->{typing_until} = 0;
+            $state->{response_started} = 0;
+            $state->{context} = { type => $context };
+            push @{$state->{response_queue}}, @parts;
+        } else {
+            _queueDirectResponse($sender, $response, { type => $context });
+        }
+    } else {
+        _queueDirectResponse($sender, $response, { type => $context });
+    }
     return 1;
 }
 
