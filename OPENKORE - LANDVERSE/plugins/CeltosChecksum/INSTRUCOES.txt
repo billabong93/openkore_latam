@@ -1,0 +1,60 @@
+ALTERACOES NECESSARIAS NO ARQUIVO CeltosChecksum.pl:
+
+1. Na funcao checkAndDownloadLandverseRecvpackets() (linha ~161):
+   
+   SUBSTITUIR:
+   - my $temp_file = "tables/recvpackets.txt";
+   
+   POR:
+   - # Cria diretorio tables/Landverse se nao existir
+   - my $dir = "tables/Landverse";
+   - unless(-d $dir){
+   -     mkdir($dir) or do {
+   -         error "[CeltosChecksum] ERRO: Nao foi possivel criar diretorio $dir\n";
+   -         return;
+   -     };
+   - }
+   - 
+   - # Salva em tables/Landverse/recvpackets.txt
+   - my $file_path = "$dir/recvpackets.txt";
+
+   E MUDAR:
+   - if(open(my $fh, '>', $temp_file)){
+   
+   PARA:
+   - if(open(my $fh, '>', $file_path)){
+
+   E MUDAR:
+   - message "[CeltosChecksum] Recvpackets.txt baixado e salvo com sucesso!\n", "success";
+   
+   PARA:
+   - message "[CeltosChecksum] Recvpackets.txt baixado e salvo em $file_path!\n", "success";
+
+   E MUDAR:
+   - error "[CeltosChecksum] ERRO: Nao foi possivel salvar recvpackets.txt\n";
+   
+   PARA:
+   - error "[CeltosChecksum] ERRO: Nao foi possivel salvar $file_path\n";
+
+
+2. REMOVER COMPLETAMENTE a funcao downloadLandverseRecvpackets() (linhas ~206-244)
+   E no checkServer() remover a chamada dela (linha ~214)
+
+   A funcao checkServer() deve ficar assim:
+   
+   sub checkServer{
+       my $m = $masterServers{$config{master}};
+
+       # Landverse nao usa checksum, apenas HWID
+       if($m->{serverType} eq 'Landverse'){
+           message "[CeltosChecksum] Landverse: Checksum desabilitado (apenas HWID)\n", "success";
+           return;
+       }
+       if(grep{ $m->{serverType} eq $_ } qw(ROla)){
+           $hooks_base = Plugins::addHooks(
+               ['serverDisconnect/fail',    \&serverDisconnect, undef],
+               ['serverDisconnect/success', \&serverDisconnect, undef],
+               ['Network::serverSend/pre',  \&serverSendPre,    undef]
+           );
+       }
+   }
