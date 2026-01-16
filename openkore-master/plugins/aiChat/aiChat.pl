@@ -987,7 +987,7 @@ sub _handleSpamCheck {
 
 sub _buildSpamRefusalMessage {
     my $message = _pickSpamRefusalReference();
-    return $message;
+    return AIChat::MessageHandler::_normalizeResponseText($message);
 }
 
 sub _queueSpamRefusal {
