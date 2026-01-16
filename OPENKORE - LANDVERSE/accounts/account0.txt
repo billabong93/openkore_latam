@@ -50,9 +50,9 @@ lockMap
 #######################################
 # Grind config
 #######################################
-attackAuto 0
+attackAuto 1
 attackAuto_ks 1
-route_randomWalk 0
+route_randomWalk 1
 
 #######################################
 # Save map
