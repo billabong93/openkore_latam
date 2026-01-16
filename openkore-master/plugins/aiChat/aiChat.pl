@@ -976,6 +976,11 @@ sub _handleSpamCheck {
 
     $question_streak_by_sender{$sender_key} = ($question_streak_by_sender{$sender_key} // 0) + 1;
     if ($question_streak_by_sender{$sender_key} >= SPAM_QUESTION_LIMIT) {
+        my $sent = _sendSpamRefusalImmediate($sender, $message, $context);
+        if ($sent) {
+            _silenceSender($sender);
+            return 1;
+        }
         my $queued = _queueSpamRefusal($sender, $message, $context);
         $queued = _queueSpamRefusalFallback($sender, $context) unless $queued;
         _markSilenceAfterResponse($sender) if $queued;
@@ -985,8 +990,8 @@ sub _handleSpamCheck {
     return;
 }
 
-sub _queueSpamRefusal {
-    my ($sender, $message, $context) = @_;
+sub _buildSpamRefusalMessage {
+    my ($sender, $message) = @_;
     return unless defined $sender && defined $message;
     AIChat::ConversationHistory::addMessage(
         $sender,
@@ -995,9 +1000,46 @@ sub _queueSpamRefusal {
         "intent"
     );
     my $responses = AIChat::MessageHandler::processMessages([ $message ], $sender);
-    my $message = $responses && ref $responses eq 'ARRAY' ? $responses->[0] : undef;
-    $message = _pickSpamRefusalReference() unless defined $message && $message ne '';
-    return unless defined $message && $message ne '';
+    my $reply = $responses && ref $responses eq 'ARRAY' ? $responses->[0] : undef;
+    $reply = _pickSpamRefusalReference() unless defined $reply && $reply ne '';
+    return $reply;
+}
+
+sub _sendSpamRefusalImmediate {
+    my ($sender, $message, $context) = @_;
+    return unless defined $sender && defined $message;
+    my $reply = _buildSpamRefusalMessage($sender, $message);
+    return unless defined $reply && $reply ne '';
+    $reply = _sanitizeOutgoingMessage($reply);
+    return unless $reply;
+
+    if ($context && $context eq 'public') {
+        $messageSender->sendChat($reply);
+        AIChat::Log::log_message(
+            direction => 'out',
+            visibility => 'public',
+            sender => 'Public',
+            message => $reply,
+        );
+    } else {
+        $messageSender->sendPrivateMsg($sender, $reply);
+        AIChat::Log::log_message(
+            direction => 'out',
+            visibility => 'private',
+            sender => $sender,
+            message => $reply,
+        );
+    }
+
+    AIChat::ConversationHistory::addMessage($sender, "assistant", $reply);
+    return 1;
+}
+
+sub _queueSpamRefusal {
+    my ($sender, $message, $context) = @_;
+    return unless defined $sender && defined $message;
+    my $response = _buildSpamRefusalMessage($sender, $message);
+    return unless defined $response && $response ne '';
     my $state = _getBufferState($sender);
     $state->{messages} = [];
     $state->{response_queue} = [];
@@ -1005,7 +1047,7 @@ sub _queueSpamRefusal {
     $state->{response_started} = 0;
     $state->{context} = { type => $context };
     $state->{buffer_deadline} = 0;
-    push @{$state->{response_queue}}, $message;
+    push @{$state->{response_queue}}, $response;
     return 1;
 }
 
