@@ -998,7 +998,14 @@ sub _queueSpamRefusal {
     my $message = $responses && ref $responses eq 'ARRAY' ? $responses->[0] : undef;
     $message = _pickSpamRefusalReference() unless defined $message && $message ne '';
     return unless defined $message && $message ne '';
-    _queueDirectResponse($sender, $message, { type => $context });
+    my $state = _getBufferState($sender);
+    $state->{messages} = [];
+    $state->{response_queue} = [];
+    $state->{typing_until} = 0;
+    $state->{response_started} = 0;
+    $state->{context} = { type => $context };
+    $state->{buffer_deadline} = time();
+    push @{$state->{response_queue}}, $message;
     return 1;
 }
 
@@ -1007,7 +1014,14 @@ sub _queueSpamRefusalFallback {
     return unless defined $sender;
     my $message = _pickSpamRefusalReference();
     return unless defined $message && $message ne '';
-    _queueDirectResponse($sender, $message, { type => $context });
+    my $state = _getBufferState($sender);
+    $state->{messages} = [];
+    $state->{response_queue} = [];
+    $state->{typing_until} = 0;
+    $state->{response_started} = 0;
+    $state->{context} = { type => $context };
+    $state->{buffer_deadline} = time();
+    push @{$state->{response_queue}}, $message;
     return 1;
 }
 
