@@ -585,6 +585,75 @@ sub generateDropDbRefusal {
     return _randomDropDbRefusal($sender);
 }
 
+sub generateSpamRefusal {
+    my ($message, $sender) = @_;
+    return undef unless defined $message && $message ne '';
+
+    my $prompt = AIChat::Config::get('prompt');
+    my $history = AIChat::ConversationHistory::getHistory($sender) || [];
+    my @recent_assistant = grep { ($_->{role} // '') eq 'assistant' } @$history;
+    @recent_assistant = @recent_assistant[-5 .. -1] if @recent_assistant > 5;
+    my @recent_texts = map { $_->{content} // '' } @recent_assistant;
+    my $recent_block = join(' | ', grep { $_ ne '' } @recent_texts);
+    my @reference_pool = (
+        'po cara vai arrumar o que fazer',
+        'ta chato ja',
+        'ja deu dessas perguntas',
+        'para de encher com pergunta',
+        'sem paciencia pra isso',
+        'nao enche',
+        'chega disso ja',
+        'ja respondi o suficiente',
+        'ta me irritando',
+        'fica na sua',
+        'deixa quieto',
+        'para com essa chuva de pergunta',
+        'nao vou responder mais isso',
+        'ta de boa ja',
+    );
+    my @reference_samples;
+    for (1 .. 5) {
+        my $sample = _pickVariantAvoidingRecent(\@reference_pool, \@recent_texts);
+        push @reference_samples, $sample if defined $sample && $sample ne '';
+    }
+    my $reference_line = join(' | ', @reference_samples);
+    my $system_prompt = join "\n",
+        $prompt,
+        "A pessoa fez perguntas demais em seguida. Responda com frustracao e indignacao.",
+        "Seja curto, direto e rude como player. Nao responda a pergunta, apenas corte.",
+        "Nao diga que vai ficar em silencio, apenas reclame e encerre.",
+        "Use linguagem casual e nao formal.",
+        "Use as referencias abaixo como base e varie a escolha.",
+        "Referencias: $reference_line",
+        ($recent_block ? "Respostas recentes para evitar repetir: $recent_block" : ());
+
+    for my $attempt (1 .. 2) {
+        my @messages = (
+            { role => "system", content => $system_prompt },
+            { role => "user", content => $message },
+        );
+
+        my $response;
+        eval {
+            $response = $api_client->callAPIWithMessages(\@messages, {
+                max_tokens => 60,
+                temperature => $attempt == 1 ? 0.9 : 1.1,
+            });
+        };
+        if ($@) {
+            warning "[aiChat] Erro ao gerar recusa de spam: $@\n", "plugin";
+            return undef;
+        }
+
+        next unless defined $response && $response ne '';
+        my $normalized = _normalizeResponseText($response);
+        next unless $normalized ne '';
+        return $normalized;
+    }
+
+    return undef;
+}
+
 sub generateDropDbChatResponse {
     my ($message, $sender) = @_;
     return dropDbUnknownReply($sender) unless defined $message && $message ne '';
