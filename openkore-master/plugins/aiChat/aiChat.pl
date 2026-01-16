@@ -1005,7 +1005,9 @@ sub _queueSpamRefusal {
         "Usuario fez varias perguntas seguidas. Responda curto e com frustracao, corte o assunto e seja rude de forma natural. Nao diga que vai ficar em silencio, apenas corte.",
         "intent"
     );
-    my $refusal = _pickSpamRefusalReference();
+    my $responses = AIChat::MessageHandler::processMessages([ $message ], $sender);
+    my $refusal = $responses && ref $responses eq 'ARRAY' ? $responses->[0] : undef;
+    $refusal = _pickSpamRefusalReference() unless defined $refusal && $refusal ne '';
     return unless defined $refusal && $refusal ne '';
     my $state = _getBufferState($sender);
     $state->{messages} = [];
@@ -1111,7 +1113,6 @@ sub _blockSender {
     my $sender_key = _normalizeSenderKey($sender);
     return unless $sender_key;
     return if $blocked_by_sender{$sender_key};
-    Commands::run("ignore 1 $sender");
     $blocked_by_sender{$sender_key} = 1;
 }
 
