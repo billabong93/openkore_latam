@@ -998,10 +998,12 @@ sub _queueSpamRefusal {
     my $state = _getBufferState($sender);
     $state->{messages} = [];
     $state->{response_queue} = [];
+    my $buffer_delay = AIChat::Config::get('buffer_delay');
+    $buffer_delay = 2 unless defined $buffer_delay;
     $state->{typing_until} = 0;
     $state->{response_started} = 0;
     $state->{context} = { type => $context };
-    $state->{buffer_deadline} = 0;
+    $state->{buffer_deadline} = time() + $buffer_delay;
     push @{$state->{response_queue}}, $response;
     return 1;
 }
@@ -1014,10 +1016,12 @@ sub _queueSpamRefusalFallback {
     my $state = _getBufferState($sender);
     $state->{messages} = [];
     $state->{response_queue} = [];
+    my $buffer_delay = AIChat::Config::get('buffer_delay');
+    $buffer_delay = 2 unless defined $buffer_delay;
     $state->{typing_until} = 0;
     $state->{response_started} = 0;
     $state->{context} = { type => $context };
-    $state->{buffer_deadline} = 0;
+    $state->{buffer_deadline} = time() + $buffer_delay;
     push @{$state->{response_queue}}, $message;
     return 1;
 }
