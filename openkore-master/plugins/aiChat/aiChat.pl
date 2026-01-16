@@ -991,18 +991,8 @@ sub _handleSpamCheck {
 }
 
 sub _buildSpamRefusalMessage {
-    my ($sender, $message) = @_;
-    return unless defined $sender && defined $message;
-    AIChat::ConversationHistory::addMessage(
-        $sender,
-        "system",
-        "Usuario fez varias perguntas seguidas. Responda curto e com frustracao, corte o assunto e seja rude de forma natural. Nao diga que vai ficar em silencio, apenas corte.",
-        "intent"
-    );
-    my $responses = AIChat::MessageHandler::processMessages([ $message ], $sender);
-    my $reply = $responses && ref $responses eq 'ARRAY' ? $responses->[0] : undef;
-    $reply = _pickSpamRefusalReference() unless defined $reply && $reply ne '';
-    return $reply;
+    my $message = _pickSpamRefusalReference();
+    return $message;
 }
 
 sub _sendSpamRefusalImmediate {
