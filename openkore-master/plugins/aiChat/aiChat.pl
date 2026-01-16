@@ -1113,6 +1113,7 @@ sub _blockSender {
     my $sender_key = _normalizeSenderKey($sender);
     return unless $sender_key;
     return if $blocked_by_sender{$sender_key};
+    Commands::run("ignore 1 $sender");
     $blocked_by_sender{$sender_key} = 1;
 }
 
