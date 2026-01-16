@@ -130,6 +130,9 @@ sub _sanitizeOutgoingMessage {
 sub _enqueueMessage {
     my ($sender, $message, $context) = @_;
     my $state = _getBufferState($sender);
+    if (@{$state->{response_queue}} && _hasPendingSilenceResponse($sender)) {
+        return;
+    }
     push @{$state->{messages}}, $message;
     $state->{context} = $context;
     my $buffer_delay = AIChat::Config::get('buffer_delay');
@@ -924,6 +927,14 @@ sub _isSilenced {
     my $sender_key = _normalizeSenderKey($sender);
     return unless $sender_key;
     return $silenced_by_sender{$sender_key} ? 1 : 0;
+}
+
+sub _hasPendingSilenceResponse {
+    my ($sender) = @_;
+    return unless defined $sender;
+    my $sender_key = _normalizeSenderKey($sender);
+    return unless $sender_key;
+    return $silence_after_response_by_sender{$sender_key} ? 1 : 0;
 }
 
 sub _shouldAllowSilenceResponse {
