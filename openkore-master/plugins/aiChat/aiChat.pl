@@ -976,11 +976,6 @@ sub _handleSpamCheck {
 
     $question_streak_by_sender{$sender_key} = ($question_streak_by_sender{$sender_key} // 0) + 1;
     if ($question_streak_by_sender{$sender_key} >= SPAM_QUESTION_LIMIT) {
-        my $sent = _sendSpamRefusalImmediate($sender, $message, $context);
-        if ($sent) {
-            _silenceSender($sender);
-            return 1;
-        }
         my $queued = _queueSpamRefusal($sender, $message, $context);
         $queued = _queueSpamRefusalFallback($sender, $context) unless $queued;
         _markSilenceAfterResponse($sender) if $queued;
@@ -993,36 +988,6 @@ sub _handleSpamCheck {
 sub _buildSpamRefusalMessage {
     my $message = _pickSpamRefusalReference();
     return $message;
-}
-
-sub _sendSpamRefusalImmediate {
-    my ($sender, $message, $context) = @_;
-    return unless defined $sender && defined $message;
-    my $reply = _buildSpamRefusalMessage($sender, $message);
-    return unless defined $reply && $reply ne '';
-    $reply = _sanitizeOutgoingMessage($reply);
-    return unless $reply;
-
-    if ($context && $context eq 'public') {
-        $messageSender->sendChat($reply);
-        AIChat::Log::log_message(
-            direction => 'out',
-            visibility => 'public',
-            sender => 'Public',
-            message => $reply,
-        );
-    } else {
-        $messageSender->sendPrivateMsg($sender, $reply);
-        AIChat::Log::log_message(
-            direction => 'out',
-            visibility => 'private',
-            sender => $sender,
-            message => $reply,
-        );
-    }
-
-    AIChat::ConversationHistory::addMessage($sender, "assistant", $reply);
-    return 1;
 }
 
 sub _queueSpamRefusal {
@@ -1059,18 +1024,49 @@ sub _queueSpamRefusalFallback {
 
 sub _pickSpamRefusalReference {
     my @messages = (
-        "chega disso ja",
-        "para de encher com pergunta",
-        "ta de boa ja",
-        "sem spam mano",
-        "nao enche",
-        "deixa quieto",
-        "ja foi",
-        "sem paciencia pra isso",
-        "diminui ai",
-        "para com essa chuva de pergunta",
-        "ja respondi o suficiente",
-        "para de insistir",
+        "Para de spamar aí, mano.",
+        "Menos spam, por favor.",
+        "Segura o spam no chat.",
+        "Chega de flood, parça.",
+        "Dá uma segurada nas mensagens aí.",
+        "Mano, tá floodando já.",
+        "Corta o spam aí, na moral.",
+        "Tá virando spam, dá um tempo.",
+        "Manda tudo numa mensagem só, pô.",
+        "Desse jeito tá impossível acompanhar.",
+        "Pô, chatão, hein.",
+        "Caraca, tu é insistente, mano.",
+        "Tu não cansa não?",
+        "Mano, pega leve aí.",
+        "Ô chat, dá um descanso.",
+        "Tá carente de atenção, é?",
+        "Tem mais nada pra fazer, não?",
+        "Tu tá sem quest pra fazer, mano?",
+        "Vai upar e para de perguntar toda hora.",
+        "Vai farmar/upar um pouco, mano.",
+        "Bora jogar em vez de ficar perguntando.",
+        "Vai caçar mob que passa.",
+        "Vai fazer uma quest aí, pô.",
+        "Vai treinar/fechar instância e relaxa.",
+        "Vai pro grind e para com esse interrogatório.",
+        "Cara, não tô afim de papo agora.",
+        "Tô de boa, sem conversa.",
+        "Agora não, tô focado aqui.",
+        "Tô ocupado, depois a gente fala.",
+        "Sem assunto, mano, só quero jogar.",
+        "Não tô com paciência pra chat agora.",
+        "Tô na minha, valeu.",
+        "Para de incomodar, na moral.",
+        "Para de perturbar aí.",
+        "Tá me enchendo já, mano.",
+        "Dá um tempo, pô.",
+        "Me deixa jogar em paz.",
+        "Respira e para de cutucar.",
+        "Chega disso aí, mano.",
+        "Desencana.",
+        "Pergunta pro Google e para de perturbar.",
+        "Joga no Google aí e segue o jogo.",
+        "Vai na database e não enche.",
     );
     return $messages[int(rand(@messages))];
 }
