@@ -979,7 +979,7 @@ sub _handleSpamCheck {
         return 1;
     }
 
-    my $should_count = _shouldCountSpamQuestion($intent);
+    my $should_count = _shouldCountSpamQuestion($intent, $message);
     if (!$should_count) {
         _resetQuestionStreak($sender);
         return;
@@ -1117,11 +1117,25 @@ sub _blockSender {
 }
 
 sub _shouldCountSpamQuestion {
-    my ($intent) = @_;
-    return unless $intent && ref $intent eq 'HASH';
-    my $action = $intent->{action} // '';
-    return 1 if $action eq 'chat';
-    return 1 if $action eq 'drop_db';
+    my ($intent, $message) = @_;
+    if ($intent && ref $intent eq 'HASH') {
+        my $action = $intent->{action} // '';
+        return 1 if $action eq 'chat';
+        return 1 if $action eq 'drop_db';
+    }
+    return _looksLikeQuestion($message);
+}
+
+sub _looksLikeQuestion {
+    my ($message) = @_;
+    return unless defined $message;
+    return 1 if $message =~ /\?/;
+    my $normalized = lc $message;
+    $normalized =~ s/[\x00-\x1F\x7F]+/ /g;
+    $normalized =~ s/\s+/ /g;
+    $normalized =~ s/^\s+//;
+    $normalized =~ s/\s+$//;
+    return 1 if $normalized =~ /^(onde|aonde|qual|quais|como|pq|porque|por que|sabe|sabe onde|sabe aonde)\b/;
     return;
 }
 
