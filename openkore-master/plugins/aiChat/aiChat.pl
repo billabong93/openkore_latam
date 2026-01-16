@@ -1005,10 +1005,8 @@ sub _queueSpamRefusal {
         "Usuario fez varias perguntas seguidas. Responda curto e com frustracao, corte o assunto e seja rude de forma natural. Nao diga que vai ficar em silencio, apenas corte.",
         "intent"
     );
-    my $responses = AIChat::MessageHandler::processMessages([ $message ], $sender);
-    my $message = $responses && ref $responses eq 'ARRAY' ? $responses->[0] : undef;
-    $message = _pickSpamRefusalReference() unless defined $message && $message ne '';
-    return unless defined $message && $message ne '';
+    my $refusal = _pickSpamRefusalReference();
+    return unless defined $refusal && $refusal ne '';
     my $state = _getBufferState($sender);
     $state->{messages} = [];
     $state->{response_queue} = [];
@@ -1016,7 +1014,7 @@ sub _queueSpamRefusal {
     $state->{response_started} = 0;
     $state->{context} = { type => $context };
     $state->{buffer_deadline} = 0;
-    push @{$state->{response_queue}}, $message;
+    push @{$state->{response_queue}}, $refusal;
     my $sender_key = _normalizeSenderKey($sender);
     if ($sender_key) {
         delete $pending_emotion_request_by_sender{$sender_key};
