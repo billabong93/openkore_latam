@@ -275,27 +275,46 @@ sub _pickVariant {
 
 sub _dropDbRefusalReferences {
     return (
+        'sei la mano',
+        'nao faco ideia real',
+        'nem eu sei disso ai',
+        'to por fora parca',
+        'desconheco total',
+        'nunca vi isso na vida chefe',
+        'nao tenho a minima',
+        'nao sei te dizer foi mal',
+        'essa eu nao manjo',
+        'pergunta dificil nao sei',
+        'joga no google ai rapidao',
+        'da um google nisso ai mano',
+        'pesquisa ai que voce acha facil',
+        'da uma olhada na wiki e mais rapido',
+        'confere na database que ta la',
+        'vai no google que e sucesso',
+        'nao sou teu professor nao po',
+        'nao sou tutor nao da uma pesquisada',
+        'nao sou suporte do jogo mano',
+        'nao e aula particular nao chefia',
+        'to jogando tambem nao to de plantao',
+        'nao sou enciclopedia ambulante parca',
+        'nao enche to no corre aqui',
+        'calma ai to ocupado agora',
+        'pesquisa ai',
         'nao to afim de responder isso',
-        'nao sou tutor',
         'tenho cara de banco de dados',
-        'sou teu professor',
         'vai ver no banco de dados',
         'pergunta pra alguem que sabe',
         'procura no banco de dados',
         'para de perturbar',
-        'pesquisa ai',
         'vai atras disso ai',
         'nao sei disso nao',
         'nao tenho essa info',
-        'sei la mano',
         'nao manjo desse drop',
-        'nao faço ideia',
         'nao sou wiki',
         'nao to com tempo pra isso',
         'da uma pesquisada',
         'pergunta no discord',
         'pergunta no cla',
-        'da uma olhada na wiki',
         'nao vou ficar listando drop',
         'nao lembro disso',
         'meu foco nao e drop',
@@ -444,29 +463,13 @@ sub _isRepeatedDropDbQuestion {
 }
 
 sub _unknownDropReply {
-    my @options = (
-        'nao sei',
-        'nao conheco',
-        'sei nao',
-        'nao to ligado',
-        'desculpa nao sei',
-        'nao faço ideia',
-        'nao lembro',
-        'desculpa n sei',
-        'vou ficar te devendo',
-        'sei la',
-        'sei la mano',
-        'sei la velho',
-        'n to ligado',
-        'nem ideia',
-        'n sei nao',
-        'nao faço a menor ideia',
-        'nao lembro disso',
-        'nao sei dizer',
-        'n conheco isso',
-        'nem sei',
-    );
-    return $options[int(rand(@options))];
+    my ($sender) = @_;
+    my @options = _dropDbRefusalReferences();
+    my $history = $sender ? (AIChat::ConversationHistory::getHistory($sender) || []) : [];
+    my @recent_assistant = grep { ($_->{role} // '') eq 'assistant' } @$history;
+    @recent_assistant = @recent_assistant[-5 .. -1] if @recent_assistant > 5;
+    my @recent_texts = map { $_->{content} // '' } @recent_assistant;
+    return _normalizeResponseText(_pickVariantAvoidingRecent(\@options, \@recent_texts));
 }
 
 sub _readMonsterDropDbRaw {
@@ -561,16 +564,17 @@ sub generateDropDbResponse {
         });
     };
     if ($@ || !defined $response || $response eq '') {
-        return dropDbUnknownReply();
+        return dropDbUnknownReply($sender);
     }
 
     $response = _normalizeResponseText($response);
     $response = _limitDropDbList($response);
-    return $response ne '' ? $response : dropDbUnknownReply();
+    return $response ne '' ? $response : dropDbUnknownReply($sender);
 }
 
 sub dropDbUnknownReply {
-    return _unknownDropReply();
+    my ($sender) = @_;
+    return _unknownDropReply($sender);
 }
 
 sub generateDropDbRefusal {
@@ -583,7 +587,7 @@ sub generateDropDbRefusal {
 
 sub generateDropDbChatResponse {
     my ($message, $sender) = @_;
-    return dropDbUnknownReply() unless defined $message && $message ne '';
+    return dropDbUnknownReply($sender) unless defined $message && $message ne '';
 
     my $mob_database_enabled = AIChat::Config::get('mob_database');
     if (!defined $mob_database_enabled || !$mob_database_enabled) {
@@ -591,7 +595,7 @@ sub generateDropDbChatResponse {
     }
 
     my $drop_context = _readMonsterDropDbRaw();
-    return dropDbUnknownReply() unless $drop_context;
+    return dropDbUnknownReply($sender) unless $drop_context;
 
     my $prompt = AIChat::Config::get('prompt');
     my $combined_prompt = join "\n",
@@ -635,14 +639,14 @@ sub generateDropDbChatResponse {
         });
     };
     if ($@ || !defined $response || $response eq '') {
-        return dropDbUnknownReply();
+        return dropDbUnknownReply($sender);
     }
 
     $response =~ s/\s+/ /g;
     $response =~ s/^\s+//;
     $response =~ s/\s+$//;
     $response = _limitDropDbList($response);
-    return $response ne '' ? $response : dropDbUnknownReply();
+    return $response ne '' ? $response : dropDbUnknownReply($sender);
 }
 
 sub _limitDropDbList {

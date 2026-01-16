@@ -1006,6 +1006,12 @@ sub _queueSpamRefusal {
     $state->{context} = { type => $context };
     $state->{buffer_deadline} = 0;
     push @{$state->{response_queue}}, $message;
+    my $sender_key = _normalizeSenderKey($sender);
+    if ($sender_key) {
+        delete $pending_emotion_request_by_sender{$sender_key};
+        delete $pending_emotion_followup_by_sender{$sender_key};
+        delete $suppress_reply_until_by_sender{$sender_key};
+    }
     return 1;
 }
 
@@ -1022,6 +1028,12 @@ sub _queueSpamRefusalFallback {
     $state->{context} = { type => $context };
     $state->{buffer_deadline} = 0;
     push @{$state->{response_queue}}, $message;
+    my $sender_key = _normalizeSenderKey($sender);
+    if ($sender_key) {
+        delete $pending_emotion_request_by_sender{$sender_key};
+        delete $pending_emotion_followup_by_sender{$sender_key};
+        delete $suppress_reply_until_by_sender{$sender_key};
+    }
     return 1;
 }
 
@@ -1039,6 +1051,14 @@ sub _pickSpamRefusalReference {
         "para com essa chuva de pergunta",
         "ja respondi o suficiente",
         "para de insistir",
+        "nao enche o saco",
+        "ta chato ja",
+        "mano chega",
+        "toma jeito ai",
+        "nao vou responder mais isso",
+        "fica na sua",
+        "ta me irritando",
+        "nao da pra ficar nisso",
     );
     return $messages[int(rand(@messages))];
 }
