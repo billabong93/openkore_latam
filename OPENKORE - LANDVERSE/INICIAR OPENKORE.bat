@@ -3,42 +3,23 @@
 :: Enable delayed expansion for real-time variable updates inside loops
 setlocal enabledelayedexpansion
 
+:: Check for Admin rights
+net session >nul 2>&1
+if %errorLevel% neq 0 (
+    echo Requesting Administrator privileges...
+    :: Re-launch this script as Administrator
+    powershell -Command "Start-Process '%~f0' -Verb RunAs"
+    exit /b
+)
+
 :: Save current cwd
-set "CURRENT_CWD=%cd%"
+cd /d "%~dp0"
 
-:ASK_PORT
-set /p OPENKORE_PORT="Enter OpenKore Port (2350, 2351, 2352): "
-if "%OPENKORE_PORT%"=="2350" goto PORT_SET
-if "%OPENKORE_PORT%"=="2351" goto PORT_SET
-if "%OPENKORE_PORT%"=="2352" goto PORT_SET
-echo Invalid port. Please enter 2350, 2351, or 2352.
-goto ASK_PORT
-
-:PORT_SET
-
-:: Load 'config.ini'
-for /f "tokens=1,2 delims==" %%a in (config.ini) do (
-    if %%a==GAME_FOLDER set GAME_FOLDER=%%b
-    if %%a==GAME_EXE set GAME_EXE=%%b
-    if %%a==GAME_ARG set GAME_ARG=%%b
+:: Run the Python launcher script
+if exist launcher.py (
+    python launcher.py
+) else (
+    echo launcher.py not found!
+    echo Please make sure launcher.py is in the same folder.
+    pause
 )
-
-:: Set game server
-set RO_SERVER=0
-
-:: Set game cwd
-cd /d %GAME_FOLDER%
-
-:: Run game exe
-for /f %%p in ('powershell -nologo -command "Start-Process -FilePath '%GAME_EXE%' -ArgumentList '%GAME_ARG%' -PassThru | Select-Object -ExpandProperty Id"') do (
-    set "GAME_PID=%%p"
-)
-
-:: Set openkore cwd
-cd /d %CURRENT_CWD%
-
-:: Run openkore perl
-perl openkore.pl
-
-:: Kill game process
-taskkill /PID %GAME_PID% /F
