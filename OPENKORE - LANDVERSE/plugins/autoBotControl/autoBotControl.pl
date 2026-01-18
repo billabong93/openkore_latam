@@ -1,6 +1,14 @@
 # --- PLUGIN FEITO PARA AMIGOS DO FORUM OPENKORE.COM.BR
 # --- AS DONATES NAO SAO APENAS PARA ATIVAR O BOT, e SIM PARA QUE EU POSSA SEGUIR AJUDANDO A COMUNIDADE.
 # --- 
+# --- Esse plugin vai ativar o seu BOT natural do LandVerse, ao chegar no seu lockmap configurado.
+# --- 
+# --- LÓGICA DO PLUGIN:
+# --- 1. NO LOCKMAP: Desativa OpenKore (AI MANUAL) e ativa bot do jogo (usando item)
+# --- 2. FORA DO LOCKMAP: Garante que bot do jogo esteja desativado, depois ativa OpenKore (AI AUTO)
+# --- 3. AO MORRER: Desativa bot do jogo automaticamente
+# --- 4. O plugin monitora mensagens "Autoattack: Activated/Deactivated" para confirmar estado do bot
+
 package autoBotControl;
 
 use strict;
@@ -17,9 +25,19 @@ my $hooks = Plugins::addHooks(
     ['mainLoop_post', \&checkLoop],
     ['packet/map_changed', \&onMapChange],
     ['packet/system_chat', \&onSystemChat],
+    ['packet/public_chat', \&onChatMessage],
+    ['packet/self_chat', \&onChatMessage],
+    ['packet_privMsg', \&onChatMessage],
+    ['packet/received_characters', \&onChatMessage],
     ['packet/npc_talk_continue', \&onNpcTalkContinue],
     ['packet/npc_talk_responses', \&onNpcTalkResponses],
-    ['packet/npc_talk', \&onNpcTalk]  # Adicionado para detectar início do diálogo
+    ['packet/npc_talk', \&onNpcTalk],
+    ['death', \&onDeath],
+    # Hook adicional para capturar todas as mensagens
+    ['parseMsg/addPrivMsgUser', \&onChatMessage],
+    ['packet/received_sync', \&onChatMessage],
+    # Hook de log para capturar mensagens do console
+    ['log', \&onLogMessage]
 );
 
 # ================= CONFIG =================
@@ -36,7 +54,10 @@ my $itemCooldown = 8;   # segundos entre tentativas de item
 my $lastCheck = 0;
 my $mapaMudouEm = 0;
 
-my $botGameAtivo = 0;        # confirmado via system chat
+# Estado do bot do jogo (confirmado via system chat):
+# 0 (false) = Bot desativado (Autoattack: Deactivated)
+# 1 (true)  = Bot ativado (Autoattack: Activated)
+my $botGameAtivo = 0;
 my $esperandoConfirmacao = 0;
 
 my $ultimaTentativaItem = 0;
@@ -108,17 +129,21 @@ sub checkLoop {
         $currentMap = $newMap;
         message "[autoBotControl] Mapa detectado: $currentMap\n", "info";
         
-        # IMPORTANTE: Resetar estado do botGame quando muda de mapa
+        # IMPORTANTE: NÃO resetar o estado real do bot ($botGameAtivo)
+        # Apenas sinalizar que precisa verificar/ajustar
         if ($configLockMap ne '' && $currentMap eq $configLockMap) {
-            # Se entrou no lockMap, assume que precisa ativar
-            $botGameAtivo = 0;  # Precisa ativar
+            # Se entrou no lockMap e o bot NÃO está ativado, sinalizar para ativar
+            if ($botGameAtivo == 0) {
+                message "[autoBotControl] Entrou no lockMap - bot precisa ser ativado\n", "info";
+            } else {
+                message "[autoBotControl] Entrou no lockMap - bot já está ativado\n", "info";
+            }
             $forcarDesativacao = 0;
-            message "[autoBotControl] Entrou no lockMap - tentando ATIVAR bot\n", "info";
         } else {
-            # Se saiu do lockMap, força desativação
-            $botGameAtivo = 1;  # Assume que está ativado para tentar desativar
-            $forcarDesativacao = 1;  # Força tentativa de desativação
-            message "[autoBotControl] Saiu do lockMap - forçando DESATIVAÇÃO do bot\n", "info";
+            # IMPORTANTE: Ao sair do lockMap, SEMPRE tentar desativar o bot
+            # Não confiar apenas no estado interno, pois pode haver dessincronização
+            $forcarDesativacao = 1;
+            message "[autoBotControl] Saiu do lockMap - forçando desativação do bot (estado atual: " . ($botGameAtivo ? "ativado" : "desativado") . ")\n", "info";
         }
         $esperandoConfirmacao = 0;
         $ultimaTentativaItem = 0;
@@ -140,16 +165,23 @@ sub checkLoop {
 
     # ===== CONTROLE FORÇADO DE AI =====
     if ($configLockMap ne '' && $currentMap eq $configLockMap) {
+        # No lockMap → AI MANUAL
         if ($aiForcado ne 'MANUAL') {
             message "[autoBotControl] No lockMap - Forçando AI MANUAL\n", "info";
             Commands::run("ai manual");
             $aiForcado = 'MANUAL';
         }
     } else {
-        if ($aiForcado ne 'AUTO') {
-            message "[autoBotControl] Fora do lockMap - Forçando AI AUTO\n", "info";
+        # Fora do lockMap → só ativa AI AUTO se o bot do jogo estiver DESATIVADO E não estiver forçando desativação
+        if ($botGameAtivo == 0 && $forcarDesativacao == 0 && $aiForcado ne 'AUTO') {
+            message "[autoBotControl] Fora do lockMap - Bot desativado confirmado - Ativando AI AUTO\n", "info";
             Commands::run("ai auto");
             $aiForcado = 'AUTO';
+        } elsif (($botGameAtivo == 1 || $forcarDesativacao == 1) && $aiForcado ne 'MANUAL') {
+            # Se o bot ainda está ativo OU está tentando desativar, manter AI MANUAL
+            message "[autoBotControl] Bot do jogo ativo/desativando - mantendo AI MANUAL\n", "info";
+            Commands::run("ai manual");
+            $aiForcado = 'MANUAL';
         }
     }
     # =================================
@@ -172,17 +204,17 @@ sub checkLoop {
     }
     # Fora do lockMap → garantir DESATIVADO (sempre tentar até receber confirmação)
     else {
-        # Se $forcarDesativacao estiver ativo ou se o bot estiver marcado como ativado
+        # Se $forcarDesativacao estiver ativo OU se o bot estiver marcado como ativado
         if (($forcarDesativacao || $botGameAtivo == 1) && !$esperandoConfirmacao) {
             if (time - $ultimaTentativaItem >= $itemCooldown) {
-                message "[autoBotControl] Fora do lockMap - Tentando DESATIVAR bot...\n", "success";
+                message "[autoBotControl] Fora do lockMap - Tentando DESATIVAR bot (forcarDesativacao: " . ($forcarDesativacao ? "SIM" : "NÃO") . ", botGameAtivo: " . ($botGameAtivo ? "SIM" : "NÃO") . ")...\n", "success";
                 buscarEUsarItem();
                 $ultimaTentativaItem = time;
                 $esperandoConfirmacao = 1;
             }
-        } elsif ($botGameAtivo == 0) {
-            # Já está desativado, só mostra status
-            debug("[autoBotControl] Bot já desativado fora do lockMap\n");
+        } elsif ($botGameAtivo == 0 && $forcarDesativacao == 0) {
+            # Só considera desativado se $botGameAtivo == 0 E $forcarDesativacao == 0
+            debug("[autoBotControl] Bot confirmado como desativado fora do lockMap\n");
         }
     }
     # ================================
@@ -287,22 +319,76 @@ sub onSystemChat {
     return unless defined $msg;
     
     message "[autoBotControl] System chat: $msg\n", "info";
+    processAutoattackMessage($msg);
+}
+
+# Handler genérico para mensagens de chat
+sub onChatMessage {
+    my (undef, $args) = @_;
+    
+    # Tenta diferentes campos onde a mensagem pode estar
+    my $msg = $args->{Msg} || $args->{message} || $args->{MsgUser} || '';
+    
+    return unless $msg;
+    
+    # Verifica se é uma mensagem de Autoattack
+    if ($msg =~ /Autoattack\s*:/i) {
+        message "[autoBotControl] Chat message: $msg\n", "info";
+        processAutoattackMessage($msg);
+    }
+}
+
+# Handler para mensagens de log do console
+sub onLogMessage {
+    my (undef, $args) = @_;
+    
+    my $msg = $args->{message} || '';
+    
+    return unless $msg;
+    
+    # Verifica se é uma mensagem de Autoattack
+    if ($msg =~ /Autoattack\s*:/i) {
+        message "[autoBotControl] Log message detectado: $msg\n", "info";
+        processAutoattackMessage($msg);
+    }
+}
+
+# Processa mensagens de Autoattack
+sub processAutoattackMessage {
+    my ($msg) = @_;
+    
+    return unless defined $msg;
+    
     
     if ($msg =~ /Autoattack\s*:\s*Activated/i) {
         message "[autoBotControl] *** CONFIRMADO: Bot do jogo ATIVADO ***\n", "success";
-        $botGameAtivo = 1;
-        $forcarDesativacao = 0;  # Resetar flag de força
+        $botGameAtivo = 1;  # true
         $esperandoConfirmacao = 0;
         $aguardandoResposta = 0;
         $npcStep = 0;
+        
+        # IMPORTANTE: Se estiver fora do lockMap, MANTER tentativa de desativação
+        if ($configLockMap ne '' && $currentMap ne $configLockMap) {
+            message "[autoBotControl] Bot ativado fora do lockMap - mantendo forcarDesativacao = 1\n", "warning";
+            $forcarDesativacao = 1;  # Manter para continuar tentando desativar
+            $ultimaTentativaItem = time - ($itemCooldown - 2);  # Retry em 2 segundos
+        } else {
+            # Dentro do lockMap, está correto estar ativado
+            $forcarDesativacao = 0;
+        }
     }
     elsif ($msg =~ /Autoattack\s*:\s*Deactivated/i) {
         message "[autoBotControl] *** CONFIRMADO: Bot do jogo DESATIVADO ***\n", "success";
-        $botGameAtivo = 0;
-        $forcarDesativacao = 0;  # Resetar flag de força
+        $botGameAtivo = 0;  # false
+        $forcarDesativacao = 0;
         $esperandoConfirmacao = 0;
         $aguardandoResposta = 0;
         $npcStep = 0;
+        
+        # Se desativou e está fora do lockMap, pode ativar AI AUTO
+        if ($configLockMap ne '' && $currentMap ne $configLockMap) {
+            message "[autoBotControl] Bot desativado fora do lockMap - liberando para AI AUTO\n", "info";
+        }
     }
 }
 
@@ -365,6 +451,22 @@ sub onNpcTalkResponses {
     $npcStep = 0;
     $esperandoConfirmacao = 1;  # Agora espera confirmação do system chat
     message "[autoBotControl] Aguardando confirmação do system chat...\n", "info";
+}
+
+# =========================================================
+
+# Handler para morte do personagem
+sub onDeath {
+    message "[autoBotControl] Personagem morreu - forçando desativação do bot\n", "warning";
+    
+    # Marca para desativar o bot do jogo
+    $forcarDesativacao = 1;
+    $esperandoConfirmacao = 0;
+    $ultimaTentativaItem = 0;
+    $aguardandoResposta = 0;
+    $npcStep = 0;
+    
+    # O bot será desativado no próximo ciclo do checkLoop
 }
 
 # =========================================================
