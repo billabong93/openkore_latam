@@ -130,6 +130,15 @@ sub _splitResponse {
         @parts = @parts[0, 1];
     }
 
+    if (@parts > 1) {
+        for my $index (0 .. $#parts - 1) {
+            $parts[$index] =~ s/\s*([.,!?;:]+|\.{2,})\s*$//;
+            $parts[$index] =~ s/\s+$//;
+        }
+        $parts[0] =~ s/^\s+//;
+        $parts[1] =~ s/^\s+// if @parts > 1;
+    }
+
     return \@parts if @parts;
     return [$response];
 }
