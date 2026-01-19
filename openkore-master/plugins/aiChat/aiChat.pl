@@ -76,6 +76,22 @@ my %silenced_by_sender;
 my %silence_message_count_by_sender;
 my %blocked_by_sender;
 my %silence_after_response_by_sender;
+my %last_visibility_state_by_sender;
+
+my %invisibility_statuses = map { $_ => 1 } qw(
+    EFST_HIDING
+    EFST_CLOAKING
+    EFST_INVISIBLE
+    EFST_INVISIBILITY
+    EFST_CLOAKINGEXCEED
+    EFST_HALLUCINATIONWALK
+    EFST_STEALTHFIELD
+    EFST_CAMOUFLAGE
+    EFST_CHASEWALK
+    EFFECTSTATE_BURROW
+    EFFECTSTATE_HIDING
+    EFFECTSTATE_SPECIALHIDING
+);
 
 my @fallback_emotion_commands = qw(
     flg6
@@ -455,7 +471,9 @@ sub onPrivateMessage {
     my $message = bytesToString($args->{privMsg});
 
     my $actor = _getSenderActor($sender);
-    _ensurePlayerInfo($sender, $actor) if $actor;
+    my $visibility_state = _resolveVisibilityState($actor);
+    _ensureVisibilityInfo($sender, $visibility_state);
+    _ensurePlayerInfo($sender, $actor) if $visibility_state eq 'visible';
 
     my $intent_context = { map_name => $field ? $field->baseName : undef, lock_map => $config{lockMap} };
     my $intent;
@@ -522,8 +540,10 @@ sub onPublicMessage {
 
     my $sender_id = $args->{pubID};
     my $actor = _getSenderActor($sender, $sender_id);
-    return unless _isSenderWithinPublicRange($actor);
-    _ensurePlayerInfo($sender, $actor);
+    my $visibility_state = _resolveVisibilityState($actor);
+    return if $actor && !_isSenderWithinPublicRange($actor);
+    _ensureVisibilityInfo($sender, $visibility_state);
+    _ensurePlayerInfo($sender, $actor) if $visibility_state eq 'visible';
 
     my $intent_context = { map_name => $field ? $field->baseName : undef, lock_map => $config{lockMap} };
     my $intent;
@@ -593,6 +613,24 @@ sub _resolveActorClass {
     return;
 }
 
+sub _isActorInvisible {
+    my ($actor) = @_;
+    return unless $actor;
+    my $statuses = $actor->{statuses};
+    return unless $statuses && ref $statuses eq 'HASH';
+    for my $status (keys %invisibility_statuses) {
+        return 1 if $statuses->{$status};
+    }
+    return;
+}
+
+sub _resolveVisibilityState {
+    my ($actor) = @_;
+    return 'not_visible' unless $actor;
+    return 'not_visible' if _isActorInvisible($actor);
+    return 'visible';
+}
+
 sub _ensurePlayerInfo {
     my ($sender, $actor) = @_;
     return unless defined $sender;
@@ -615,6 +653,31 @@ sub _ensurePlayerInfo {
     return if defined $last_info && $last_info eq $player_info;
 
     AIChat::ConversationHistory::addMessage($sender, "system", $player_info, "player_info");
+}
+
+sub _ensureVisibilityInfo {
+    my ($sender, $visibility_state) = @_;
+    return unless defined $sender && defined $visibility_state;
+
+    my $sender_key = _normalizeSenderKey($sender);
+    my $last_state = $last_visibility_state_by_sender{$sender_key};
+    return if defined $last_state && $last_state eq $visibility_state;
+
+    $last_visibility_state_by_sender{$sender_key} = $visibility_state;
+
+    my $visibility_info;
+    if ($visibility_state eq 'visible') {
+        $visibility_info = join "\n",
+            "Informacoes de visibilidade do jogador:",
+            "O jogador esta visivel para voce agora.";
+    } else {
+        $visibility_info = join "\n",
+            "Informacoes de visibilidade do jogador:",
+            "Voce nao esta vendo esse jogador agora (pode estar longe ou invisivel).",
+            "Se a pergunta depender de ver o jogador, responda dizendo que nao esta vendo.";
+    }
+
+    AIChat::ConversationHistory::addMessage($sender, "system", $visibility_info, "visibility_info");
 }
 
 sub _isSenderWithinPublicRange {

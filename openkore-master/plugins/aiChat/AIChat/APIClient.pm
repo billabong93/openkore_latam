@@ -57,6 +57,14 @@ sub callAPI {
             content => $prompt
         }
     );
+
+    my $glossary = AIChat::Config::get('glossary');
+    if (defined $glossary && $glossary ne '') {
+        push @messages, {
+            role => "system",
+            content => "Glossario do jogo para referencia: $glossary",
+        };
+    }
     
     # Adiciona o histórico de conversas, garantindo que mensagens do sistema fiquem no início
     my @system_messages = grep { $_->{role} eq "system" } @$history;
