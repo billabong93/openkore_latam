@@ -77,6 +77,7 @@ my %silence_message_count_by_sender;
 my %blocked_by_sender;
 my %silence_after_response_by_sender;
 my %last_visibility_state_by_sender;
+my $last_packet_sent_at = 0;
 
 my %invisibility_statuses = map { $_ => 1 } qw(
     EFST_HIDING
@@ -228,6 +229,9 @@ sub _sendQueuedResponse {
     }
 
     return if $state->{typing_until} && time() < $state->{typing_until};
+    if (_shouldThrottleOutgoingPackets($state)) {
+        return;
+    }
 
     $response = shift @{$state->{response_queue}};
     $state->{response_started} = 1;
@@ -236,6 +240,7 @@ sub _sendQueuedResponse {
         my $emotion_id = getEmotionByCommand($emotion_command);
         if (defined $emotion_id) {
             $messageSender->sendEmotion($emotion_id);
+            _recordOutgoingPacketSent();
         } else {
             $response = _sanitizeOutgoingMessage($response);
             if (!$response) {
@@ -245,6 +250,7 @@ sub _sendQueuedResponse {
                 return;
             }
             $messageSender->sendChat($response);
+            _recordOutgoingPacketSent();
         }
     } else {
         $response = _sanitizeOutgoingMessage($response);
@@ -258,6 +264,7 @@ sub _sendQueuedResponse {
 
     if (!$emotion_command && $context->{type} && $context->{type} eq 'public') {
         $messageSender->sendChat($response);
+        _recordOutgoingPacketSent();
         AIChat::Log::log_message(
             direction => 'out',
             visibility => 'public',
@@ -266,6 +273,7 @@ sub _sendQueuedResponse {
         );
     } elsif (!$emotion_command) {
         $messageSender->sendPrivateMsg($sender, $response);
+        _recordOutgoingPacketSent();
         AIChat::Log::log_message(
             direction => 'out',
             visibility => 'private',
@@ -447,6 +455,7 @@ sub onCommand {
         message "Chance de dividir resposta: " . AIChat::Config::get('split_chance'), "list";
         message "Delay do buffer: " . AIChat::Config::get('buffer_delay'), "list";
         message "Responder no chat publico no lockMap: " . AIChat::Config::get('public_on_lockmap'), "list";
+        message "Intervalo minimo entre pacotes: " . AIChat::Config::get('min_packet_interval'), "list";
     } elsif ($arg =~ /^provider\s+(openai|deepseek)$/) {
         if (AIChat::Config::set('provider', $1)) {
             message $translator->translatef("%s Provedor alterado para %s\n", PLUGIN_PREFIX, $1), "list";
@@ -908,6 +917,10 @@ sub _processPendingEmotionRequests {
         my $respond_at = $pending->{respond_at} // 0;
         next unless $respond_at;
         next unless $now >= $respond_at;
+        if (_shouldThrottleOutgoingPackets()) {
+            $pending->{respond_at} = _nextAllowedPacketTime();
+            next;
+        }
 
         my $command;
         if (($pending->{mode} // '') eq 'emote_random') {
@@ -948,6 +961,7 @@ sub _sendEmotionByCommand {
     my $emotion_id = getEmotionByCommand($command);
     return unless defined $emotion_id;
     $messageSender->sendEmotion($emotion_id);
+    _recordOutgoingPacketSent();
 }
 
 sub _queueEmotionFollowup {
@@ -986,6 +1000,7 @@ sub _processPendingEmotionFollowups {
         my $send_at = $pending->{send_at} // 0;
         next unless $send_at;
         next unless $now >= $send_at;
+        next if _shouldThrottleOutgoingPackets();
 
         my $message = _sanitizeOutgoingMessage($pending->{message});
         if (!$message) {
@@ -996,6 +1011,7 @@ sub _processPendingEmotionFollowups {
         my $sender_name = $pending->{sender_name};
         if ($context && $context eq 'public') {
             $messageSender->sendChat($message);
+            _recordOutgoingPacketSent();
             AIChat::Log::log_message(
                 direction => 'out',
                 visibility => 'public',
@@ -1004,6 +1020,7 @@ sub _processPendingEmotionFollowups {
             );
         } else {
             $messageSender->sendPrivateMsg($sender_name, $message);
+            _recordOutgoingPacketSent();
             AIChat::Log::log_message(
                 direction => 'out',
                 visibility => 'private',
@@ -1015,6 +1032,33 @@ sub _processPendingEmotionFollowups {
         AIChat::ConversationHistory::addMessage($sender_name, "assistant", $message);
         delete $pending_emotion_followup_by_sender{$sender_key};
     }
+}
+
+sub _minPacketInterval {
+    my $interval = AIChat::Config::get('min_packet_interval');
+    $interval = 0.6 unless defined $interval;
+    return $interval < 0 ? 0 : $interval;
+}
+
+sub _nextAllowedPacketTime {
+    my $interval = _minPacketInterval();
+    return $last_packet_sent_at + $interval;
+}
+
+sub _shouldThrottleOutgoingPackets {
+    my ($state) = @_;
+    my $now = time();
+    my $next_allowed = _nextAllowedPacketTime();
+    return if $now >= $next_allowed;
+    if ($state) {
+        $state->{typing_until} = $next_allowed
+            if !$state->{typing_until} || $state->{typing_until} < $next_allowed;
+    }
+    return 1;
+}
+
+sub _recordOutgoingPacketSent {
+    $last_packet_sent_at = time();
 }
 
 sub _hasPendingEmotionRequest {
