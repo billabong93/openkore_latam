@@ -4,14 +4,14 @@ use strict;
 use warnings;
 
 use Commands;
-use Globals qw(%timeout $messageSender $net %config $char $field %jobs_lut %emotions_lut %monsters %items %monsters_lut %monsters_name_lut %items_lut);
+use Globals qw(%timeout $messageSender $net %config $char $field $playersList %jobs_lut %emotions_lut %monsters %items %monsters_lut %monsters_name_lut %items_lut);
 use Settings qw(%sys);
 use I18N qw(bytesToString);
 use Log qw(warning message debug);
 use Plugins;
 use AI;
 use Misc qw(getEmotionByCommand);
-use Utils qw(getHex timeOut);
+use Utils qw(getHex timeOut distance);
 use Cwd 'abs_path';
 use Time::HiRes qw(time);
 use Actor ();
@@ -97,6 +97,7 @@ use constant {
     DROP_DB_REFUSAL_MAX => 4,
     SPAM_QUESTION_LIMIT => 3,
     SILENCE_BLOCK_THRESHOLD => 2,
+    MAX_PUBLIC_CHAT_DISTANCE => 8,
 };
 
 sub _getBufferState {
@@ -516,6 +517,9 @@ sub onPublicMessage {
         return unless $lock_map && $map_name eq $lock_map && $allow_public;
     }
 
+    my $sender_id = $args->{pubID};
+    return unless _isSenderWithinPublicRange($sender, $sender_id);
+
     my $intent_context = { map_name => $field ? $field->baseName : undef, lock_map => $config{lockMap} };
     my $intent;
     $intent = _interpretCommand($message, $sender, $intent_context);
@@ -561,6 +565,22 @@ sub onPublicMessage {
         message => $message,
     );
     _enqueueMessage($sender, $message, { type => 'public' });
+}
+
+sub _isSenderWithinPublicRange {
+    my ($sender, $sender_id) = @_;
+    return unless $char && $char->{pos_to};
+    my $actor;
+    if (defined $sender_id) {
+        $actor = Actor::get($sender_id);
+    }
+    if (!$actor && $playersList && defined $sender) {
+        ($actor) = grep { $_->{name} && $_->{name} eq $sender } @{$playersList->getItems};
+    }
+    return unless $actor && $actor->{pos_to};
+
+    my $dist = distance($char->{pos_to}, $actor->{pos_to});
+    return defined $dist && $dist <= MAX_PUBLIC_CHAT_DISTANCE;
 }
 
 sub onEmotion {
