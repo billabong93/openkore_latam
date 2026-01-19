@@ -2,6 +2,7 @@ package aiChat;
 
 use strict;
 use warnings;
+use utf8;
 
 use Commands;
 use Globals qw(%timeout $messageSender $net %config $char $field $playersList %jobs_lut %emotions_lut %monsters %items %monsters_lut %monsters_name_lut %items_lut);
