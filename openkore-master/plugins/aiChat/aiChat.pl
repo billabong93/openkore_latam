@@ -985,27 +985,26 @@ sub _handleSpamCheck {
     return;
 }
 
+sub _buildSpamRefusalMessage {
+    my $message = _pickSpamRefusalReference();
+    return AIChat::MessageHandler::_normalizeResponseText($message);
+}
+
 sub _queueSpamRefusal {
     my ($sender, $message, $context) = @_;
     return unless defined $sender && defined $message;
-    AIChat::ConversationHistory::addMessage(
-        $sender,
-        "system",
-        "Usuario fez varias perguntas seguidas. Responda curto e com frustracao, corte o assunto e seja rude de forma natural. Nao diga que vai ficar em silencio, apenas corte.",
-        "intent"
-    );
-    my $responses = AIChat::MessageHandler::processMessages([ $message ], $sender);
-    my $message = $responses && ref $responses eq 'ARRAY' ? $responses->[0] : undef;
-    $message = _pickSpamRefusalReference() unless defined $message && $message ne '';
-    return unless defined $message && $message ne '';
+    my $response = _buildSpamRefusalMessage($sender, $message);
+    return unless defined $response && $response ne '';
     my $state = _getBufferState($sender);
     $state->{messages} = [];
     $state->{response_queue} = [];
+    my $buffer_delay = AIChat::Config::get('buffer_delay');
+    $buffer_delay = 2 unless defined $buffer_delay;
     $state->{typing_until} = 0;
     $state->{response_started} = 0;
     $state->{context} = { type => $context };
-    $state->{buffer_deadline} = 0;
-    push @{$state->{response_queue}}, $message;
+    $state->{buffer_deadline} = time() + $buffer_delay;
+    push @{$state->{response_queue}}, $response;
     return 1;
 }
 
@@ -1017,28 +1016,61 @@ sub _queueSpamRefusalFallback {
     my $state = _getBufferState($sender);
     $state->{messages} = [];
     $state->{response_queue} = [];
+    my $buffer_delay = AIChat::Config::get('buffer_delay');
+    $buffer_delay = 2 unless defined $buffer_delay;
     $state->{typing_until} = 0;
     $state->{response_started} = 0;
     $state->{context} = { type => $context };
-    $state->{buffer_deadline} = 0;
+    $state->{buffer_deadline} = time() + $buffer_delay;
     push @{$state->{response_queue}}, $message;
     return 1;
 }
 
 sub _pickSpamRefusalReference {
     my @messages = (
-        "chega disso ja",
-        "para de encher com pergunta",
-        "ta de boa ja",
-        "sem spam mano",
-        "nao enche",
-        "deixa quieto",
-        "ja foi",
-        "sem paciencia pra isso",
-        "diminui ai",
-        "para com essa chuva de pergunta",
-        "ja respondi o suficiente",
-        "para de insistir",
+        "Para de spamar aí, mano.",
+        "Menos spam, por favor.",
+        "Segura o spam no chat.",
+        "Chega de flood, parça.",
+        "Dá uma segurada nas mensagens aí.",
+        "Mano, tá floodando já.",
+        "Corta o spam aí, na moral.",
+        "Tá virando spam, dá um tempo.",
+        "Manda tudo numa mensagem só, pô.",
+        "Desse jeito tá impossível acompanhar.",
+        "Pô, chatão, hein.",
+        "Caraca, tu é insistente, mano.",
+        "Tu não cansa não?",
+        "Mano, pega leve aí.",
+        "Ô chat, dá um descanso.",
+        "Tá carente de atenção, é?",
+        "Tem mais nada pra fazer, não?",
+        "Tu tá sem quest pra fazer, mano?",
+        "Vai upar e para de perguntar toda hora.",
+        "Vai farmar/upar um pouco, mano.",
+        "Bora jogar em vez de ficar perguntando.",
+        "Vai caçar mob que passa.",
+        "Vai fazer uma quest aí, pô.",
+        "Vai treinar/fechar instância e relaxa.",
+        "Vai pro grind e para com esse interrogatório.",
+        "Cara, não tô afim de papo agora.",
+        "Tô de boa, sem conversa.",
+        "Agora não, tô focado aqui.",
+        "Tô ocupado, depois a gente fala.",
+        "Sem assunto, mano, só quero jogar.",
+        "Não tô com paciência pra chat agora.",
+        "Tô na minha, valeu.",
+        "Para de incomodar, na moral.",
+        "Para de perturbar aí.",
+        "Tá me enchendo já, mano.",
+        "Dá um tempo, pô.",
+        "Me deixa jogar em paz.",
+        "Respira e para de cutucar.",
+        "Chega disso aí, mano.",
+        "Desencana.",
+        "Pergunta pro Google e para de perturbar.",
+        "Joga no Google aí e segue o jogo.",
+        "Vai na database e não enche.",
     );
     return $messages[int(rand(@messages))];
 }
