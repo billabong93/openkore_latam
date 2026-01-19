@@ -14,6 +14,7 @@ use constant {
     DEFAULT_PROVIDER => "deepseek", # openai ou deepseek
     DEFAULT_MODEL => "deepseek-chat", # gpt-3.5-turbo ou deepseek-chat
     DEFAULT_PROMPT => "voce é um assistente se passando por um jogador dentro do ragnarok online no servidor ROLA (ragnarok latam) sempre responde como se fosse um player mesmo simples direto curto sem enrolar nao escreve certo demais nem usa acento nem pontuacao escreve igual a galera da net evita texto longo responde sempre curto e na lata pode ser seco se a pessoa ficar insistindo ou enchendo o saco saudacoes tipo oi e ae vc responde so com oi e ae tb sem enrolar nao faz piada boba nem tenta ser engraçado usa o historico da conversa pra parecer que vc ta ali jogando mesmo parece jogador de verdade falando no chat do jogo, verifique as Informações do personagem para responder de acordo, então analise o level e classe para por exemplo falar onde upar etc",
+    DEFAULT_GLOSSARY => "",
     DEFAULT_PROMPT_GM => "voce é um jogador tentando parecer humano ao falar com GMs dentro do mapa sec_pri, responda curto e educado, evite discutir bots, siga instrucoes e mantenha respostas objetivas",
     DEFAULT_MAX_TOKENS => 150,
     DEFAULT_TEMPERATURE => 0.6,
@@ -32,6 +33,7 @@ my %_file_key_map = (
     aiChat_api_key => 'api_key',
     aiChat_model => 'model',
     aiChat_prompt => 'prompt',
+    aiChat_glossary => 'glossary',
     aiChat_prompt_gm => 'prompt_gm',
     aiChat_max_tokens => 'max_tokens',
     aiChat_temperature => 'temperature',
@@ -54,6 +56,7 @@ sub _loadFromConfigHash {
         'aiChat_model',
         'aiChat_api_key',
         'aiChat_prompt',
+        'aiChat_glossary',
         'aiChat_prompt_gm',
         'aiChat_max_tokens',
         'aiChat_temperature',
@@ -111,6 +114,7 @@ BEGIN {
         api_key => DEFAULT_API_KEY,
         model => DEFAULT_MODEL,
         prompt => DEFAULT_PROMPT,
+        glossary => DEFAULT_GLOSSARY,
         prompt_gm => DEFAULT_PROMPT_GM,
         max_tokens => DEFAULT_MAX_TOKENS,
         temperature => DEFAULT_TEMPERATURE,
@@ -150,6 +154,7 @@ sub save {
     print $fh "aiChat_api_key $_aiChatConfig{api_key}\n";
     print $fh "aiChat_model $_aiChatConfig{model}\n";
     print $fh "aiChat_prompt $_aiChatConfig{prompt}\n";
+    print $fh "aiChat_glossary $_aiChatConfig{glossary}\n";
     print $fh "aiChat_prompt_gm $_aiChatConfig{prompt_gm}\n";
     print $fh "aiChat_max_tokens $_aiChatConfig{max_tokens}\n";
     print $fh "aiChat_temperature $_aiChatConfig{temperature}\n";
