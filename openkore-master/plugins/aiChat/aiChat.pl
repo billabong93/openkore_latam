@@ -454,6 +454,9 @@ sub onPrivateMessage {
     my $sender = bytesToString($args->{privMsgUser});
     my $message = bytesToString($args->{privMsg});
 
+    my $actor = _getSenderActor($sender);
+    _ensurePlayerInfo($sender, $actor) if $actor;
+
     my $intent_context = { map_name => $field ? $field->baseName : undef, lock_map => $config{lockMap} };
     my $intent;
     $intent = _interpretCommand($message, $sender, $intent_context);
@@ -518,7 +521,9 @@ sub onPublicMessage {
     }
 
     my $sender_id = $args->{pubID};
-    return unless _isSenderWithinPublicRange($sender, $sender_id);
+    my $actor = _getSenderActor($sender, $sender_id);
+    return unless _isSenderWithinPublicRange($actor);
+    _ensurePlayerInfo($sender, $actor);
 
     my $intent_context = { map_name => $field ? $field->baseName : undef, lock_map => $config{lockMap} };
     my $intent;
@@ -567,9 +572,8 @@ sub onPublicMessage {
     _enqueueMessage($sender, $message, { type => 'public' });
 }
 
-sub _isSenderWithinPublicRange {
+sub _getSenderActor {
     my ($sender, $sender_id) = @_;
-    return unless $char && $char->{pos_to};
     my $actor;
     if (defined $sender_id) {
         $actor = Actor::get($sender_id);
@@ -577,6 +581,45 @@ sub _isSenderWithinPublicRange {
     if (!$actor && $playersList && defined $sender) {
         ($actor) = grep { $_->{name} && $_->{name} eq $sender } @{$playersList->getItems};
     }
+    return $actor;
+}
+
+sub _resolveActorClass {
+    my ($actor) = @_;
+    return unless $actor;
+    my $job_id = $actor->{jobID};
+    return $jobs_lut{$job_id} if defined $job_id && $jobs_lut{$job_id};
+    return $actor->{job} if defined $actor->{job} && $actor->{job} ne '';
+    return;
+}
+
+sub _ensurePlayerInfo {
+    my ($sender, $actor) = @_;
+    return unless defined $sender;
+    return unless $actor;
+    my $class = _resolveActorClass($actor) // 'Desconhecida';
+    my $player_info = join "\n",
+        "Informacoes do jogador que esta falando com voce:",
+        "Nome: $sender",
+        "Classe: $class";
+
+    my $history = AIChat::ConversationHistory::getHistory($sender) || [];
+    my $last_info;
+    for (my $i = @$history - 1; $i >= 0; $i--) {
+        my $entry = $history->[$i];
+        next unless $entry->{role} && $entry->{role} eq 'system';
+        next unless ($entry->{type} // '') eq 'player_info';
+        $last_info = $entry->{content};
+        last;
+    }
+    return if defined $last_info && $last_info eq $player_info;
+
+    AIChat::ConversationHistory::addMessage($sender, "system", $player_info, "player_info");
+}
+
+sub _isSenderWithinPublicRange {
+    my ($actor) = @_;
+    return unless $char && $char->{pos_to};
     return unless $actor && $actor->{pos_to};
 
     my $dist = distance($char->{pos_to}, $actor->{pos_to});
