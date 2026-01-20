@@ -1321,10 +1321,15 @@ sub _pickSabotageRefusalReference {
     return $messages[int(rand(@messages))];
 }
 
+sub _buildSabotageRefusalMessage {
+    my $message = _pickSabotageRefusalReference();
+    return AIChat::MessageHandler::_normalizeResponseText($message);
+}
+
 sub _queueSabotageRefusal {
     my ($sender, $context) = @_;
     return unless defined $sender;
-    my $message = _pickSabotageRefusalReference();
+    my $message = _buildSabotageRefusalMessage();
     return unless defined $message && $message ne '';
     my $state = _getBufferState($sender);
     $state->{messages} = [];
