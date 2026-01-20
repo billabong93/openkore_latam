@@ -1340,6 +1340,10 @@ sub _queueSabotageRefusal {
     $state->{response_started} = 0;
     $state->{context} = { type => $context };
     $state->{buffer_deadline} = time() + $buffer_delay;
+    my $typing_delay = _calculateTypingDelay($message);
+    if ($typing_delay > 0) {
+        $state->{typing_until} = time() + $buffer_delay + $typing_delay;
+    }
     push @{$state->{response_queue}}, $message;
     return 1;
 }
@@ -1357,6 +1361,15 @@ sub _markSilenceAfterResponse {
     $silence_after_response_by_sender{$sender_key} = 1;
     $silence_message_count_by_sender{$sender_key} = 0;
     $question_streak_by_sender{$sender_key} = 0;
+}
+
+sub _calculateTypingDelay {
+    my ($message) = @_;
+    return 0 unless defined $message;
+    my $typing_speed = AIChat::Config::get('typing_speed');
+    return 0 unless $typing_speed && $typing_speed > 0;
+    my $delay = length($message) / $typing_speed;
+    return $delay > 0 ? $delay : 0;
 }
 
 sub _finalizeSilenceIfNeeded {
