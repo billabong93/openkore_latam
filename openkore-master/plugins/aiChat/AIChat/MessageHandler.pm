@@ -73,10 +73,9 @@ sub _splitResponse {
     my $split_chance = AIChat::Config::get('split_chance');
     $split_chance = 0.2 unless defined $split_chance;
 
-    if ($response =~ /\|\|/) {
-        @parts = split /\s*\|\|\s*/, $response;
+    if ($response =~ /\|\|/ || $response =~ /\r?\n/) {
+        @parts = split /(?:\s*\|\|\s*|\s*\r?\n\s*)/, $response;
     } else {
-        $response =~ s/\s*\r?\n\s*/ /g;
         if (rand() < $split_chance) {
             my ($first, $second);
             if ($response =~ /(.+?[.!?])\s+(.+)/s) {
