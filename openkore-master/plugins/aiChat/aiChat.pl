@@ -1457,7 +1457,7 @@ sub _shouldCountSpamQuestion {
     my ($intent) = @_;
     return unless $intent && ref $intent eq 'HASH';
     my $action = $intent->{action} // '';
-    return 1 if $action eq 'chat';
+    return 1 if $action eq 'chat' && $intent->{is_question};
     return 1 if $action eq 'drop_db';
     return;
 }
