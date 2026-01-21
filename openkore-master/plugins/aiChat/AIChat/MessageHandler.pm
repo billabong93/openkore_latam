@@ -846,14 +846,14 @@ sub generateDropDbResponse {
         return generateDropDbRefusal($message, $sender);
     }
 
-    unless (_isDropDbQueryMessage($message) || _isMapQuery($message)) {
-        return dropDbUnknownReply();
-    }
-
     my $direct_reply = _buildDirectDropDbReply($message);
     if (defined $direct_reply && $direct_reply ne '') {
         _setDropDbStance($sender, 'answer');
         return $direct_reply;
+    }
+
+    unless (_isDropDbQueryMessage($message) || _isMapQuery($message)) {
+        return dropDbUnknownReply();
     }
 
     if (_isRepeatedDropDbQuestion($sender, $message)) {
@@ -947,14 +947,14 @@ sub generateDropDbChatResponse {
         return generateDropDbRefusal($message, $sender);
     }
 
-    unless (_isDropDbQueryMessage($message) || _isMapQuery($message)) {
-        return dropDbUnknownReply();
-    }
-
     my $direct_reply = _buildDirectDropDbReply($message);
     if (defined $direct_reply && $direct_reply ne '') {
         _setDropDbStance($sender, 'answer');
         return $direct_reply;
+    }
+
+    unless (_isDropDbQueryMessage($message) || _isMapQuery($message)) {
+        return dropDbUnknownReply();
     }
 
     my $include_maps = _isMapQuery($message);
