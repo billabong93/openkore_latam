@@ -276,46 +276,50 @@ sub _normalizeResponseText {
     return $normalized;
 }
 
-sub _messageRequestsActivity {
-    my ($messages) = @_;
-    return unless $messages && ref $messages eq 'ARRAY' && @$messages;
-    my $last_message = $messages->[-1];
-    return unless defined $last_message;
-    my $normalized = _normalizeQueryText($last_message);
-    return unless length $normalized;
-    return 1 if $normalized =~ /\b(ta|tava|esta|to|t[oô])\s+fazendo\b/;
-    return 1 if $normalized =~ /\bfazendo\s+(oq|o que|que)\b/;
-    return 1 if $normalized =~ /\b(oq|o que|que)\s+faz\b/;
-    return 1 if $normalized =~ /\b(oq|o que|que)\s+ta\s+fazendo\b/;
-    return 1 if $normalized =~ /\b(onde|aonde)\b/;
-    return 1 if $normalized =~ /\b(mapa|spot|lugar|campo)\b/;
-    return 1 if $normalized =~ /\b(upar|upar|farmar|farmando|upando|grindando)\b/;
-    return;
-}
-
-sub _trimUnpromptedDetails {
-    my ($response, $messages) = @_;
+sub _rewriteResponseForBrevity {
+    my ($response, $messages, $sender) = @_;
     return $response unless defined $response;
-    return $response if _messageRequestsActivity($messages);
+    return $response unless $messages && ref $messages eq 'ARRAY' && @$messages;
 
-    my $activity_pattern = qr/\b(upando|farmando|grindando|treinando|cacando|fazendo|quest|instancia|dungeon|mapa|campo|spot)\b/;
-    my @segments = split /(?<=[.!?])\s+|,\s+/, $response;
-    my @kept;
-    for my $segment (@segments) {
-        next unless defined $segment;
-        my $normalized = _normalizeQueryText($segment);
-        next if $normalized =~ $activity_pattern;
-        $segment =~ s/^\s+//;
-        $segment =~ s/\s+$//;
-        push @kept, $segment if length $segment;
+    my $last_message = $messages->[-1];
+    return $response unless defined $last_message;
+
+    my @rewrite_messages = (
+        {
+            role => "system",
+            content => "Voce e um revisor de respostas do chat. Receba a mensagem do jogador e a resposta gerada. Remova detalhes sobre atividade, localizacao, mapa, spot ou o que o bot esta fazendo quando o jogador nao perguntou isso. Se o jogador perguntou o que o bot esta fazendo ou onde esta, mantenha esses detalhes. Responda apenas com JSON valido no formato {\"text\":\"...\"}. Nao inclua texto fora do JSON.",
+        },
+        {
+            role => "user",
+            content => "Mensagem do jogador: $last_message\nResposta gerada: $response",
+        },
+    );
+
+    my $rewrite;
+    eval {
+        $rewrite = $api_client->callAPIWithMessages(\@rewrite_messages, {
+            max_tokens => 120,
+            temperature => 0,
+        });
+    };
+    if ($@) {
+        warning "[aiChat] Erro ao revisar resposta: $@\n", "plugin";
+        return $response;
     }
 
-    my $trimmed = join ' ', @kept;
-    $trimmed =~ s/\s+/ /g;
-    $trimmed =~ s/^\s+//;
-    $trimmed =~ s/\s+$//;
-    return $trimmed if length $trimmed;
-    return $response;
+    return $response unless defined $rewrite && length $rewrite;
+    my $parsed;
+    eval {
+        $parsed = decode_json($rewrite);
+    };
+    if ($@ || !ref $parsed) {
+        debug "[aiChat] Resposta invalida ao revisar resposta: $rewrite\n", "plugin";
+        return $response;
+    }
+
+    my $text = $parsed->{text};
+    return $response unless defined $text && length $text;
+    return $text;
 }
 
 sub _pickVariant {
@@ -1064,7 +1068,7 @@ sub processMessages {
     }
 
     return undef unless defined $response && length $response > 0;
-    $response = _trimUnpromptedDetails($response, $messages);
+    $response = _rewriteResponseForBrevity($response, $messages, $sender);
 
     my $parts = _splitResponse($response, $messages);
     return $parts;
