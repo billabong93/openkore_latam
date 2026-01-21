@@ -7,7 +7,7 @@ Lunático: (Arredores de Prontera, prt_fild01, prt_fild08, pay_fild03)  Trevo, P
 Pupa: (Arredores de Geffen, gef_fild07, prt_fild08, prt_fild07)  Fracon, Crisálida, Muco Pegajoso, Casca, Minério de Ferro, Carta Pupa
 ChonChon: (Arredores de Geffen, gef_fild00, gef_fild04, moc_fild07)  Ferro, Casca, Jellopy, Punhal [4], Boneco de Chonchon, Minério de Ferro, Carta ChonChon
 Fabre: (Arredores de Prontera, prt_fild06, prt_fild08, pay_fild03)  Felpa, Pluma, Clava [4], Esmeralda, Erva Verde, Trevo, Clava [3], Carta Fabre
-Salgueiro: (Floresta de Payon, pay_fild01, prt_fild07, pay_fild03)  Raiz de Árvore, Tronco, Resina, Batata Doce, Tronco Estéril, Tronco Sólido, Tronco de Alta Qualidade, Carta Salgueiro
+Salgueiro: (Floresta de Payon, pay_fild01, pay_fild07, pay_fild03)  Raiz de Árvore, Tronco, Resina, Batata Doce, Tronco Estéril, Tronco Sólido, Tronco de Alta Qualidade, Carta Salgueiro
 Condor: (Deserto de Morroc, moc_fild11, moc_fild12, prt_fild09)  Garra de Ave, Arco [4], Gema Amarela, Flecha, Carne, Plumas de Ave, Laranja, Carta Condor
 Mandrágora: (Arredores de Geffen, gef_fild04, prt_fild02, mjolnir_11)  Vida Verdejante, Ranseur [4], Erva Verde, Broto, Trevo de Quatro Folhas, Chicote de Gaia, Carta Mandrágora
 Sapo de Rodda: (Arredores de Prontera, prt_fild00, gef_fild01, prt_fild04)  Pata Pegajosa, Ova de Sapo, Erva Verde, Esmeralda, Garrafa Vazia, Carta Sapo de Rodda

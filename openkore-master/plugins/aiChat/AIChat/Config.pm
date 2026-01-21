@@ -24,6 +24,7 @@ use constant {
     DEFAULT_PUBLIC_ON_LOCKMAP => 1, # Permitir respostas no chat publico quando estiver no lockMap
     DEFAULT_MOB_DATABASE => 1, # Habilitar respostas usando o banco de dados de monstros
     DEFAULT_MIN_PACKET_INTERVAL => 0.6, # Intervalo minimo entre pacotes enviados (em segundos)
+    DEFAULT_CONVERSATION_LIMIT => 10, # Numero de mensagens do jogador antes de iniciar o encerramento
 };
 
 # Use a lexically scoped variable for the package's internal config
@@ -44,6 +45,7 @@ my %_file_key_map = (
     aiChat_public_on_lockmap => 'public_on_lockmap',
     aiChat_mob_database => 'mob_database',
     aiChat_min_packet_interval => 'min_packet_interval',
+    aiChat_conversation_limit => 'conversation_limit',
 );
 
 sub _configFilePath {
@@ -68,6 +70,7 @@ sub _loadFromConfigHash {
         'aiChat_public_on_lockmap',
         'aiChat_mob_database',
         'aiChat_min_packet_interval',
+        'aiChat_conversation_limit',
     );
 
     for my $file_key (@load_order) {
@@ -106,6 +109,8 @@ sub _applyValue {
         return unless $value =~ /^(?:0|1)$/;
     } elsif ($key eq 'min_packet_interval') {
         return unless $value =~ /^\d+(?:\.\d+)?$/;
+    } elsif ($key eq 'conversation_limit') {
+        return unless $value =~ /^\d+$/;
     }
 
     $_aiChatConfig{$key} = $value;
@@ -129,6 +134,7 @@ BEGIN {
         public_on_lockmap => DEFAULT_PUBLIC_ON_LOCKMAP,
         mob_database => DEFAULT_MOB_DATABASE,
         min_packet_interval => DEFAULT_MIN_PACKET_INTERVAL,
+        conversation_limit => DEFAULT_CONVERSATION_LIMIT,
     );
 }
 
@@ -170,6 +176,7 @@ sub save {
     print $fh "aiChat_public_on_lockmap $_aiChatConfig{public_on_lockmap}\n";
     print $fh "aiChat_mob_database $_aiChatConfig{mob_database}\n";
     print $fh "aiChat_min_packet_interval $_aiChatConfig{min_packet_interval}\n";
+    print $fh "aiChat_conversation_limit $_aiChatConfig{conversation_limit}\n";
     close $fh or warning "[aiChat] Não foi possível fechar $config_file: $!\n", "plugin";
 }
 

@@ -42,3 +42,6 @@ aiChat_mob_database 1
 
 # Intervalo minimo entre pacotes enviados (em segundos)
 aiChat_min_packet_interval 0.6
+
+# Numero de mensagens do jogador antes de tentar encerrar o papo (0 desativa)
+aiChat_conversation_limit 10

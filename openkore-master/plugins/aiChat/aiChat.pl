@@ -9,6 +9,7 @@ use Globals qw(%timeout $messageSender $net %config $char $field $playersList %j
 use Settings qw(%sys);
 use I18N qw(bytesToString);
 use Log qw(warning message debug);
+use JSON::Tiny qw(decode_json);
 use Plugins;
 use AI;
 use Misc qw(getEmotionByCommand);
@@ -59,6 +60,7 @@ my $emotionHookID = Plugins::addHook('packet_emotion', \&onEmotion, undef);
 $hooks{packet_emotion_direct} = $emotionHookID;
 
 my %message_buffers;
+my $ack_client = AIChat::APIClient->new();
 my $last_emotion_command;
 my $last_emotion_time;
 my %last_emotion_command_by_sender;
@@ -78,6 +80,8 @@ my %silence_message_count_by_sender;
 my %blocked_by_sender;
 my %silence_after_response_by_sender;
 my %last_visibility_state_by_sender;
+my %conversation_message_count_by_sender;
+my %conversation_close_stage_by_sender;
 my $last_packet_sent_at = 0;
 
 my %invisibility_statuses = map { $_ => 1 } qw(
@@ -294,7 +298,7 @@ sub _sendQueuedResponse {
             _recordOutgoingPacketSent();
         }
     } else {
-        if ($context->{sabotage}) {
+        if ($context->{sabotage} || $context->{normalize}) {
             $response = AIChat::MessageHandler::_normalizeResponseText($response);
         }
         $response = _sanitizeOutgoingMessage($response);
@@ -500,6 +504,7 @@ sub onCommand {
         message "Delay do buffer: " . AIChat::Config::get('buffer_delay'), "list";
         message "Responder no chat publico no lockMap: " . AIChat::Config::get('public_on_lockmap'), "list";
         message "Intervalo minimo entre pacotes: " . AIChat::Config::get('min_packet_interval'), "list";
+        message "Limite de mensagens antes de encerrar papo: " . AIChat::Config::get('conversation_limit'), "list";
     } elsif ($arg =~ /^provider\s+(openai|deepseek)$/) {
         if (AIChat::Config::set('provider', $1)) {
             message $translator->translatef("%s Provedor alterado para %s\n", PLUGIN_PREFIX, $1), "list";
@@ -532,6 +537,15 @@ sub onPrivateMessage {
     my $intent;
     $intent = _interpretCommand($message, $sender, $intent_context);
     if (_handleSpamCheck($sender, $message, 'private', $intent)) {
+        AIChat::Log::log_message(
+            direction => 'in',
+            visibility => 'private',
+            sender => $sender,
+            message => $message,
+        );
+        return;
+    }
+    if (_handleConversationLimit($sender, $message, 'private')) {
         AIChat::Log::log_message(
             direction => 'in',
             visibility => 'private',
@@ -602,6 +616,15 @@ sub onPublicMessage {
     my $intent;
     $intent = _interpretCommand($message, $sender, $intent_context);
     if (_handleSpamCheck($sender, $message, 'public', $intent)) {
+        AIChat::Log::log_message(
+            direction => 'in',
+            visibility => 'public',
+            sender => $sender,
+            message => $message,
+        );
+        return;
+    }
+    if (_handleConversationLimit($sender, $message, 'public')) {
         AIChat::Log::log_message(
             direction => 'in',
             visibility => 'public',
@@ -1147,6 +1170,227 @@ sub _isBlockedSender {
     return $blocked_by_sender{$sender_key} ? 1 : 0;
 }
 
+sub _shouldHandleConversationLimit {
+    my $limit = AIChat::Config::get('conversation_limit');
+    $limit = 0 unless defined $limit;
+    return $limit > 0 ? $limit : 0;
+}
+
+sub _incrementConversationCount {
+    my ($sender) = @_;
+    return unless defined $sender;
+    my $sender_key = _normalizeSenderKey($sender);
+    return unless $sender_key;
+    $conversation_message_count_by_sender{$sender_key} = ($conversation_message_count_by_sender{$sender_key} // 0) + 1;
+    return $conversation_message_count_by_sender{$sender_key};
+}
+
+sub _conversationCloseStage {
+    my ($sender) = @_;
+    return unless defined $sender;
+    my $sender_key = _normalizeSenderKey($sender);
+    return unless $sender_key;
+    return $conversation_close_stage_by_sender{$sender_key} // 0;
+}
+
+sub _setConversationCloseStage {
+    my ($sender, $stage) = @_;
+    return unless defined $sender;
+    my $sender_key = _normalizeSenderKey($sender);
+    return unless $sender_key;
+    $conversation_close_stage_by_sender{$sender_key} = $stage;
+}
+
+sub _pickConversationCloseWarning {
+    my @messages = (
+        "Mano, vou ter que parar por aqui.",
+        "Foi mal, vou encerrar aqui.",
+        "Aí não dá, vou ficar quieto agora.",
+        "Mal aí, não vou conseguir continuar conversando.",
+        "Mano, agora eu não consigo mais responder.",
+        "Foi mal, vou focar no game e parar de falar.",
+        "Tô no meio do rolê aqui, vou parar de conversar.",
+        "Tá bom, mas vou parar por aqui, valeu.",
+        "A conversa foi boa, mas vou sair do papo agora.",
+        "Deixa eu cortar aqui, tô ocupado.",
+        "Vou dar uma sumida do chat agora.",
+        "Vou ficar off no papo, foi mal.",
+        "Vou mutar aqui e seguir o jogo.",
+        "Vou parar de responder por agora.",
+        "Não dá pra seguir no papo, desculpa.",
+        "Vou ter que te deixar falando sozinho agora, foi mal.",
+        "Mano, não consigo continuar nessa conversa.",
+        "Agora não dá mais, vou ficar na minha.",
+        "Tô farmando, vou parar de conversar.",
+        "Tô ocupado demais, vou encerrar aqui.",
+        "Tô sem tempo pra continuar, vou parar por aqui.",
+        "Vou focar aqui e parar de trocar ideia.",
+        "Vou ficar quieto agora pra não atrapalhar.",
+        "Já deu por hoje, vou parar de conversar.",
+        "Aí já era, vou sair do chat agora.",
+        "Vou deixar esse assunto pra depois, agora não dá.",
+        "Depois a gente continua, agora eu vou parar.",
+        "Mais tarde a gente troca ideia, agora vou encerrar.",
+        "Foi mal, não rola continuar agora.",
+    );
+    return $messages[int(rand(@messages))];
+}
+
+sub _pickConversationCloseFinal {
+    my @messages = (
+        "Mano, já falei que não dá. Flw.",
+        "Já disse que vou parar, tchau.",
+        "Não dá mesmo, vou sair daqui. Flw.",
+        "Já encerrei, para de insistir. Flw.",
+        "Sem papo, mano. Tchau.",
+        "Mano, acabou o assunto. Flw.",
+        "Já deu, tô ocupado. Tchau.",
+        "Não vou continuar respondendo. Flw.",
+        "Mano, para de puxar assunto, já foi.",
+        "Falei que ia parar, lembra? Flw.",
+        "Última vez: não dá. Tchau.",
+        "Chega, mano. Vou ficar quieto agora.",
+        "Já era, vou mutar isso aqui. Flw.",
+        "Tô saindo do chat, insiste não.",
+        "Não adianta insistir, já parei.",
+        "Mano, não força. Já encerrou.",
+        "Acabou, tô off do papo. Flw.",
+        "Vou ignorar agora, valeu.",
+        "Já disse que não dá, então tchau.",
+        "Tu tá insistindo à toa, mano. Flw.",
+        "Pô, respeita aí: eu parei.",
+        "Já falei: não dá pra conversar. Flw.",
+        "Mano, cê não entendeu? Não dá.",
+        "Sem conversa, já falei. Tchau.",
+        "Chega de mensagem, flw.",
+        "Insiste não, vou sair.",
+        "Não vou ficar nisso, tchau.",
+        "A conversa acabou, mano. Flw.",
+        "Se continuar, vou só ignorar.",
+        "Já deu, mano… flw e pronto.",
+    );
+    return $messages[int(rand(@messages))];
+}
+
+sub _pickConversationCloseGoodbye {
+    my @messages = (
+        "Vlw, vlw.",
+        "Falou, bom up aí.",
+        "Blz, bom farm.",
+        "Boa, bom jogo.",
+        "Tmj, boa run.",
+        "É nóis, bom up.",
+        "Fechou, boa sorte.",
+        "Falou, sucesso aí.",
+        "Vlw, fica bem.",
+        "Demorou, boa.",
+        "Boa, bom loot.",
+        "Falou, bons drops.",
+        "Vlw, que venha carta.",
+        "Boa, que drope tudo.",
+        "Bom grind aí.",
+        "Bom corre aí.",
+        "Bom up pra você.",
+        "Falou, bom role.",
+        "Tamo junto, bom jogo.",
+        "É isso, bom up e boa.",
+        "Valeu, até mais.",
+        "Falou, até a próxima.",
+        "Tchau, bom jogo aí.",
+        "Vlw, gg.",
+        "Sucesso no up.",
+        "Boa sorte no farm.",
+        "Bons loots pra você.",
+        "Falou, fica na paz.",
+        "Tmj, se cuida.",
+        "Vlw, abraço.",
+    );
+    return $messages[int(rand(@messages))];
+}
+
+sub _interpretConversationCloseAcknowledgement {
+    my ($sender, $message) = @_;
+    return unless defined $sender && defined $message;
+
+    my $history = AIChat::ConversationHistory::getHistory($sender) || [];
+    my @recent = grep { $_->{role} ne "system" } @$history;
+    @recent = @recent[-6 .. -1] if @recent > 6;
+
+    my @messages = (
+        {
+            role => "system",
+            content => "Voce e um classificador de conversa. Responda apenas com JSON valido no formato {\"acknowledge\":true|false}. Marque true se o jogador concordar em encerrar a conversa, aceitar o encerramento, se despedir, agradecer ou indicar que vai parar o papo. Marque false se ele insistir, pedir para continuar, insistir em assunto, ou ignorar o encerramento. Nao inclua nenhum texto fora do JSON.",
+        }
+    );
+
+    push @messages, map {
+        {
+            role => $_->{role},
+            content => $_->{content},
+        }
+    } @recent;
+
+    push @messages, {
+        role => "user",
+        content => $message,
+    };
+
+    my $response;
+    eval {
+        $response = $ack_client->callAPIWithMessages(\@messages, {
+            max_tokens => 40,
+            temperature => 0,
+        });
+    };
+    if ($@) {
+        warning "[aiChat] Erro ao interpretar encerramento: $@\n", "plugin";
+        return;
+    }
+
+    return unless defined $response && length $response;
+    my $parsed;
+    eval {
+        $parsed = decode_json($response);
+    };
+    if ($@ || !ref $parsed) {
+        debug "[aiChat] Resposta invalida ao interpretar encerramento: $response\n", "plugin";
+        return;
+    }
+
+    return $parsed->{acknowledge} ? 1 : 0;
+}
+
+sub _handleConversationLimit {
+    my ($sender, $message, $context) = @_;
+    return unless defined $sender;
+    my $limit = _shouldHandleConversationLimit();
+    return unless $limit;
+    my $count = _incrementConversationCount($sender);
+    return unless defined $count;
+    my $stage = _conversationCloseStage($sender);
+    return if $count < $limit && !$stage;
+
+    if (!$stage) {
+        my $response = _pickConversationCloseWarning();
+        _queueDirectResponse($sender, $response, { type => $context, normalize => 1 });
+        _setConversationCloseStage($sender, 1);
+        return 1;
+    }
+
+    if ($stage == 1) {
+        my $response = _interpretConversationCloseAcknowledgement($sender, $message)
+            ? _pickConversationCloseGoodbye()
+            : _pickConversationCloseFinal();
+        _queueDirectResponse($sender, $response, { type => $context, normalize => 1 });
+        _setConversationCloseStage($sender, 2);
+        _markSilenceAfterResponse($sender);
+        return 1;
+    }
+
+    return 1 if $stage >= 2;
+    return;
+}
+
 sub _resetQuestionStreak {
     my ($sender) = @_;
     return unless defined $sender;
@@ -1275,7 +1519,6 @@ sub _pickSpamRefusalReference {
         "Bora jogar em vez de ficar perguntando.",
         "Vai caçar mob que passa.",
         "Vai fazer uma quest aí, pô.",
-        "Vai treinar/fechar instância e relaxa.",
         "Vai pro grind e para com esse interrogatório.",
         "Cara, não tô afim de papo agora.",
         "Tô de boa, sem conversa.",
@@ -1437,6 +1680,8 @@ sub _silenceSender {
     $silenced_by_sender{$sender_key} = 1;
     $silence_message_count_by_sender{$sender_key} = 0;
     $question_streak_by_sender{$sender_key} = 0;
+    delete $conversation_message_count_by_sender{$sender_key};
+    delete $conversation_close_stage_by_sender{$sender_key};
     delete $message_buffers{$sender};
     delete $pending_emotion_request_by_sender{$sender_key};
     delete $pending_emotion_followup_by_sender{$sender_key};
@@ -1451,6 +1696,8 @@ sub _blockSender {
     return if $blocked_by_sender{$sender_key};
     Commands::run("ignore 1 $sender");
     $blocked_by_sender{$sender_key} = 1;
+    delete $conversation_message_count_by_sender{$sender_key};
+    delete $conversation_close_stage_by_sender{$sender_key};
 }
 
 sub _shouldCountSpamQuestion {
