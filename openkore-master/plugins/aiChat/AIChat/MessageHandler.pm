@@ -480,7 +480,7 @@ sub _randomDropDbRefusal {
 }
 
 sub _generateDropDbRefusalResponse {
-    my ($message, $sender) = @_;
+    my ($message, $sender, $preferred_hint) = @_;
     return undef unless defined $message && $message ne '';
 
     my $prompt = AIChat::Config::get('prompt');
@@ -490,6 +490,10 @@ sub _generateDropDbRefusalResponse {
     my @recent_texts = map { $_->{content} // '' } @recent_assistant;
     my $recent_block = join(' | ', grep { $_ ne '' } @recent_texts);
     my @reference_pool = _dropDbRefusalReferences();
+    my $primary_reference = $preferred_hint;
+    if (!defined $primary_reference || $primary_reference eq '') {
+        $primary_reference = _pickVariantAvoidingRecent(\@reference_pool, \@recent_texts);
+    }
     my @reference_samples;
     for (1 .. 5) {
         my $sample = _pickVariantAvoidingRecent(\@reference_pool, \@recent_texts);
@@ -504,6 +508,7 @@ sub _generateDropDbRefusalResponse {
         "Pode usar frases como 'nao sei' ou 'nao lembro', mas nao repita a mesma resposta muitas vezes seguidas.",
         "Evite fazer perguntas.",
         "Varie as respostas e nao repita as mesmas palavras.",
+        ($primary_reference ? "Use como base principal esta referencia: $primary_reference" : ()),
         "Use as referencias abaixo como base e varie a escolha.",
         "Referencias: $reference_line",
         ($recent_block ? "Respostas recentes para evitar repetir: $recent_block" : ());
@@ -698,8 +703,9 @@ sub generateDropDbResponse {
     }
 
     if (rand() < 0.5) {
-        my $refusal = _generateDropDbRefusalResponse($message, $sender);
-        my $response = (defined $refusal && $refusal ne '') ? $refusal : _randomDropDbRefusal($sender);
+        my $preferred_hint = _pickVariantAvoidingRecent([_dropDbRefusalReferences()], []);
+        my $refusal = _generateDropDbRefusalResponse($message, $sender, $preferred_hint);
+        my $response = (defined $refusal && $refusal ne '') ? $refusal : ($preferred_hint || _randomDropDbRefusal($sender));
         _setDropDbStance($sender, 'refusal');
         return $response;
     }
@@ -759,12 +765,14 @@ sub dropDbUnknownReply {
 sub generateDropDbRefusal {
     my ($message, $sender) = @_;
     return _randomDropDbRefusal($sender) unless defined $message && $message ne '';
-    my $refusal = _generateDropDbRefusalResponse($message, $sender);
-    my $response = (defined $refusal && $refusal ne '') ? $refusal : _randomDropDbRefusal($sender);
+    my $history = $sender ? (AIChat::ConversationHistory::getHistory($sender) || []) : [];
+    my @recent_assistant = grep { ($_->{role} // '') eq 'assistant' } @$history;
+    @recent_assistant = @recent_assistant[-5 .. -1] if @recent_assistant > 5;
+    my @recent_texts = map { $_->{content} // '' } @recent_assistant;
+    my $preferred_hint = _pickVariantAvoidingRecent([_dropDbRefusalReferences()], \@recent_texts);
+    my $refusal = _generateDropDbRefusalResponse($message, $sender, $preferred_hint);
+    my $response = (defined $refusal && $refusal ne '') ? $refusal : ($preferred_hint || _randomDropDbRefusal($sender));
     if ($sender) {
-        my $history = AIChat::ConversationHistory::getHistory($sender) || [];
-        my @recent_assistant = grep { ($_->{role} // '') eq 'assistant' } @$history;
-        @recent_assistant = @recent_assistant[-5 .. -1] if @recent_assistant > 5;
         my %recent = map { _normalizeEchoText($_->{content} // '') => 1 } @recent_assistant;
         if ($recent{_normalizeEchoText($response)}) {
             $response = _randomDropDbRefusal($sender);
@@ -826,8 +834,9 @@ sub generateDropDbChatResponse {
     my $max_tokens = AIChat::Config::get('max_tokens');
     my $temperature = AIChat::Config::get('temperature');
     if (rand() < 0.5) {
-        my $refusal = _generateDropDbRefusalResponse($message, $sender);
-        my $response = (defined $refusal && $refusal ne '') ? $refusal : _randomDropDbRefusal($sender);
+        my $preferred_hint = _pickVariantAvoidingRecent([_dropDbRefusalReferences()], []);
+        my $refusal = _generateDropDbRefusalResponse($message, $sender, $preferred_hint);
+        my $response = (defined $refusal && $refusal ne '') ? $refusal : ($preferred_hint || _randomDropDbRefusal($sender));
         _setDropDbStance($sender, 'refusal');
         return $response;
     }
