@@ -23,7 +23,8 @@ const server = http.createServer((req, res) => {
                 const provider = requestData.provider;
                 const aiApiUrl = provider === 'openai' ? OPENAI_API_URL : DEEPSEEK_API_URL;
 
-                const apiKey = (requestData.api_key || process.env.AICHAT_API_KEY || API_KEY || '').trim();
+                const apiKey = (API_KEY || process.env.AICHAT_API_KEY || requestData.api_key || '')
+                    .replace(/\s+/g, '');
 
                 // Remove campos internos do payload antes de enviar para a API de IA
                 delete requestData.provider;
