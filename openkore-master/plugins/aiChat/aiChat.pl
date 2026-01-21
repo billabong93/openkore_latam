@@ -149,6 +149,8 @@ sub _sanitizeOutgoingMessage {
 sub _splitOutgoingResponse {
     my ($response) = @_;
     return () unless defined $response;
+    my $split_chance = AIChat::Config::get('split_chance');
+    $split_chance = 0.2 unless defined $split_chance;
     if ($response =~ /\|\|/) {
         my @parts = split /\s*\|\|\s*/, $response;
         @parts = map {
@@ -168,7 +170,7 @@ sub _splitOutgoingResponse {
             $part =~ s/\s+$//;
             $part;
         } grep { defined $_ && length $_ } @parts;
-        if (@parts >= 2 && rand() < 0.5) {
+        if (@parts >= 2 && rand() < $split_chance) {
             my @pair = @parts[0, 1];
             my $first_words = scalar grep { length } split /\s+/, $pair[0];
             my $second_words = scalar grep { length } split /\s+/, $pair[1];

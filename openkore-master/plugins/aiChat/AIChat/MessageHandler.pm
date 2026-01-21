@@ -84,7 +84,7 @@ sub _splitResponse {
             $part;
         } grep { defined $_ && length $_ } @candidate_parts;
 
-        if (@candidate_parts >= 2 && rand() < 0.5) {
+        if (@candidate_parts >= 2 && rand() < $split_chance) {
             my @pair = @candidate_parts[0, 1];
             if (_wordCount($pair[0]) >= 2 && _wordCount($pair[1]) >= 2) {
                 @parts = @pair;
