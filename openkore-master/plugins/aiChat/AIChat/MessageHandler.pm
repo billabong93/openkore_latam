@@ -276,6 +276,48 @@ sub _normalizeResponseText {
     return $normalized;
 }
 
+sub _messageRequestsActivity {
+    my ($messages) = @_;
+    return unless $messages && ref $messages eq 'ARRAY' && @$messages;
+    my $last_message = $messages->[-1];
+    return unless defined $last_message;
+    my $normalized = _normalizeQueryText($last_message);
+    return unless length $normalized;
+    return 1 if $normalized =~ /\b(ta|tava|esta|to|t[oô])\s+fazendo\b/;
+    return 1 if $normalized =~ /\bfazendo\s+(oq|o que|que)\b/;
+    return 1 if $normalized =~ /\b(oq|o que|que)\s+faz\b/;
+    return 1 if $normalized =~ /\b(oq|o que|que)\s+ta\s+fazendo\b/;
+    return 1 if $normalized =~ /\b(onde|aonde)\b/;
+    return 1 if $normalized =~ /\b(mapa|spot|lugar|campo)\b/;
+    return 1 if $normalized =~ /\b(upar|upar|farmar|farmando|upando|grindando)\b/;
+    return;
+}
+
+sub _trimUnpromptedDetails {
+    my ($response, $messages) = @_;
+    return $response unless defined $response;
+    return $response if _messageRequestsActivity($messages);
+
+    my $activity_pattern = qr/\b(upando|farmando|grindando|treinando|cacando|fazendo|quest|instancia|dungeon|mapa|campo|spot)\b/;
+    my @segments = split /(?<=[.!?])\s+|,\s+/, $response;
+    my @kept;
+    for my $segment (@segments) {
+        next unless defined $segment;
+        my $normalized = _normalizeQueryText($segment);
+        next if $normalized =~ $activity_pattern;
+        $segment =~ s/^\s+//;
+        $segment =~ s/\s+$//;
+        push @kept, $segment if length $segment;
+    }
+
+    my $trimmed = join ' ', @kept;
+    $trimmed =~ s/\s+/ /g;
+    $trimmed =~ s/^\s+//;
+    $trimmed =~ s/\s+$//;
+    return $trimmed if length $trimmed;
+    return $response;
+}
+
 sub _pickVariant {
     my (@options) = @_;
     return '' unless @options;
@@ -1022,6 +1064,7 @@ sub processMessages {
     }
 
     return undef unless defined $response && length $response > 0;
+    $response = _trimUnpromptedDetails($response, $messages);
 
     my $parts = _splitResponse($response, $messages);
     return $parts;

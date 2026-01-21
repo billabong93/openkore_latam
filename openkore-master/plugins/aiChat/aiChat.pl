@@ -178,6 +178,10 @@ sub _queueDirectResponse {
     $state->{typing_until} = 0;
     $state->{response_started} = 0;
     $state->{context} = $context;
+    my $typing_delay = _calculateTypingDelay($response);
+    if ($typing_delay > 0) {
+        $state->{typing_until} = time() + $buffer_delay + $typing_delay;
+    }
     push @{$state->{response_queue}}, $response;
 }
 
@@ -1185,6 +1189,10 @@ sub _queueSpamRefusal {
     $state->{response_started} = 0;
     $state->{context} = { type => $context, sabotage => 1 };
     $state->{buffer_deadline} = time() + $buffer_delay;
+    my $typing_delay = _calculateTypingDelay($response);
+    if ($typing_delay > 0) {
+        $state->{typing_until} = time() + $buffer_delay + $typing_delay;
+    }
     push @{$state->{response_queue}}, $response;
     return 1;
 }
@@ -1203,6 +1211,10 @@ sub _queueSpamRefusalFallback {
     $state->{response_started} = 0;
     $state->{context} = { type => $context, sabotage => 1 };
     $state->{buffer_deadline} = time() + $buffer_delay;
+    my $typing_delay = _calculateTypingDelay($message);
+    if ($typing_delay > 0) {
+        $state->{typing_until} = time() + $buffer_delay + $typing_delay;
+    }
     push @{$state->{response_queue}}, $message;
     return 1;
 }
