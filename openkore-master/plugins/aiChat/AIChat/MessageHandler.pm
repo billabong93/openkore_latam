@@ -73,8 +73,23 @@ sub _splitResponse {
     my $split_chance = AIChat::Config::get('split_chance');
     $split_chance = 0.2 unless defined $split_chance;
 
-    if ($response =~ /\|\|/ || $response =~ /\r?\n/) {
-        @parts = split /(?:\s*\|\|\s*|\s*\r?\n\s*)/, $response;
+    if ($response =~ /\|\|/) {
+        @parts = split /\s*\|\|\s*/, $response;
+    } elsif ($response =~ /\r?\n/) {
+        my @candidate_parts = split /\s*\r?\n\s*/, $response;
+        @candidate_parts = map {
+            my $part = $_;
+            $part =~ s/^\s+//;
+            $part =~ s/\s+$//;
+            $part;
+        } grep { defined $_ && length $_ } @candidate_parts;
+
+        if (@candidate_parts >= 2 && rand() < 0.5) {
+            my @pair = @candidate_parts[0, 1];
+            if (_wordCount($pair[0]) >= 2 && _wordCount($pair[1]) >= 2) {
+                @parts = @pair;
+            }
+        }
     } else {
         if (rand() < $split_chance) {
             my ($first, $second);

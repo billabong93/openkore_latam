@@ -149,8 +149,8 @@ sub _sanitizeOutgoingMessage {
 sub _splitOutgoingResponse {
     my ($response) = @_;
     return () unless defined $response;
-    if ($response =~ /\|\|/ || $response =~ /\r?\n/) {
-        my @parts = split /(?:\s*\|\|\s*|\s*\r?\n\s*)/, $response;
+    if ($response =~ /\|\|/) {
+        my @parts = split /\s*\|\|\s*/, $response;
         @parts = map {
             my $part = $_;
             $part =~ s/^\s+//;
@@ -158,6 +158,22 @@ sub _splitOutgoingResponse {
             $part;
         } grep { defined $_ && length $_ } @parts;
         return @parts if @parts;
+    }
+
+    if ($response =~ /\r?\n/) {
+        my @parts = split /\s*\r?\n\s*/, $response;
+        @parts = map {
+            my $part = $_;
+            $part =~ s/^\s+//;
+            $part =~ s/\s+$//;
+            $part;
+        } grep { defined $_ && length $_ } @parts;
+        if (@parts >= 2 && rand() < 0.5) {
+            my @pair = @parts[0, 1];
+            my $first_words = scalar grep { length } split /\s+/, $pair[0];
+            my $second_words = scalar grep { length } split /\s+/, $pair[1];
+            return @pair if $first_words >= 2 && $second_words >= 2;
+        }
     }
     return ($response);
 }
