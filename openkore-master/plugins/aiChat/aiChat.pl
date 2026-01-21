@@ -78,6 +78,8 @@ my %silence_message_count_by_sender;
 my %blocked_by_sender;
 my %silence_after_response_by_sender;
 my %last_visibility_state_by_sender;
+my %conversation_message_count_by_sender;
+my %conversation_close_stage_by_sender;
 my $last_packet_sent_at = 0;
 
 my %invisibility_statuses = map { $_ => 1 } qw(
@@ -500,6 +502,7 @@ sub onCommand {
         message "Delay do buffer: " . AIChat::Config::get('buffer_delay'), "list";
         message "Responder no chat publico no lockMap: " . AIChat::Config::get('public_on_lockmap'), "list";
         message "Intervalo minimo entre pacotes: " . AIChat::Config::get('min_packet_interval'), "list";
+        message "Limite de mensagens antes de encerrar papo: " . AIChat::Config::get('conversation_limit'), "list";
     } elsif ($arg =~ /^provider\s+(openai|deepseek)$/) {
         if (AIChat::Config::set('provider', $1)) {
             message $translator->translatef("%s Provedor alterado para %s\n", PLUGIN_PREFIX, $1), "list";
@@ -532,6 +535,15 @@ sub onPrivateMessage {
     my $intent;
     $intent = _interpretCommand($message, $sender, $intent_context);
     if (_handleSpamCheck($sender, $message, 'private', $intent)) {
+        AIChat::Log::log_message(
+            direction => 'in',
+            visibility => 'private',
+            sender => $sender,
+            message => $message,
+        );
+        return;
+    }
+    if (_handleConversationLimit($sender, $message, 'private')) {
         AIChat::Log::log_message(
             direction => 'in',
             visibility => 'private',
@@ -602,6 +614,15 @@ sub onPublicMessage {
     my $intent;
     $intent = _interpretCommand($message, $sender, $intent_context);
     if (_handleSpamCheck($sender, $message, 'public', $intent)) {
+        AIChat::Log::log_message(
+            direction => 'in',
+            visibility => 'public',
+            sender => $sender,
+            message => $message,
+        );
+        return;
+    }
+    if (_handleConversationLimit($sender, $message, 'public')) {
         AIChat::Log::log_message(
             direction => 'in',
             visibility => 'public',
@@ -1147,6 +1168,110 @@ sub _isBlockedSender {
     return $blocked_by_sender{$sender_key} ? 1 : 0;
 }
 
+sub _shouldHandleConversationLimit {
+    my $limit = AIChat::Config::get('conversation_limit');
+    $limit = 0 unless defined $limit;
+    return $limit > 0 ? $limit : 0;
+}
+
+sub _incrementConversationCount {
+    my ($sender) = @_;
+    return unless defined $sender;
+    my $sender_key = _normalizeSenderKey($sender);
+    return unless $sender_key;
+    $conversation_message_count_by_sender{$sender_key} = ($conversation_message_count_by_sender{$sender_key} // 0) + 1;
+    return $conversation_message_count_by_sender{$sender_key};
+}
+
+sub _conversationCloseStage {
+    my ($sender) = @_;
+    return unless defined $sender;
+    my $sender_key = _normalizeSenderKey($sender);
+    return unless $sender_key;
+    return $conversation_close_stage_by_sender{$sender_key} // 0;
+}
+
+sub _setConversationCloseStage {
+    my ($sender, $stage) = @_;
+    return unless defined $sender;
+    my $sender_key = _normalizeSenderKey($sender);
+    return unless $sender_key;
+    $conversation_close_stage_by_sender{$sender_key} = $stage;
+}
+
+sub _pickConversationCloseWarning {
+    my @messages = (
+        "mano foi mal, da mais pra conversar nao",
+        "mal ai, nao da pra ficar no papo agora",
+        "to ocupado aqui, nao da pra conversar",
+        "foi mal, ja deu de conversar",
+        "sem tempo pra papo agora",
+    );
+    return $messages[int(rand(@messages))];
+}
+
+sub _pickConversationCloseFinal {
+    my @messages = (
+        "mano ja falei que nao da, tchau",
+        "ja deu, to ocupado, flw",
+        "nao da mesmo, vou sair daqui",
+        "ja encerrou, flw",
+        "sem papo, tchau",
+    );
+    return $messages[int(rand(@messages))];
+}
+
+sub _pickConversationCloseGoodbye {
+    my @messages = (
+        "vlw, pra vc tbm",
+        "blz, bom up",
+        "falou, boa sorte",
+        "tmj, bom jogo",
+        "vlw, boa",
+    );
+    return $messages[int(rand(@messages))];
+}
+
+sub _isConversationCloseAcknowledgement {
+    my ($message) = @_;
+    return unless defined $message;
+    my $text = lc $message;
+    return 1 if $text =~ /\b(blz|beleza|ok|okay|vlw|valeu|valew|flw|falou|tchau|ate|até|obg|obrigado|brigado|tmj|dboa|de boa|tranquilo)\b/;
+    return 1 if $text =~ /\b(bom\s+up|boa\s+sorte|bom\s+jogo)\b/;
+    return;
+}
+
+sub _handleConversationLimit {
+    my ($sender, $message, $context) = @_;
+    return unless defined $sender;
+    my $limit = _shouldHandleConversationLimit();
+    return unless $limit;
+    my $count = _incrementConversationCount($sender);
+    return unless defined $count;
+    my $stage = _conversationCloseStage($sender);
+    return if $count < $limit && !$stage;
+
+    if (!$stage) {
+        my $response = _pickConversationCloseWarning();
+        _queueDirectResponse($sender, $response, { type => $context });
+        _setConversationCloseStage($sender, 1);
+        return 1;
+    }
+
+    if ($stage == 1) {
+        my $response = _isConversationCloseAcknowledgement($message)
+            ? _pickConversationCloseGoodbye()
+            : _pickConversationCloseFinal();
+        _queueDirectResponse($sender, $response, { type => $context });
+        _setConversationCloseStage($sender, 2);
+        _markSilenceAfterResponse($sender);
+        return 1;
+    }
+
+    return 1 if $stage >= 2;
+    return;
+}
+
 sub _resetQuestionStreak {
     my ($sender) = @_;
     return unless defined $sender;
@@ -1437,6 +1562,8 @@ sub _silenceSender {
     $silenced_by_sender{$sender_key} = 1;
     $silence_message_count_by_sender{$sender_key} = 0;
     $question_streak_by_sender{$sender_key} = 0;
+    delete $conversation_message_count_by_sender{$sender_key};
+    delete $conversation_close_stage_by_sender{$sender_key};
     delete $message_buffers{$sender};
     delete $pending_emotion_request_by_sender{$sender_key};
     delete $pending_emotion_followup_by_sender{$sender_key};
@@ -1451,6 +1578,8 @@ sub _blockSender {
     return if $blocked_by_sender{$sender_key};
     Commands::run("ignore 1 $sender");
     $blocked_by_sender{$sender_key} = 1;
+    delete $conversation_message_count_by_sender{$sender_key};
+    delete $conversation_close_stage_by_sender{$sender_key};
 }
 
 sub _shouldCountSpamQuestion {
