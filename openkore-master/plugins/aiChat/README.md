@@ -37,6 +37,25 @@ Configure as opções no `plugins/aiChat/config.txt` ou via console do OpenKore 
 *   `aiChat_min_packet_interval`: Intervalo mínimo entre pacotes enviados (em segundos, padrão: `0.6`).
 *   `aiChat_conversation_limit`: Número de mensagens do jogador antes do bot encerrar o papo (padrão: `10`, `0` desativa).
 
+### Banco de monstros/drops (`plugins/aiChat/mondb.txt`)
+
+Você pode separar o banco em duas partes: uma com respostas garantidas e outra sujeita à chance de recusa. Use os marcadores abaixo em linhas próprias:
+
+*   `[always]`: Tudo abaixo desta linha responde sempre (sem chance de recusa).
+*   `[chance]`: Tudo abaixo desta linha segue a chance de recusa (`aiChat_dropdb_refusal_chance`).
+
+Se não houver marcador, o comportamento padrão é `chance`.
+
+Exemplo:
+
+```
+[always]
+Poring: (Arredores de Prontera, prt_fild08) Jellopy, Carta Poring
+
+[chance]
+Orc Zumbi: (Caverna de Geffen, gef_dun01) Pele de Orc, Carta Orc Zumbi
+```
+
 ### B. No Proxy Node.js (`api_proxy.js`)
 
 Abra `plugins/aiChat/api_proxy.js` e **insira sua chave de API diretamente** (ex: `const DEEPSEEK_API_KEY = 'SUA_CHAVE_AQUI';`).

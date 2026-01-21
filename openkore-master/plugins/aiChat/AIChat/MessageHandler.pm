@@ -25,6 +25,7 @@ my $mondb_cache;
 my $item_translation_cache;
 my %mondb_map_cache;
 my $mondb_lookup_cache;
+my %mondb_tier_lookup_cache;
 
 BEGIN {
     $api_client = AIChat::APIClient->new();
@@ -369,6 +370,66 @@ sub _loadMonsterDropLookup {
     return $mondb_lookup_cache;
 }
 
+sub _loadMonsterDropTierLookup {
+    my ($tier) = @_;
+    $tier = 'chance' unless defined $tier && $tier ne '';
+    return $mondb_tier_lookup_cache{$tier} if $mondb_tier_lookup_cache{$tier};
+    my $mondb = _loadMonsterDropDb();
+    return {} unless $mondb && %$mondb;
+
+    my %lookup;
+    for my $monster (keys %$mondb) {
+        my $entry = $mondb->{$monster} || {};
+        my $entry_tier = $entry->{tier} // 'chance';
+        next unless $entry_tier eq $tier;
+        my $monster_key = _normalizeQueryText($monster);
+        $lookup{$monster_key} = 1 if defined $monster_key && $monster_key ne '';
+
+        if ($monster =~ /^Mapa\s+(.+)/i) {
+            my $map_name = $1;
+            my $map_key = _normalizeQueryText($map_name);
+            $lookup{$map_key} = 1 if defined $map_key && $map_key ne '';
+        }
+
+        my $drops = $entry->{drops} || [];
+        for my $drop (@$drops) {
+            next unless defined $drop && $drop ne '';
+            my $drop_key = _normalizeQueryText($drop);
+            $lookup{$drop_key} = 1 if defined $drop_key && $drop_key ne '';
+        }
+
+        my $location = $entry->{location} // '';
+        if (defined $location && $location ne '') {
+            my $location_key = _normalizeQueryText($location);
+            $lookup{$location_key} = 1 if defined $location_key && $location_key ne '';
+        }
+
+        my $maps = $entry->{maps} || [];
+        for my $map (@$maps) {
+            next unless defined $map && $map ne '';
+            my $map_key = _normalizeQueryText($map);
+            $lookup{$map_key} = 1 if defined $map_key && $map_key ne '';
+        }
+    }
+
+    $mondb_tier_lookup_cache{$tier} = \%lookup;
+    return $mondb_tier_lookup_cache{$tier};
+}
+
+sub _isGuaranteedDropDbQuery {
+    my ($message) = @_;
+    return 0 unless defined $message && $message ne '';
+    my $normalized = _normalizeQueryText($message);
+    return 0 unless $normalized ne '';
+    my $lookup = _loadMonsterDropTierLookup('always');
+    return 0 unless $lookup && %$lookup;
+    for my $key (keys %$lookup) {
+        next unless $key && $key ne '';
+        return 1 if index($normalized, $key) >= 0;
+    }
+    return 0;
+}
+
 sub _pickVariant {
     my (@options) = @_;
     return '' unless @options;
@@ -687,7 +748,8 @@ sub generateDropDbResponse {
     return undef unless defined $message && $message ne '';
 
     my $stance = _getDropDbStance($sender);
-    if (defined $stance && $stance eq 'refusal') {
+    my $guaranteed_match = _isGuaranteedDropDbQuery($message);
+    if (defined $stance && $stance eq 'refusal' && !$guaranteed_match) {
         return generateDropDbRefusal($message, $sender);
     }
 
@@ -704,7 +766,7 @@ sub generateDropDbResponse {
 
     my $refusal_chance = AIChat::Config::get('dropdb_refusal_chance');
     $refusal_chance = 0.5 unless defined $refusal_chance;
-    if (rand() < $refusal_chance) {
+    if (!$guaranteed_match && rand() < $refusal_chance) {
         my $preferred_hint = _pickVariant(_dropDbRefusalReferences());
         my $refusal = _generateDropDbRefusalResponse($message, $sender, $preferred_hint);
         my $response = (defined $refusal && $refusal ne '') ? $refusal : ($preferred_hint || _randomDropDbRefusal($sender));
@@ -779,7 +841,8 @@ sub generateDropDbChatResponse {
     return dropDbUnknownReply() unless defined $message && $message ne '';
 
     my $stance = _getDropDbStance($sender);
-    if (defined $stance && $stance eq 'refusal') {
+    my $guaranteed_match = _isGuaranteedDropDbQuery($message);
+    if (defined $stance && $stance eq 'refusal' && !$guaranteed_match) {
         return generateDropDbRefusal($message, $sender);
     }
 
@@ -827,7 +890,7 @@ sub generateDropDbChatResponse {
     my $temperature = AIChat::Config::get('temperature');
     my $refusal_chance = AIChat::Config::get('dropdb_refusal_chance');
     $refusal_chance = 0.5 unless defined $refusal_chance;
-    if (rand() < $refusal_chance) {
+    if (!$guaranteed_match && rand() < $refusal_chance) {
         my $preferred_hint = _pickVariant(_dropDbRefusalReferences());
         my $refusal = _generateDropDbRefusalResponse($message, $sender, $preferred_hint);
         my $response = (defined $refusal && $refusal ne '') ? $refusal : ($preferred_hint || _randomDropDbRefusal($sender));
@@ -942,6 +1005,7 @@ sub _loadMonsterDropDb {
     }
 
     my %db;
+    my $current_tier = 'chance';
     if (open my $fh, '<:encoding(UTF-8)', $path) {
         while (my $line = <$fh>) {
             chomp $line;
@@ -949,6 +1013,10 @@ sub _loadMonsterDropDb {
             $line =~ s/^\s+//;
             $line =~ s/\s+$//;
             next if $line eq '' || $line =~ /^\s*#/;
+            if ($line =~ /^\s*\[(always|chance)\]\s*$/i) {
+                $current_tier = lc $1;
+                next;
+            }
             my ($monster, $drop_text) = split /\s*:\s*/, $line, 2;
             next unless defined $monster && defined $drop_text;
             my @maps;
@@ -971,13 +1039,19 @@ sub _loadMonsterDropDb {
             if (@maps) {
                 $location = shift @maps;
             }
-            $db{$monster} = { drops => \@drops, maps => \@maps, location => $location } if @drops || @maps || $location ne '';
+            $db{$monster} = {
+                drops => \@drops,
+                maps => \@maps,
+                location => $location,
+                tier => $current_tier,
+            } if @drops || @maps || $location ne '';
         }
         close $fh;
     }
 
     $mondb_cache = \%db;
     $mondb_lookup_cache = undef;
+    %mondb_tier_lookup_cache = ();
     return $mondb_cache;
 }
 
@@ -1056,6 +1130,7 @@ sub updateMondbFromMap {
         print $fh @lines;
         close $fh;
         $mondb_cache = undef;
+        %mondb_tier_lookup_cache = ();
     }
 }
 
