@@ -505,6 +505,7 @@ sub onCommand {
         message "Responder no chat publico no lockMap: " . AIChat::Config::get('public_on_lockmap'), "list";
         message "Intervalo minimo entre pacotes: " . AIChat::Config::get('min_packet_interval'), "list";
         message "Limite de mensagens antes de encerrar papo: " . AIChat::Config::get('conversation_limit'), "list";
+        message "Limite de perguntas seguidas antes de recusar spam: " . AIChat::Config::get('spam_question_limit'), "list";
     } elsif ($arg =~ /^provider\s+(openai|deepseek)$/) {
         if (AIChat::Config::set('provider', $1)) {
             message $translator->translatef("%s Provedor alterado para %s\n", PLUGIN_PREFIX, $1), "list";
@@ -1430,8 +1431,11 @@ sub _handleSpamCheck {
         return;
     }
 
+    my $spam_limit = _getSpamQuestionLimit();
+    return if $spam_limit <= 0;
+
     $question_streak_by_sender{$sender_key} = ($question_streak_by_sender{$sender_key} // 0) + 1;
-    if ($question_streak_by_sender{$sender_key} >= SPAM_QUESTION_LIMIT) {
+    if ($question_streak_by_sender{$sender_key} >= $spam_limit) {
         my $queued = _queueSpamRefusal($sender, $message, $context);
         $queued = _queueSpamRefusalFallback($sender, $context) unless $queued;
         _markSilenceAfterResponse($sender) if $queued;
@@ -1439,6 +1443,12 @@ sub _handleSpamCheck {
     }
 
     return;
+}
+
+sub _getSpamQuestionLimit {
+    my $limit = AIChat::Config::get('spam_question_limit');
+    $limit = SPAM_QUESTION_LIMIT unless defined $limit && $limit =~ /^\d+$/;
+    return $limit;
 }
 
 sub _buildSpamRefusalMessage {
