@@ -276,52 +276,6 @@ sub _normalizeResponseText {
     return $normalized;
 }
 
-sub _rewriteResponseForBrevity {
-    my ($response, $messages, $sender) = @_;
-    return $response unless defined $response;
-    return $response unless $messages && ref $messages eq 'ARRAY' && @$messages;
-
-    my $last_message = $messages->[-1];
-    return $response unless defined $last_message;
-
-    my @rewrite_messages = (
-        {
-            role => "system",
-            content => "Voce e um revisor de respostas do chat. Receba a mensagem do jogador e a resposta gerada. Remova detalhes sobre atividade, localizacao, mapa, spot ou o que o bot esta fazendo quando o jogador nao perguntou isso. Se o jogador perguntou o que o bot esta fazendo ou onde esta, mantenha esses detalhes. Responda apenas com JSON valido no formato {\"text\":\"...\"}. Nao inclua texto fora do JSON.",
-        },
-        {
-            role => "user",
-            content => "Mensagem do jogador: $last_message\nResposta gerada: $response",
-        },
-    );
-
-    my $rewrite;
-    eval {
-        $rewrite = $api_client->callAPIWithMessages(\@rewrite_messages, {
-            max_tokens => 120,
-            temperature => 0,
-        });
-    };
-    if ($@) {
-        warning "[aiChat] Erro ao revisar resposta: $@\n", "plugin";
-        return $response;
-    }
-
-    return $response unless defined $rewrite && length $rewrite;
-    my $parsed;
-    eval {
-        $parsed = decode_json($rewrite);
-    };
-    if ($@ || !ref $parsed) {
-        debug "[aiChat] Resposta invalida ao revisar resposta: $rewrite\n", "plugin";
-        return $response;
-    }
-
-    my $text = $parsed->{text};
-    return $response unless defined $text && length $text;
-    return $text;
-}
-
 sub _pickVariant {
     my (@options) = @_;
     return '' unless @options;
@@ -1068,7 +1022,6 @@ sub processMessages {
     }
 
     return undef unless defined $response && length $response > 0;
-    $response = _rewriteResponseForBrevity($response, $messages, $sender);
 
     my $parts = _splitResponse($response, $messages);
     return $parts;
