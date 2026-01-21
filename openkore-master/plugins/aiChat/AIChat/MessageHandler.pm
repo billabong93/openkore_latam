@@ -223,8 +223,9 @@ sub _buildDropDbContext {
         my $entry = $mondb->{$key} || {};
         my $drops = $entry->{drops} || [];
         my $maps = $entry->{maps} || [];
-        next unless @$drops || @$maps;
-        my $map_text = @$maps ? " (" . join(', ', @$maps) . ") " : " ";
+        my $location = $entry->{location} // '';
+        next unless @$drops || @$maps || $location ne '';
+        my $map_text = _formatDropDbLocation($entry, 1);
         push @entries, "$key:$map_text" . join(', ', @$drops);
     }
     return undef unless @entries;
@@ -236,6 +237,18 @@ sub _buildDropDbContext {
         @entries,
         (@$item_index ? ("Indice de itens (item -> monstros que dropam):", @$item_index) : ()),
         "Se nao houver informacao, diga que nao sabe ou nao tem certeza.";
+}
+
+sub _formatDropDbLocation {
+    my ($entry, $include_maps) = @_;
+    $include_maps = 0 unless defined $include_maps;
+    return " " unless $entry && ref $entry eq 'HASH';
+    my $location = $entry->{location} // '';
+    my $maps = $entry->{maps} || [];
+    my @parts;
+    push @parts, $location if defined $location && $location ne '';
+    push @parts, @$maps if $include_maps && @$maps;
+    return @parts ? " (" . join(', ', @parts) . ") " : " ";
 }
 
 sub _buildDropItemIndex {
@@ -275,6 +288,34 @@ sub _normalizeQueryText {
     $normalized =~ s/^\s+//;
     $normalized =~ s/\s+$//;
     return $normalized;
+}
+
+sub _isMapQuery {
+    my ($message) = @_;
+    return 0 unless defined $message && $message ne '';
+    my $normalized = _normalizeQueryText($message);
+    return 0 unless $normalized ne '';
+    return $normalized =~ /\bmapa(s)?\b/;
+}
+
+sub _getDropDbStance {
+    my ($sender) = @_;
+    return undef unless defined $sender;
+    my $history = AIChat::ConversationHistory::getHistory($sender) || [];
+    for (my $i = @$history - 1; $i >= 0; $i--) {
+        my $entry = $history->[$i];
+        next unless ($entry->{type} // '') eq 'drop_db_stance';
+        return $entry->{content};
+    }
+    return undef;
+}
+
+sub _setDropDbStance {
+    my ($sender, $stance) = @_;
+    return unless defined $sender && defined $stance && $stance ne '';
+    my $last = _getDropDbStance($sender);
+    return if defined $last && $last eq $stance;
+    AIChat::ConversationHistory::addMessage($sender, "system", $stance, "drop_db_stance");
 }
 
 sub _normalizeResponseText {
@@ -566,20 +607,18 @@ sub _unknownDropReply {
 }
 
 sub _readMonsterDropDbRaw {
-    my $path = File::Spec->catfile(_pluginBaseDir(), 'mondb.txt');
-    return undef unless -e $path;
-    my @lines;
-    if (open my $fh, '<:encoding(UTF-8)', $path) {
-        @lines = <$fh>;
-        close $fh;
-    }
-    return undef unless @lines;
+    my ($include_maps) = @_;
+    $include_maps = 0 unless defined $include_maps;
+    my $mondb = _loadMonsterDropDb();
+    return undef unless $mondb && %$mondb;
     my @raw_lines;
-    for my $line (@lines) {
-        my $raw = $line;
-        chomp $raw;
-        $raw =~ s/\r//g;
-        push @raw_lines, $raw;
+    for my $monster (sort keys %$mondb) {
+        my $entry = $mondb->{$monster} || {};
+        my $drops = $entry->{drops} || [];
+        my $location_text = _formatDropDbLocation($entry, $include_maps);
+        next unless @$drops || $location_text ne ' ';
+        my $line = "$monster:$location_text" . join(', ', @$drops);
+        push @raw_lines, $line;
     }
     return undef unless @raw_lines;
     return join "\n", @raw_lines;
@@ -604,6 +643,11 @@ sub generateDropDbResponse {
     my ($message, $sender) = @_;
     return undef unless defined $message && $message ne '';
 
+    my $stance = _getDropDbStance($sender);
+    if (defined $stance && $stance eq 'refusal') {
+        return generateDropDbRefusal($message, $sender);
+    }
+
     _ensureDropDbContext($sender);
 
     my $mob_database_enabled = AIChat::Config::get('mob_database');
@@ -617,8 +661,9 @@ sub generateDropDbResponse {
 
     if (rand() < 0.5) {
         my $refusal = _generateDropDbRefusalResponse($message, $sender);
-        return $refusal if defined $refusal && $refusal ne '';
-        return _randomDropDbRefusal($sender);
+        my $response = (defined $refusal && $refusal ne '') ? $refusal : _randomDropDbRefusal($sender);
+        _setDropDbStance($sender, 'refusal');
+        return $response;
     }
 
     my $prompt = AIChat::Config::get('prompt');
@@ -657,12 +702,16 @@ sub generateDropDbResponse {
         });
     };
     if ($@ || !defined $response || $response eq '') {
-        return dropDbUnknownReply();
+        return generateDropDbRefusal($message, $sender);
     }
 
     $response = _normalizeResponseText($response);
     $response = _limitDropDbList($response);
-    return $response ne '' ? $response : dropDbUnknownReply();
+    if ($response ne '') {
+        _setDropDbStance($sender, 'answer');
+        return $response;
+    }
+    return generateDropDbRefusal($message, $sender);
 }
 
 sub dropDbUnknownReply {
@@ -673,26 +722,36 @@ sub generateDropDbRefusal {
     my ($message, $sender) = @_;
     return _randomDropDbRefusal($sender) unless defined $message && $message ne '';
     my $refusal = _generateDropDbRefusalResponse($message, $sender);
-    return $refusal if defined $refusal && $refusal ne '';
-    return _randomDropDbRefusal($sender);
+    my $response = (defined $refusal && $refusal ne '') ? $refusal : _randomDropDbRefusal($sender);
+    _setDropDbStance($sender, 'refusal');
+    return $response;
 }
 
 sub generateDropDbChatResponse {
     my ($message, $sender) = @_;
     return dropDbUnknownReply() unless defined $message && $message ne '';
 
+    my $stance = _getDropDbStance($sender);
+    if (defined $stance && $stance eq 'refusal') {
+        return generateDropDbRefusal($message, $sender);
+    }
+
     my $mob_database_enabled = AIChat::Config::get('mob_database');
     if (!defined $mob_database_enabled || !$mob_database_enabled) {
         return generateDropDbRefusal($message, $sender);
     }
 
-    my $drop_context = _readMonsterDropDbRaw();
+    my $include_maps = _isMapQuery($message);
+    my $drop_context = _readMonsterDropDbRaw($include_maps);
     return dropDbUnknownReply() unless $drop_context;
 
     my $prompt = AIChat::Config::get('prompt');
+    my $format_hint = $include_maps
+        ? "Banco de dados de monstros e drops (formato: Monstro: (Localizacao, Mapa1, Mapa2) Drop1, Drop2):"
+        : "Banco de dados de monstros e drops (formato: Monstro: (Localizacao) Drop1, Drop2):";
     my $combined_prompt = join "\n",
         $prompt,
-        "Banco de dados de monstros e drops (formato: Monstro: (Mapa1, Mapa2) Drop1, Drop2):",
+        $format_hint,
         $drop_context,
         "Use somente as informacoes do banco acima.",
         "Varie o jeito de responder para nao ficar engessado, como player de MMO.",
@@ -721,8 +780,9 @@ sub generateDropDbChatResponse {
     my $temperature = AIChat::Config::get('temperature');
     if (rand() < 0.5) {
         my $refusal = _generateDropDbRefusalResponse($message, $sender);
-        return $refusal if defined $refusal && $refusal ne '';
-        return _randomDropDbRefusal($sender);
+        my $response = (defined $refusal && $refusal ne '') ? $refusal : _randomDropDbRefusal($sender);
+        _setDropDbStance($sender, 'refusal');
+        return $response;
     }
     eval {
         $response = $api_client->callAPIWithMessages(\@messages, {
@@ -731,14 +791,18 @@ sub generateDropDbChatResponse {
         });
     };
     if ($@ || !defined $response || $response eq '') {
-        return dropDbUnknownReply();
+        return generateDropDbRefusal($message, $sender);
     }
 
     $response =~ s/\s+/ /g;
     $response =~ s/^\s+//;
     $response =~ s/\s+$//;
     $response = _limitDropDbList($response);
-    return $response ne '' ? $response : dropDbUnknownReply();
+    if ($response ne '') {
+        _setDropDbStance($sender, 'answer');
+        return $response;
+    }
+    return generateDropDbRefusal($message, $sender);
 }
 
 sub _limitDropDbList {
@@ -838,6 +902,7 @@ sub _loadMonsterDropDb {
             my ($monster, $drop_text) = split /\s*:\s*/, $line, 2;
             next unless defined $monster && defined $drop_text;
             my @maps;
+            my $location = '';
             if ($drop_text =~ s/^\(\s*([^)]+)\s*\)\s*//) {
                 @maps = map {
                     my $map = $_;
@@ -853,7 +918,10 @@ sub _loadMonsterDropDb {
                 _translateItemName($item);
             } split /\s*,\s*/, $drop_text;
             @drops = grep { defined $_ && $_ ne '' } @drops;
-            $db{$monster} = { drops => \@drops, maps => \@maps } if @drops || @maps;
+            if (@maps) {
+                $location = shift @maps;
+            }
+            $db{$monster} = { drops => \@drops, maps => \@maps, location => $location } if @drops || @maps || $location ne '';
         }
         close $fh;
     }
