@@ -146,6 +146,40 @@ sub _sanitizeOutgoingMessage {
     return $sanitized;
 }
 
+sub _splitOutgoingResponse {
+    my ($response) = @_;
+    return () unless defined $response;
+    my $split_chance = AIChat::Config::get('split_chance');
+    $split_chance = 0.2 unless defined $split_chance;
+    if ($response =~ /\|\|/) {
+        my @parts = split /\s*\|\|\s*/, $response;
+        @parts = map {
+            my $part = $_;
+            $part =~ s/^\s+//;
+            $part =~ s/\s+$//;
+            $part;
+        } grep { defined $_ && length $_ } @parts;
+        return @parts if @parts;
+    }
+
+    if ($response =~ /\r?\n/) {
+        my @parts = split /\s*\r?\n\s*/, $response;
+        @parts = map {
+            my $part = $_;
+            $part =~ s/^\s+//;
+            $part =~ s/\s+$//;
+            $part;
+        } grep { defined $_ && length $_ } @parts;
+        if (@parts >= 2 && rand() < $split_chance) {
+            my @pair = @parts[0, 1];
+            my $first_words = scalar grep { length } split /\s+/, $pair[0];
+            my $second_words = scalar grep { length } split /\s+/, $pair[1];
+            return @pair if $first_words >= 2 && $second_words >= 2;
+        }
+    }
+    return ($response);
+}
+
 sub _enqueueMessage {
     my ($sender, $message, $context) = @_;
     my $state = _getBufferState($sender);
@@ -178,7 +212,13 @@ sub _queueDirectResponse {
     $state->{typing_until} = 0;
     $state->{response_started} = 0;
     $state->{context} = $context;
-    push @{$state->{response_queue}}, $response;
+    my @parts = _splitOutgoingResponse($response);
+    return unless @parts;
+    my $typing_delay = _calculateTypingDelay($parts[0]);
+    if ($typing_delay > 0) {
+        $state->{typing_until} = time() + $buffer_delay + $typing_delay;
+    }
+    push @{$state->{response_queue}}, @parts;
 }
 
 sub _flushBufferedMessages {
@@ -764,27 +804,18 @@ sub _queueDropDbResponseIfNeeded {
     }
     $response = AIChat::MessageHandler::dropDbUnknownReply() unless defined $response && $response ne '';
     AIChat::ConversationHistory::addMessage($sender, "user", $message, "intent");
-    if ($response =~ /\|\|/) {
-        my @parts = grep { defined $_ && length $_ } map {
-            my $part = $_;
-            $part =~ s/^\s+//;
-            $part =~ s/\s+$//;
-            $part;
-        } split /\s*\|\|\s*/, $response;
-        if (@parts) {
-            my $state = _getBufferState($sender);
-            $state->{messages} = [];
-            $state->{response_queue} = [];
-            my $buffer_delay = AIChat::Config::get('buffer_delay');
-            $buffer_delay = 2 unless defined $buffer_delay;
-            $state->{buffer_deadline} = time() + $buffer_delay;
-            $state->{typing_until} = 0;
-            $state->{response_started} = 0;
-            $state->{context} = { type => $context };
-            push @{$state->{response_queue}}, @parts;
-        } else {
-            _queueDirectResponse($sender, $response, { type => $context });
-        }
+    my @parts = _splitOutgoingResponse($response);
+    if (@parts > 1) {
+        my $state = _getBufferState($sender);
+        $state->{messages} = [];
+        $state->{response_queue} = [];
+        my $buffer_delay = AIChat::Config::get('buffer_delay');
+        $buffer_delay = 2 unless defined $buffer_delay;
+        $state->{buffer_deadline} = time() + $buffer_delay;
+        $state->{typing_until} = 0;
+        $state->{response_started} = 0;
+        $state->{context} = { type => $context };
+        push @{$state->{response_queue}}, @parts;
     } else {
         _queueDirectResponse($sender, $response, { type => $context });
     }
@@ -1185,7 +1216,13 @@ sub _queueSpamRefusal {
     $state->{response_started} = 0;
     $state->{context} = { type => $context, sabotage => 1 };
     $state->{buffer_deadline} = time() + $buffer_delay;
-    push @{$state->{response_queue}}, $response;
+    my @parts = _splitOutgoingResponse($response);
+    return unless @parts;
+    my $typing_delay = _calculateTypingDelay($parts[0]);
+    if ($typing_delay > 0) {
+        $state->{typing_until} = time() + $buffer_delay + $typing_delay;
+    }
+    push @{$state->{response_queue}}, @parts;
     return 1;
 }
 
@@ -1203,7 +1240,13 @@ sub _queueSpamRefusalFallback {
     $state->{response_started} = 0;
     $state->{context} = { type => $context, sabotage => 1 };
     $state->{buffer_deadline} = time() + $buffer_delay;
-    push @{$state->{response_queue}}, $message;
+    my @parts = _splitOutgoingResponse($message);
+    return unless @parts;
+    my $typing_delay = _calculateTypingDelay($parts[0]);
+    if ($typing_delay > 0) {
+        $state->{typing_until} = time() + $buffer_delay + $typing_delay;
+    }
+    push @{$state->{response_queue}}, @parts;
     return 1;
 }
 
@@ -1343,11 +1386,13 @@ sub _queueSabotageRefusal {
     $state->{response_started} = 0;
     $state->{context} = { type => $context, sabotage => 1 };
     $state->{buffer_deadline} = time() + $buffer_delay;
-    my $typing_delay = _calculateTypingDelay($message);
+    my @parts = _splitOutgoingResponse($message);
+    return unless @parts;
+    my $typing_delay = _calculateTypingDelay($parts[0]);
     if ($typing_delay > 0) {
         $state->{typing_until} = time() + $buffer_delay + $typing_delay;
     }
-    push @{$state->{response_queue}}, $message;
+    push @{$state->{response_queue}}, @parts;
     return 1;
 }
 
@@ -1412,7 +1457,7 @@ sub _shouldCountSpamQuestion {
     my ($intent) = @_;
     return unless $intent && ref $intent eq 'HASH';
     my $action = $intent->{action} // '';
-    return 1 if $action eq 'chat';
+    return 1 if $action eq 'chat' && $intent->{is_question};
     return 1 if $action eq 'drop_db';
     return;
 }
