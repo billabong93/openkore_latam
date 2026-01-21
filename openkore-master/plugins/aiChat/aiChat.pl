@@ -254,6 +254,9 @@ sub _sendQueuedResponse {
             _recordOutgoingPacketSent();
         }
     } else {
+        if ($context->{sabotage}) {
+            $response = AIChat::MessageHandler::_normalizeResponseText($response);
+        }
         $response = _sanitizeOutgoingMessage($response);
         if (!$response) {
             debug "[aiChat] Resposta vazia apos sanitizacao para '$sender'\n", "plugin";
@@ -1180,7 +1183,7 @@ sub _queueSpamRefusal {
     $buffer_delay = 2 unless defined $buffer_delay;
     $state->{typing_until} = 0;
     $state->{response_started} = 0;
-    $state->{context} = { type => $context };
+    $state->{context} = { type => $context, sabotage => 1 };
     $state->{buffer_deadline} = time() + $buffer_delay;
     push @{$state->{response_queue}}, $response;
     return 1;
@@ -1198,7 +1201,7 @@ sub _queueSpamRefusalFallback {
     $buffer_delay = 2 unless defined $buffer_delay;
     $state->{typing_until} = 0;
     $state->{response_started} = 0;
-    $state->{context} = { type => $context };
+    $state->{context} = { type => $context, sabotage => 1 };
     $state->{buffer_deadline} = time() + $buffer_delay;
     push @{$state->{response_queue}}, $message;
     return 1;
@@ -1338,7 +1341,7 @@ sub _queueSabotageRefusal {
     $buffer_delay = 2 unless defined $buffer_delay;
     $state->{typing_until} = 0;
     $state->{response_started} = 0;
-    $state->{context} = { type => $context };
+    $state->{context} = { type => $context, sabotage => 1 };
     $state->{buffer_deadline} = time() + $buffer_delay;
     my $typing_delay = _calculateTypingDelay($message);
     if ($typing_delay > 0) {
