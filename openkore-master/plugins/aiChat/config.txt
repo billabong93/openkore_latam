@@ -40,6 +40,9 @@ aiChat_public_on_lockmap 1
 # Habilita respostas usando o banco de dados de monstros/drops (0 para sempre recusar)
 aiChat_mob_database 1
 
+# Chance de recusar perguntas do banco de drops (0.0 - 1.0)
+aiChat_dropdb_refusal_chance 0.5
+
 # Intervalo minimo entre pacotes enviados (em segundos)
 aiChat_min_packet_interval 0.6
 

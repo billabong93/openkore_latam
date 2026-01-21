@@ -702,7 +702,9 @@ sub generateDropDbResponse {
         return _randomDropDbRepeatReply();
     }
 
-    if (rand() < 0.5) {
+    my $refusal_chance = AIChat::Config::get('dropdb_refusal_chance');
+    $refusal_chance = 0.5 unless defined $refusal_chance;
+    if (rand() < $refusal_chance) {
         my $preferred_hint = _pickVariant(_dropDbRefusalReferences());
         my $refusal = _generateDropDbRefusalResponse($message, $sender, $preferred_hint);
         my $response = (defined $refusal && $refusal ne '') ? $refusal : ($preferred_hint || _randomDropDbRefusal($sender));
@@ -823,7 +825,9 @@ sub generateDropDbChatResponse {
     my $response;
     my $max_tokens = AIChat::Config::get('max_tokens');
     my $temperature = AIChat::Config::get('temperature');
-    if (rand() < 0.5) {
+    my $refusal_chance = AIChat::Config::get('dropdb_refusal_chance');
+    $refusal_chance = 0.5 unless defined $refusal_chance;
+    if (rand() < $refusal_chance) {
         my $preferred_hint = _pickVariant(_dropDbRefusalReferences());
         my $refusal = _generateDropDbRefusalResponse($message, $sender, $preferred_hint);
         my $response = (defined $refusal && $refusal ne '') ? $refusal : ($preferred_hint || _randomDropDbRefusal($sender));
