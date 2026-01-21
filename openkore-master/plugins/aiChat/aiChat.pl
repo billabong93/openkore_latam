@@ -537,6 +537,9 @@ sub onPrivateMessage {
     my $intent_context = { map_name => $field ? $field->baseName : undef, lock_map => $config{lockMap} };
     my $intent;
     $intent = _interpretCommand($message, $sender, $intent_context);
+    if (!_isDropDbIntent($intent) && _isMapFollowUpDropDb($sender, $message)) {
+        $intent = { action => 'drop_db', is_question => 1 };
+    }
     if (_handleSpamCheck($sender, $message, 'private', $intent)) {
         AIChat::Log::log_message(
             direction => 'in',
@@ -616,6 +619,9 @@ sub onPublicMessage {
     my $intent_context = { map_name => $field ? $field->baseName : undef, lock_map => $config{lockMap} };
     my $intent;
     $intent = _interpretCommand($message, $sender, $intent_context);
+    if (!_isDropDbIntent($intent) && _isMapFollowUpDropDb($sender, $message)) {
+        $intent = { action => 'drop_db', is_question => 1 };
+    }
     if (_handleSpamCheck($sender, $message, 'public', $intent)) {
         AIChat::Log::log_message(
             direction => 'in',
@@ -849,6 +855,26 @@ sub _queueDropDbResponseIfNeeded {
 sub _isDropDbIntent {
     my ($intent) = @_;
     return $intent && ref $intent eq 'HASH' && ($intent->{action} // '') eq 'drop_db';
+}
+
+sub _getLastDropDbStance {
+    my ($sender) = @_;
+    return unless defined $sender;
+    my $history = AIChat::ConversationHistory::getHistory($sender) || [];
+    for (my $i = @$history - 1; $i >= 0; $i--) {
+        my $entry = $history->[$i];
+        next unless ($entry->{type} // '') eq 'drop_db_stance';
+        return $entry->{content};
+    }
+    return;
+}
+
+sub _isMapFollowUpDropDb {
+    my ($sender, $message) = @_;
+    return 0 unless defined $message && $message ne '';
+    return 0 unless $message =~ /\bmapa(s)?\b/i;
+    my $stance = _getLastDropDbStance($sender);
+    return defined $stance && $stance eq 'answer';
 }
 
 sub _normalizeSenderKey {
