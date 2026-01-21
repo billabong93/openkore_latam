@@ -2,6 +2,7 @@ package aiChat;
 
 use strict;
 use warnings;
+use utf8;
 
 use Commands;
 use Globals qw(%timeout $messageSender $net %config $char $field $playersList %jobs_lut %emotions_lut %monsters %items %monsters_lut %monsters_name_lut %items_lut);
@@ -253,6 +254,9 @@ sub _sendQueuedResponse {
             _recordOutgoingPacketSent();
         }
     } else {
+        if ($context->{sabotage}) {
+            $response = AIChat::MessageHandler::_normalizeResponseText($response);
+        }
         $response = _sanitizeOutgoingMessage($response);
         if (!$response) {
             debug "[aiChat] Resposta vazia apos sanitizacao para '$sender'\n", "plugin";
@@ -1138,6 +1142,13 @@ sub _handleSpamCheck {
         return 1;
     }
 
+    if (_isSabotageIntent($intent)) {
+        my $queued = _queueSabotageRefusal($sender, $context);
+        $queued = _queueSabotageRefusalFallback($sender, $context) unless $queued;
+        _markSilenceAfterResponse($sender) if $queued;
+        return 1;
+    }
+
     my $should_count = _shouldCountSpamQuestion($intent);
     if (!$should_count) {
         _resetQuestionStreak($sender);
@@ -1172,7 +1183,7 @@ sub _queueSpamRefusal {
     $buffer_delay = 2 unless defined $buffer_delay;
     $state->{typing_until} = 0;
     $state->{response_started} = 0;
-    $state->{context} = { type => $context };
+    $state->{context} = { type => $context, sabotage => 1 };
     $state->{buffer_deadline} = time() + $buffer_delay;
     push @{$state->{response_queue}}, $response;
     return 1;
@@ -1190,7 +1201,7 @@ sub _queueSpamRefusalFallback {
     $buffer_delay = 2 unless defined $buffer_delay;
     $state->{typing_until} = 0;
     $state->{response_started} = 0;
-    $state->{context} = { type => $context };
+    $state->{context} = { type => $context, sabotage => 1 };
     $state->{buffer_deadline} = time() + $buffer_delay;
     push @{$state->{response_queue}}, $message;
     return 1;
@@ -1245,6 +1256,106 @@ sub _pickSpamRefusalReference {
     return $messages[int(rand(@messages))];
 }
 
+sub _pickSabotageRefusalReference {
+    my @messages = (
+        "Nem vem com essa, mano.",
+        "Sai fora com esse papo.",
+        "Aham, senta lá.",
+        "Para de forçar, velho.",
+        "Mano, que ideia torta.",
+        "Curiosidade demais é suspeito.",
+        "Pô, já deu, né?",
+        "Olha o Sherlock Holmes do servidor.",
+        "Lá vem o CSI do chat.",
+        "Tá achando que é interrogatório?",
+        "Tá em modo investigação agora, é?",
+        "Menos, detetive.",
+        "Maluco tá em missão secreta.",
+        "Quer o quê, CPF também?",
+        "Tá querendo o dossiê completo, é?",
+        "Que chatice, mano.",
+        "Vai arrumar o que fazer.",
+        "Tô sem paciência pra isso.",
+        "Muda de assunto ou para por aqui.",
+        "Tá enchendo já, na moral.",
+        "Para de caçar treta.",
+        "Tá tentando sabotar, só pode.",
+        "Corta essa viagem aí.",
+        "Vai jogar e para de palhaçada.",
+        "Ah, pronto… lá vem.",
+        "Menos, investigador.",
+        "Calma, agente secreto.",
+        "Tá achando que é polícia do chat?",
+        "Vai com calma aí, delegado.",
+        "Ô perito, relaxa.",
+        "Lá vem o interrogatório 2.0.",
+        "Tá coletando prova pra quê, mano?",
+        "Quer abrir inquérito agora?",
+        "Tá querendo atenção, né?",
+        "Tá carente, mano?",
+        "Vai caçar mob e larga do meu pé.",
+        "Vai farmar e para de arrumar assunto.",
+        "Vai upar, parça, na moral.",
+        "Vai fazer quest, mano.",
+        "Chega, já saturou.",
+        "Já deu dessa palhaçada.",
+        "Muda esse assunto aí.",
+        "Tá chato já.",
+        "Dá um tempo, velho.",
+        "Me poupa, mano.",
+        "Não viaja.",
+        "Para de inventar moda.",
+        "Mano, sério isso?",
+        "Tá de brincadeira comigo?",
+        "Tá me tirando, né?",
+        "Nossa, que insistência.",
+        "Cê não desencana não?",
+        "Já tá feio isso aí.",
+        "Tá passando vergonha, mano.",
+        "Para de graça.",
+        "Que papinho torto.",
+        "Tá tentando pagar de esperto, né?",
+        "Boa tentativa, espertão.",
+        "Vai lá, tenta com outro.",
+        "Comigo não cola.",
+        "Aqui não, campeão.",
+        "Boa sorte com essa aí… longe daqui.",
+    );
+    return $messages[int(rand(@messages))];
+}
+
+sub _buildSabotageRefusalMessage {
+    my $message = _pickSabotageRefusalReference();
+    return AIChat::MessageHandler::_normalizeResponseText($message);
+}
+
+sub _queueSabotageRefusal {
+    my ($sender, $context) = @_;
+    return unless defined $sender;
+    my $message = _buildSabotageRefusalMessage();
+    return unless defined $message && $message ne '';
+    my $state = _getBufferState($sender);
+    $state->{messages} = [];
+    $state->{response_queue} = [];
+    my $buffer_delay = AIChat::Config::get('buffer_delay');
+    $buffer_delay = 2 unless defined $buffer_delay;
+    $state->{typing_until} = 0;
+    $state->{response_started} = 0;
+    $state->{context} = { type => $context, sabotage => 1 };
+    $state->{buffer_deadline} = time() + $buffer_delay;
+    my $typing_delay = _calculateTypingDelay($message);
+    if ($typing_delay > 0) {
+        $state->{typing_until} = time() + $buffer_delay + $typing_delay;
+    }
+    push @{$state->{response_queue}}, $message;
+    return 1;
+}
+
+sub _queueSabotageRefusalFallback {
+    my ($sender, $context) = @_;
+    return _queueSabotageRefusal($sender, $context);
+}
+
 sub _markSilenceAfterResponse {
     my ($sender) = @_;
     return unless defined $sender;
@@ -1253,6 +1364,15 @@ sub _markSilenceAfterResponse {
     $silence_after_response_by_sender{$sender_key} = 1;
     $silence_message_count_by_sender{$sender_key} = 0;
     $question_streak_by_sender{$sender_key} = 0;
+}
+
+sub _calculateTypingDelay {
+    my ($message) = @_;
+    return 0 unless defined $message;
+    my $typing_speed = AIChat::Config::get('typing_speed');
+    return 0 unless $typing_speed && $typing_speed > 0;
+    my $delay = length($message) / $typing_speed;
+    return $delay > 0 ? $delay : 0;
 }
 
 sub _finalizeSilenceIfNeeded {
@@ -1297,6 +1417,12 @@ sub _shouldCountSpamQuestion {
     return;
 }
 
+sub _isSabotageIntent {
+    my ($intent) = @_;
+    return unless $intent && ref $intent eq 'HASH';
+    return ($intent->{action} // '') eq 'sabotage';
+}
+
 sub _injectEmotionHint {
     my ($sender) = @_;
     return unless defined $sender;
@@ -1322,4 +1448,4 @@ sub _injectEmotionHint {
     $last_emotion_hint_by_sender{$sender_key} = $hint;
 }
 
-1; 
+1;
