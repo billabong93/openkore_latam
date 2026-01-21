@@ -23,6 +23,7 @@ use constant {
     DEFAULT_BUFFER_DELAY => 2, # Segundos para aguardar novas mensagens antes de responder
     DEFAULT_PUBLIC_ON_LOCKMAP => 1, # Permitir respostas no chat publico quando estiver no lockMap
     DEFAULT_MOB_DATABASE => 1, # Habilitar respostas usando o banco de dados de monstros
+    DEFAULT_DROPDB_REFUSAL_CHANCE => 0.5, # Chance de recusar perguntas do banco de drops
     DEFAULT_MIN_PACKET_INTERVAL => 0.6, # Intervalo minimo entre pacotes enviados (em segundos)
     DEFAULT_CONVERSATION_LIMIT => 10, # Numero de mensagens do jogador antes de iniciar o encerramento
 };
@@ -44,6 +45,7 @@ my %_file_key_map = (
     aiChat_buffer_delay => 'buffer_delay',
     aiChat_public_on_lockmap => 'public_on_lockmap',
     aiChat_mob_database => 'mob_database',
+    aiChat_dropdb_refusal_chance => 'dropdb_refusal_chance',
     aiChat_min_packet_interval => 'min_packet_interval',
     aiChat_conversation_limit => 'conversation_limit',
 );
@@ -69,6 +71,7 @@ sub _loadFromConfigHash {
         'aiChat_buffer_delay',
         'aiChat_public_on_lockmap',
         'aiChat_mob_database',
+        'aiChat_dropdb_refusal_chance',
         'aiChat_min_packet_interval',
         'aiChat_conversation_limit',
     );
@@ -107,6 +110,9 @@ sub _applyValue {
         return unless $value =~ /^(?:0|1)$/;
     } elsif ($key eq 'mob_database') {
         return unless $value =~ /^(?:0|1)$/;
+    } elsif ($key eq 'dropdb_refusal_chance') {
+        return unless $value =~ /^-?\d+(?:\.\d+)?$/;
+        return if $value < 0 || $value > 1;
     } elsif ($key eq 'min_packet_interval') {
         return unless $value =~ /^\d+(?:\.\d+)?$/;
     } elsif ($key eq 'conversation_limit') {
@@ -133,6 +139,7 @@ BEGIN {
         buffer_delay => DEFAULT_BUFFER_DELAY,
         public_on_lockmap => DEFAULT_PUBLIC_ON_LOCKMAP,
         mob_database => DEFAULT_MOB_DATABASE,
+        dropdb_refusal_chance => DEFAULT_DROPDB_REFUSAL_CHANCE,
         min_packet_interval => DEFAULT_MIN_PACKET_INTERVAL,
         conversation_limit => DEFAULT_CONVERSATION_LIMIT,
     );
@@ -175,6 +182,7 @@ sub save {
     print $fh "aiChat_buffer_delay $_aiChatConfig{buffer_delay}\n";
     print $fh "aiChat_public_on_lockmap $_aiChatConfig{public_on_lockmap}\n";
     print $fh "aiChat_mob_database $_aiChatConfig{mob_database}\n";
+    print $fh "aiChat_dropdb_refusal_chance $_aiChatConfig{dropdb_refusal_chance}\n";
     print $fh "aiChat_min_packet_interval $_aiChatConfig{min_packet_interval}\n";
     print $fh "aiChat_conversation_limit $_aiChatConfig{conversation_limit}\n";
     close $fh or warning "[aiChat] Não foi possível fechar $config_file: $!\n", "plugin";
