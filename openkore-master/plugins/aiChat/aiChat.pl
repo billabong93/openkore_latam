@@ -872,7 +872,8 @@ sub _getLastDropDbStance {
 sub _isMapFollowUpDropDb {
     my ($sender, $message) = @_;
     return 0 unless defined $message && $message ne '';
-    return 0 unless $message =~ /\bmapa(s)?\b/i;
+    my $normalized = lc $message;
+    return 0 if index($normalized, 'mapa') < 0;
     my $stance = _getLastDropDbStance($sender);
     return defined $stance && $stance eq 'answer';
 }

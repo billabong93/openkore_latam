@@ -26,6 +26,8 @@ my $item_translation_cache;
 my %mondb_map_cache;
 my $mondb_lookup_cache;
 my %mondb_tier_lookup_cache;
+my $mondb_entity_lookup_cache;
+my $mondb_item_index_cache;
 
 BEGIN {
     $api_client = AIChat::APIClient->new();
@@ -292,6 +294,193 @@ sub _normalizeQueryText {
     return $normalized;
 }
 
+sub _extractJsonFromText {
+    my ($text) = @_;
+    return unless defined $text;
+    my $start = index($text, '{');
+    return if $start < 0;
+    my $end = rindex($text, '}');
+    return if $end < $start;
+    return substr($text, $start, $end - $start + 1);
+}
+
+sub _interpretDropDbQuestion {
+    my ($message, $sender) = @_;
+    return unless defined $message && $message ne '';
+
+    my $prompt = join "\n",
+        "Voce interpreta perguntas sobre monstros, drops e mapas do Ragnarok.",
+        "Responda apenas com JSON no formato:",
+        "{\"intent\":\"monster_location|monster_drops|item_source|unknown\",\"entity\":\"...\",\"map_only\":true|false}",
+        "Use intent=monster_location quando a pessoa perguntar onde encontrar um monstro.",
+        "Use intent=monster_drops quando perguntarem o que um monstro dropa.",
+        "Use intent=item_source quando perguntarem onde pegar um item.",
+        "Use map_only=true quando a pergunta pedir mapa ou codigo do mapa.",
+        "Se nao der para identificar, use intent=unknown e entity vazio.",
+        "Nao escreva nada fora do JSON.";
+
+    my @messages = (
+        {
+            role => "system",
+            content => $prompt,
+        }
+    );
+
+    my $history = AIChat::ConversationHistory::getHistory($sender) || [];
+    push @messages, map {
+        {
+            role => $_->{role},
+            content => $_->{content},
+        }
+    } @$history;
+
+    push @messages, {
+        role => "user",
+        content => $message,
+    };
+
+    my $response;
+    eval {
+        $response = $api_client->callAPIWithMessages(\@messages, {
+            max_tokens => 80,
+            temperature => 0,
+        });
+    };
+    return if $@ || !defined $response || $response eq '';
+
+    my $json_text = _extractJsonFromText($response);
+    return unless defined $json_text;
+
+    my $data;
+    eval {
+        $data = decode_json($json_text);
+    };
+    return if $@ || !$data || ref $data ne 'HASH';
+
+    my $intent = $data->{intent};
+    my $entity = $data->{entity};
+    my $map_only = $data->{map_only} ? 1 : 0;
+
+    return {
+        intent => $intent,
+        entity => $entity,
+        map_only => $map_only,
+    };
+}
+
+sub _loadDropDbEntityLookup {
+    return $mondb_entity_lookup_cache if $mondb_entity_lookup_cache;
+    my $mondb = _loadMonsterDropDb();
+    return {} unless $mondb && %$mondb;
+
+    my %monsters;
+    my %items;
+    my %locations;
+    my %maps;
+
+    for my $monster (keys %$mondb) {
+        my $entry = $mondb->{$monster} || {};
+        unless ($monster =~ /^Mapa\s+/i) {
+            my $monster_key = _normalizeQueryText($monster);
+            $monsters{$monster_key} = $monster if $monster_key ne '';
+        }
+
+        my $location = $entry->{location} // '';
+        if ($location ne '') {
+            my $location_key = _normalizeQueryText($location);
+            $locations{$location_key} = $location if $location_key ne '';
+        }
+
+        my $maps = $entry->{maps} || [];
+        for my $map (@$maps) {
+            next unless defined $map && $map ne '';
+            my $map_key = _normalizeQueryText($map);
+            $maps{$map_key} = $map if $map_key ne '';
+        }
+
+        my $drops = $entry->{drops} || [];
+        for my $drop (@$drops) {
+            next unless defined $drop && $drop ne '';
+            my $drop_key = _normalizeQueryText($drop);
+            $items{$drop_key} = $drop if $drop_key ne '';
+        }
+    }
+
+    $mondb_entity_lookup_cache = {
+        monsters => \%monsters,
+        items => \%items,
+        locations => \%locations,
+        maps => \%maps,
+    };
+    return $mondb_entity_lookup_cache;
+}
+
+sub _loadDropDbItemIndex {
+    return $mondb_item_index_cache if $mondb_item_index_cache;
+    my $mondb = _loadMonsterDropDb();
+    return {} unless $mondb && %$mondb;
+
+    my %index;
+    for my $monster (keys %$mondb) {
+        next if $monster =~ /^Mapa\s+/i;
+        my $entry = $mondb->{$monster} || {};
+        my $drops = $entry->{drops} || [];
+        for my $drop (@$drops) {
+            next unless defined $drop && $drop ne '';
+            my $key = _normalizeQueryText($drop);
+            next unless $key ne '';
+            $index{$key} ||= [];
+            push @{$index{$key}}, $monster;
+        }
+    }
+
+    $mondb_item_index_cache = \%index;
+    return $mondb_item_index_cache;
+}
+
+sub _resolveDropDbMonster {
+    my ($entity) = @_;
+    return unless defined $entity && $entity ne '';
+    my $lookup = _loadDropDbEntityLookup();
+    return unless $lookup->{monsters};
+    my $key = _normalizeQueryText($entity);
+    return $lookup->{monsters}{$key};
+}
+
+sub _resolveDropDbItem {
+    my ($entity) = @_;
+    return unless defined $entity && $entity ne '';
+    my $lookup = _loadDropDbEntityLookup();
+    return unless $lookup->{items};
+    my $key = _normalizeQueryText($entity);
+    return $lookup->{items}{$key};
+}
+
+sub _formatDropDbDrops {
+    my ($entry) = @_;
+    return '' unless $entry && ref $entry eq 'HASH';
+    my $drops = $entry->{drops} || [];
+    return '' unless @$drops;
+    my @list = @$drops;
+    @list = @list[0, 1] if @list > 2;
+    return join(', ', @list);
+}
+
+sub _formatDropDbLocationAnswer {
+    my ($entry, $map_only) = @_;
+    return '' unless $entry && ref $entry eq 'HASH';
+    my $location = $entry->{location} // '';
+    my $maps = $entry->{maps} || [];
+
+    if ($map_only) {
+        return $maps->[0] if $maps && @$maps;
+    }
+
+    return $location if $location ne '';
+    return $maps->[0] if $maps && @$maps;
+    return '';
+}
+
 sub _isMapQuery {
     my ($message) = @_;
     return 0 unless defined $message && $message ne '';
@@ -310,6 +499,45 @@ sub _getDropDbStance {
         return $entry->{content};
     }
     return undef;
+}
+
+sub _getLastDropDbAnswer {
+    my ($sender) = @_;
+    return unless defined $sender;
+    my $history = AIChat::ConversationHistory::getHistory($sender) || [];
+    for (my $i = @$history - 1; $i >= 0; $i--) {
+        my $entry = $history->[$i];
+        next unless ($entry->{type} // '') eq 'drop_db_answer';
+        my $content = $entry->{content};
+        next unless defined $content && $content ne '';
+        my $data;
+        eval { $data = decode_json($content); };
+        next if $@ || !$data || ref $data ne 'HASH';
+        return $data;
+    }
+    return;
+}
+
+sub _setLastDropDbAnswer {
+    my ($sender, $data) = @_;
+    return unless defined $sender && $data && ref $data eq 'HASH';
+    my $payload;
+    eval { $payload = JSON::Tiny::encode_json($data); };
+    return if $@ || !defined $payload || $payload eq '';
+    AIChat::ConversationHistory::addMessage($sender, "system", $payload, "drop_db_answer");
+}
+
+sub _shouldAnswerWithMapOnly {
+    my ($sender, $intent, $entity, $map_only) = @_;
+    return 1 if $map_only;
+    return 0 unless defined $sender && defined $intent && defined $entity;
+    return 0 unless $intent eq 'monster_location';
+    my $last = _getLastDropDbAnswer($sender);
+    return 0 unless $last && ref $last eq 'HASH';
+    return 0 unless ($last->{intent} // '') eq $intent;
+    return 0 unless defined $last->{entity} && _normalizeQueryText($last->{entity}) eq _normalizeQueryText($entity);
+    return 0 unless ($last->{answer_type} // '') eq 'location';
+    return 1;
 }
 
 sub _setDropDbStance {
@@ -781,7 +1009,6 @@ sub generateDropDbResponse {
     my $prompt = AIChat::Config::get('prompt');
     my $history = AIChat::ConversationHistory::getHistory($sender) || [];
     my @recent = grep { $_->{role} && $_->{role} ne 'system' } @$history;
-    @recent = @recent[-6 .. -1] if @recent > 6;
 
     my @messages = (
         {
@@ -855,75 +1082,60 @@ sub generateDropDbChatResponse {
         return generateDropDbRefusal($message, $sender);
     }
 
-    unless (_isDropDbQueryMessage($message) || _isMapQuery($message)) {
+    my $analysis = _interpretDropDbQuestion($message, $sender);
+    return dropDbUnknownReply() unless $analysis;
+
+    my $intent = $analysis->{intent} // '';
+    my $entity = $analysis->{entity} // '';
+    my $map_only = $analysis->{map_only} ? 1 : 0;
+    return dropDbUnknownReply() if $intent eq '' || $intent eq 'unknown' || $entity eq '';
+
+    my $mondb = _loadMonsterDropDb();
+    return dropDbUnknownReply() unless $mondb && %$mondb;
+
+    my $response = '';
+    my $answer_type = '';
+    if ($intent eq 'monster_location' || $intent eq 'monster_drops') {
+        my $monster = _resolveDropDbMonster($entity);
+        return dropDbUnknownReply() unless $monster;
+        my $entry = $mondb->{$monster} || {};
+        if ($intent eq 'monster_location') {
+            my $use_map_only = _shouldAnswerWithMapOnly($sender, $intent, $monster, $map_only);
+            $response = _formatDropDbLocationAnswer($entry, $use_map_only);
+            $answer_type = $use_map_only ? 'map' : 'location';
+        } else {
+            $response = _formatDropDbDrops($entry);
+            $answer_type = 'drops';
+        }
+    } elsif ($intent eq 'item_source') {
+        my $item = _resolveDropDbItem($entity);
+        return dropDbUnknownReply() unless $item;
+        my $index = _loadDropDbItemIndex();
+        my $item_key = _normalizeQueryText($item);
+        my $monsters = $index->{$item_key} || [];
+        return dropDbUnknownReply() unless @$monsters;
+        my $monster = $monsters->[0];
+        if ($map_only) {
+            my $entry = $mondb->{$monster} || {};
+            $response = _formatDropDbLocationAnswer($entry, 1);
+            $answer_type = 'map';
+        } else {
+            $response = $monster;
+            $answer_type = 'monster';
+        }
+    } else {
         return dropDbUnknownReply();
     }
 
-    my $include_maps = _isMapQuery($message);
-    my $drop_context = _readMonsterDropDbRaw($include_maps);
-    return dropDbUnknownReply() unless $drop_context;
-
-    my $prompt = AIChat::Config::get('prompt');
-    my $format_hint = $include_maps
-        ? "Banco de dados de monstros e drops (formato: Monstro: (Localizacao, Mapa1, Mapa2) Drop1, Drop2):"
-        : "Banco de dados de monstros e drops (formato: Monstro: (Localizacao) Drop1, Drop2):";
-    my $combined_prompt = join "\n",
-        $prompt,
-        $format_hint,
-        $drop_context,
-        "Use somente as informacoes do banco acima.",
-        "Varie o jeito de responder para nao ficar engessado, como player de MMO.",
-        "Nunca invente monstros, itens ou mapas.",
-        "Quando perguntarem onde fica um monstro, responda apenas com a localizacao OU apenas com o monstro, nunca ambos na mesma mensagem.",
-        "Quando perguntarem onde pega um item, responda apenas com o monstro OU apenas com a localizacao, nunca ambos na mesma mensagem.",
-        "Se a pergunta for \"qual mapa\" ou \"mapa?\", responda somente com o codigo do mapa (o que estiver entre parenteses).",
-        "Se a pessoa repetir a mesma pergunta depois da localizacao, responda com o codigo do mapa em vez de repetir a localizacao.",
-        "Se precisar enviar duas partes diferentes, use \"||\" para separar em duas mensagens.",
-        "Nunca liste mais de 1 ou 2 monstros/itens/mapas por mensagem.",
-        "Se nao houver informacao clara, responda com uma frase curta de desconhecimento, como um player.",
-        "Exemplos: nao sei, nao conheco, sei nao, nao to ligado, desculpa nao sei.";
-    my @messages = (
-        {
-            role => "system",
-            content => $combined_prompt
-        },
-        {
-            role => "user",
-            content => $message,
-        }
-    );
-
-    my $response;
-    my $max_tokens = AIChat::Config::get('max_tokens');
-    my $temperature = AIChat::Config::get('temperature');
-    my $refusal_chance = AIChat::Config::get('dropdb_refusal_chance');
-    $refusal_chance = 0.5 unless defined $refusal_chance;
-    if (!$guaranteed_match && rand() < $refusal_chance) {
-        my $preferred_hint = _pickVariant(_dropDbRefusalReferences());
-        my $refusal = _generateDropDbRefusalResponse($message, $sender, $preferred_hint);
-        my $response = (defined $refusal && $refusal ne '') ? $refusal : ($preferred_hint || _randomDropDbRefusal($sender));
-        _setDropDbStance($sender, 'refusal');
-        return $response;
-    }
-    eval {
-        $response = $api_client->callAPIWithMessages(\@messages, {
-            max_tokens => $max_tokens,
-            temperature => $temperature,
-        });
-    };
-    if ($@ || !defined $response || $response eq '') {
-        return generateDropDbRefusal($message, $sender);
-    }
-
-    $response =~ s/\s+/ /g;
-    $response =~ s/^\s+//;
-    $response =~ s/\s+$//;
     $response = _limitDropDbList($response);
-    if ($response ne '') {
-        _setDropDbStance($sender, 'answer');
-        return $response;
-    }
-    return generateDropDbRefusal($message, $sender);
+    return dropDbUnknownReply() unless $response ne '';
+    _setDropDbStance($sender, 'answer');
+    _setLastDropDbAnswer($sender, {
+        intent => $intent,
+        entity => $entity,
+        answer_type => $answer_type,
+    });
+    return $response;
 }
 
 sub _limitDropDbList {
@@ -1060,6 +1272,8 @@ sub _loadMonsterDropDb {
     $mondb_cache = \%db;
     $mondb_lookup_cache = undef;
     %mondb_tier_lookup_cache = ();
+    $mondb_entity_lookup_cache = undef;
+    $mondb_item_index_cache = undef;
     return $mondb_cache;
 }
 
@@ -1293,7 +1507,6 @@ sub interpretCommand {
 
     my $history = AIChat::ConversationHistory::getHistory($sender) || [];
     my @recent = grep { $_->{role} ne "system" } @$history;
-    @recent = @recent[-6 .. -1] if @recent > 6;
 
     my @recent_intents = grep { ($_->{type} // '') eq 'intent' } @$history;
     @recent_intents = @recent_intents[-10 .. -1] if @recent_intents > 10;
@@ -1352,7 +1565,6 @@ sub generateEmoteFollowup {
 
     my $history = AIChat::ConversationHistory::getHistory($sender) || [];
     my @recent = grep { $_->{role} ne "system" } @$history;
-    @recent = @recent[-6 .. -1] if @recent > 6;
 
     my $prompt = AIChat::Config::get('prompt');
     my $map_name = $context && defined $context->{map_name} ? $context->{map_name} : ($bot_character_data{map_name} // '');
