@@ -349,92 +349,6 @@ sub _isDropDbQueryMessage {
     return 0;
 }
 
-sub _isLocationQuery {
-    my ($message) = @_;
-    return 0 unless defined $message && $message ne '';
-    my $normalized = _normalizeQueryText($message);
-    return 0 unless $normalized ne '';
-    return $normalized =~ /\b(onde|aonde|local|localizacao|lugar)\b/;
-}
-
-sub _isDropQuery {
-    my ($message) = @_;
-    return 0 unless defined $message && $message ne '';
-    my $normalized = _normalizeQueryText($message);
-    return 0 unless $normalized ne '';
-    return $normalized =~ /\b(dropa|drop|dropou|drops)\b/;
-}
-
-sub _pickDropDbMapCode {
-    my ($entry) = @_;
-    return '' unless $entry && ref $entry eq 'HASH';
-    my $maps = $entry->{maps} || [];
-    return $maps->[0] if @$maps;
-    return '';
-}
-
-sub _findDropDbMatch {
-    my ($message) = @_;
-    return undef unless defined $message && $message ne '';
-    my $normalized = _normalizeQueryText($message);
-    return undef unless $normalized ne '';
-    my $mondb = _loadMonsterDropDb();
-    return undef unless $mondb && %$mondb;
-
-    for my $monster (keys %$mondb) {
-        next if $monster =~ /^Mapa\s+/i;
-        my $entry = $mondb->{$monster} || {};
-        my $monster_key = _normalizeQueryText($monster);
-        if ($monster_key ne '' && index($normalized, $monster_key) >= 0) {
-            return { monster => $monster, entry => $entry, type => 'monster' };
-        }
-        my $drops = $entry->{drops} || [];
-        for my $drop (@$drops) {
-            next unless defined $drop && $drop ne '';
-            my $drop_key = _normalizeQueryText($drop);
-            if ($drop_key ne '' && index($normalized, $drop_key) >= 0) {
-                return { monster => $monster, entry => $entry, type => 'drop', drop => $drop };
-            }
-        }
-    }
-    return undef;
-}
-
-sub _buildDirectDropDbReply {
-    my ($message) = @_;
-    my $match = _findDropDbMatch($message);
-    return '' unless $match;
-    my $entry = $match->{entry} || {};
-    my $location = $entry->{location} // '';
-    my $drops = $entry->{drops} || [];
-
-    if (_isMapQuery($message)) {
-        my $map_code = _pickDropDbMapCode($entry);
-        return $map_code if $map_code ne '';
-        return $location if $location ne '';
-        return '';
-    }
-
-    if (_isLocationQuery($message)) {
-        return $location if $location ne '';
-        my $map_code = _pickDropDbMapCode($entry);
-        return $map_code if $map_code ne '';
-        return '';
-    }
-
-    if (_isDropQuery($message)) {
-        return '' unless @$drops;
-        return join(', ', @$drops[0 .. ($#$drops < 1 ? $#$drops : 1)]);
-    }
-
-    if ($match->{type} && $match->{type} eq 'drop') {
-        return $match->{monster} // '';
-    }
-
-    return $location if $location ne '';
-    return '';
-}
-
 sub _loadMonsterDropLookup {
     return $mondb_lookup_cache if $mondb_lookup_cache;
     my $mondb = _loadMonsterDropDb();
@@ -846,12 +760,6 @@ sub generateDropDbResponse {
         return generateDropDbRefusal($message, $sender);
     }
 
-    my $direct_reply = _buildDirectDropDbReply($message);
-    if (defined $direct_reply && $direct_reply ne '') {
-        _setDropDbStance($sender, 'answer');
-        return $direct_reply;
-    }
-
     unless (_isDropDbQueryMessage($message) || _isMapQuery($message)) {
         return dropDbUnknownReply();
     }
@@ -945,12 +853,6 @@ sub generateDropDbChatResponse {
     my $mob_database_enabled = AIChat::Config::get('mob_database');
     if (!defined $mob_database_enabled || !$mob_database_enabled) {
         return generateDropDbRefusal($message, $sender);
-    }
-
-    my $direct_reply = _buildDirectDropDbReply($message);
-    if (defined $direct_reply && $direct_reply ne '') {
-        _setDropDbStance($sender, 'answer');
-        return $direct_reply;
     }
 
     unless (_isDropDbQueryMessage($message) || _isMapQuery($message)) {
