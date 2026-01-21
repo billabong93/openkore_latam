@@ -9,6 +9,7 @@ use Globals qw(%timeout $messageSender $net %config $char $field $playersList %j
 use Settings qw(%sys);
 use I18N qw(bytesToString);
 use Log qw(warning message debug);
+use JSON::Tiny qw(decode_json);
 use Plugins;
 use AI;
 use Misc qw(getEmotionByCommand);
@@ -59,6 +60,7 @@ my $emotionHookID = Plugins::addHook('packet_emotion', \&onEmotion, undef);
 $hooks{packet_emotion_direct} = $emotionHookID;
 
 my %message_buffers;
+my $ack_client = AIChat::APIClient->new();
 my $last_emotion_command;
 my $last_emotion_time;
 my %last_emotion_command_by_sender;
@@ -296,7 +298,7 @@ sub _sendQueuedResponse {
             _recordOutgoingPacketSent();
         }
     } else {
-        if ($context->{sabotage}) {
+        if ($context->{sabotage} || $context->{normalize}) {
             $response = AIChat::MessageHandler::_normalizeResponseText($response);
         }
         $response = _sanitizeOutgoingMessage($response);
@@ -1201,44 +1203,161 @@ sub _setConversationCloseStage {
 
 sub _pickConversationCloseWarning {
     my @messages = (
-        "mano foi mal, da mais pra conversar nao",
-        "mal ai, nao da pra ficar no papo agora",
-        "to ocupado aqui, nao da pra conversar",
-        "foi mal, ja deu de conversar",
-        "sem tempo pra papo agora",
+        "Mano, vou ter que parar por aqui.",
+        "Foi mal, vou encerrar aqui.",
+        "Aí não dá, vou ficar quieto agora.",
+        "Mal aí, não vou conseguir continuar conversando.",
+        "Mano, agora eu não consigo mais responder.",
+        "Foi mal, vou focar no game e parar de falar.",
+        "Tô no meio do rolê aqui, vou parar de conversar.",
+        "Tá bom, mas vou parar por aqui, valeu.",
+        "A conversa foi boa, mas vou sair do papo agora.",
+        "Deixa eu cortar aqui, tô ocupado.",
+        "Vou dar uma sumida do chat agora.",
+        "Vou ficar off no papo, foi mal.",
+        "Vou mutar aqui e seguir o jogo.",
+        "Vou parar de responder por agora.",
+        "Não dá pra seguir no papo, desculpa.",
+        "Vou ter que te deixar falando sozinho agora, foi mal.",
+        "Mano, não consigo continuar nessa conversa.",
+        "Agora não dá mais, vou ficar na minha.",
+        "Tô farmando, vou parar de conversar.",
+        "Tô ocupado demais, vou encerrar aqui.",
+        "Tô sem tempo pra continuar, vou parar por aqui.",
+        "Vou focar aqui e parar de trocar ideia.",
+        "Vou ficar quieto agora pra não atrapalhar.",
+        "Já deu por hoje, vou parar de conversar.",
+        "Aí já era, vou sair do chat agora.",
+        "Vou deixar esse assunto pra depois, agora não dá.",
+        "Depois a gente continua, agora eu vou parar.",
+        "Mais tarde a gente troca ideia, agora vou encerrar.",
+        "Foi mal, não rola continuar agora.",
     );
     return $messages[int(rand(@messages))];
 }
 
 sub _pickConversationCloseFinal {
     my @messages = (
-        "mano ja falei que nao da, tchau",
-        "ja deu, to ocupado, flw",
-        "nao da mesmo, vou sair daqui",
-        "ja encerrou, flw",
-        "sem papo, tchau",
+        "Mano, já falei que não dá. Flw.",
+        "Já disse que vou parar, tchau.",
+        "Não dá mesmo, vou sair daqui. Flw.",
+        "Já encerrei, para de insistir. Flw.",
+        "Sem papo, mano. Tchau.",
+        "Mano, acabou o assunto. Flw.",
+        "Já deu, tô ocupado. Tchau.",
+        "Não vou continuar respondendo. Flw.",
+        "Mano, para de puxar assunto, já foi.",
+        "Falei que ia parar, lembra? Flw.",
+        "Última vez: não dá. Tchau.",
+        "Chega, mano. Vou ficar quieto agora.",
+        "Já era, vou mutar isso aqui. Flw.",
+        "Tô saindo do chat, insiste não.",
+        "Não adianta insistir, já parei.",
+        "Mano, não força. Já encerrou.",
+        "Acabou, tô off do papo. Flw.",
+        "Vou ignorar agora, valeu.",
+        "Já disse que não dá, então tchau.",
+        "Tu tá insistindo à toa, mano. Flw.",
+        "Pô, respeita aí: eu parei.",
+        "Já falei: não dá pra conversar. Flw.",
+        "Mano, cê não entendeu? Não dá.",
+        "Sem conversa, já falei. Tchau.",
+        "Chega de mensagem, flw.",
+        "Insiste não, vou sair.",
+        "Não vou ficar nisso, tchau.",
+        "A conversa acabou, mano. Flw.",
+        "Se continuar, vou só ignorar.",
+        "Já deu, mano… flw e pronto.",
     );
     return $messages[int(rand(@messages))];
 }
 
 sub _pickConversationCloseGoodbye {
     my @messages = (
-        "vlw, pra vc tbm",
-        "blz, bom up",
-        "falou, boa sorte",
-        "tmj, bom jogo",
-        "vlw, boa",
+        "Vlw, vlw.",
+        "Falou, bom up aí.",
+        "Blz, bom farm.",
+        "Boa, bom jogo.",
+        "Tmj, boa run.",
+        "É nóis, bom up.",
+        "Fechou, boa sorte.",
+        "Falou, sucesso aí.",
+        "Vlw, fica bem.",
+        "Demorou, boa.",
+        "Boa, bom loot.",
+        "Falou, bons drops.",
+        "Vlw, que venha carta.",
+        "Boa, que drope tudo.",
+        "Bom grind aí.",
+        "Bom corre aí.",
+        "Boa instância pra você.",
+        "Falou, bom role.",
+        "Tamo junto, bom jogo.",
+        "É isso, bom up e boa.",
+        "Valeu, até mais.",
+        "Falou, até a próxima.",
+        "Tchau, bom jogo aí.",
+        "Vlw, gg.",
+        "Sucesso no up.",
+        "Boa sorte no farm.",
+        "Bons loots pra você.",
+        "Falou, fica na paz.",
+        "Tmj, se cuida.",
+        "Vlw, abraço.",
     );
     return $messages[int(rand(@messages))];
 }
 
-sub _isConversationCloseAcknowledgement {
-    my ($message) = @_;
-    return unless defined $message;
-    my $text = lc $message;
-    return 1 if $text =~ /\b(blz|beleza|ok|okay|vlw|valeu|valew|flw|falou|tchau|ate|até|obg|obrigado|brigado|tmj|dboa|de boa|tranquilo)\b/;
-    return 1 if $text =~ /\b(bom\s+up|boa\s+sorte|bom\s+jogo)\b/;
-    return;
+sub _interpretConversationCloseAcknowledgement {
+    my ($sender, $message) = @_;
+    return unless defined $sender && defined $message;
+
+    my $history = AIChat::ConversationHistory::getHistory($sender) || [];
+    my @recent = grep { $_->{role} ne "system" } @$history;
+    @recent = @recent[-6 .. -1] if @recent > 6;
+
+    my @messages = (
+        {
+            role => "system",
+            content => "Voce e um classificador de conversa. Responda apenas com JSON valido no formato {\"acknowledge\":true|false}. Marque true se o jogador concordar em encerrar a conversa, aceitar o encerramento, se despedir, agradecer ou indicar que vai parar o papo. Marque false se ele insistir, pedir para continuar, insistir em assunto, ou ignorar o encerramento. Nao inclua nenhum texto fora do JSON.",
+        }
+    );
+
+    push @messages, map {
+        {
+            role => $_->{role},
+            content => $_->{content},
+        }
+    } @recent;
+
+    push @messages, {
+        role => "user",
+        content => $message,
+    };
+
+    my $response;
+    eval {
+        $response = $ack_client->callAPIWithMessages(\@messages, {
+            max_tokens => 40,
+            temperature => 0,
+        });
+    };
+    if ($@) {
+        warning "[aiChat] Erro ao interpretar encerramento: $@\n", "plugin";
+        return;
+    }
+
+    return unless defined $response && length $response;
+    my $parsed;
+    eval {
+        $parsed = decode_json($response);
+    };
+    if ($@ || !ref $parsed) {
+        debug "[aiChat] Resposta invalida ao interpretar encerramento: $response\n", "plugin";
+        return;
+    }
+
+    return $parsed->{acknowledge} ? 1 : 0;
 }
 
 sub _handleConversationLimit {
@@ -1253,16 +1372,16 @@ sub _handleConversationLimit {
 
     if (!$stage) {
         my $response = _pickConversationCloseWarning();
-        _queueDirectResponse($sender, $response, { type => $context });
+        _queueDirectResponse($sender, $response, { type => $context, normalize => 1 });
         _setConversationCloseStage($sender, 1);
         return 1;
     }
 
     if ($stage == 1) {
-        my $response = _isConversationCloseAcknowledgement($message)
+        my $response = _interpretConversationCloseAcknowledgement($sender, $message)
             ? _pickConversationCloseGoodbye()
             : _pickConversationCloseFinal();
-        _queueDirectResponse($sender, $response, { type => $context });
+        _queueDirectResponse($sender, $response, { type => $context, normalize => 1 });
         _setConversationCloseStage($sender, 2);
         _markSilenceAfterResponse($sender);
         return 1;
