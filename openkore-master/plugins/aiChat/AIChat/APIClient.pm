@@ -81,6 +81,7 @@ sub callAPI {
 
     my $data = {
         provider => $self->{provider}, # Enviar o provedor para o proxy
+        api_key => AIChat::Config::get('api_key'),
         model => $self->{model},
         messages => \@messages,
         max_tokens => $self->{max_tokens},
@@ -114,6 +115,7 @@ sub callAPIWithMessages {
     my $proxy_url = 'http://localhost:3000/proxy';
     my $data = {
         provider => $self->{provider},
+        api_key => AIChat::Config::get('api_key'),
         model => $self->{model},
         messages => $messages,
         max_tokens => $self->{max_tokens},

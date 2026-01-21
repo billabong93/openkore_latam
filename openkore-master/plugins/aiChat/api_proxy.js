@@ -22,16 +22,26 @@ const server = http.createServer((req, res) => {
                 const requestData = JSON.parse(body);
                 const provider = requestData.provider;
                 const aiApiUrl = provider === 'openai' ? OPENAI_API_URL : DEEPSEEK_API_URL;
-                
-                // Remove o provider do payload antes de enviar para a API de IA
-                delete requestData.provider; 
+
+                const apiKey = (requestData.api_key || process.env.AICHAT_API_KEY || API_KEY || '').trim();
+
+                // Remove campos internos do payload antes de enviar para a API de IA
+                delete requestData.provider;
+                delete requestData.api_key;
+
+                if (!apiKey) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'API key ausente. Configure no config.txt ou defina AICHAT_API_KEY.' }));
+                    return;
+                }
+
                 const aiApiPayload = JSON.stringify(requestData);
 
                 const options = {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${API_KEY}`, // Chave API para a DeepSeek/OpenAI
+                        'Authorization': `Bearer ${apiKey}`, // Chave API para a DeepSeek/OpenAI
                         'Content-Length': Buffer.byteLength(aiApiPayload)
                     }
                 };

@@ -59,7 +59,7 @@ Orc Zumbi: (Caverna de Geffen, gef_dun01) Pele de Orc, Carta Orc Zumbi
 
 ### B. No Proxy Node.js (`api_proxy.js`)
 
-Abra `plugins/aiChat/api_proxy.js` e **insira sua chave de API diretamente** (ex: `const DEEPSEEK_API_KEY = 'SUA_CHAVE_AQUI';`).
+O proxy usa a chave definida em `aiChat_api_key` no `config.txt`. Como alternativa, você pode definir a variável de ambiente `AICHAT_API_KEY` ou inserir a chave diretamente no `api_proxy.js`.
 
 ## 3. Uso
 
