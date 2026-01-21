@@ -24,6 +24,7 @@ my $api_client;
 my $mondb_cache;
 my $item_translation_cache;
 my %mondb_map_cache;
+my $mondb_lookup_cache;
 
 BEGIN {
     $api_client = AIChat::APIClient->new();
@@ -329,6 +330,43 @@ sub _normalizeResponseText {
     $normalized =~ s/^\s+//;
     $normalized =~ s/\s+$//;
     return $normalized;
+}
+
+sub _isDropDbQueryMessage {
+    my ($message) = @_;
+    return 0 unless defined $message && $message ne '';
+    my $normalized = _normalizeQueryText($message);
+    return 0 unless $normalized ne '';
+    my $mondb = _loadMonsterDropDb();
+    return 0 unless $mondb && %$mondb;
+    my $lookup = _loadMonsterDropLookup();
+    return 0 unless $lookup && %$lookup;
+    for my $key (keys %$lookup) {
+        next unless $key && $key ne '';
+        return 1 if index($normalized, $key) >= 0;
+    }
+    return 0;
+}
+
+sub _loadMonsterDropLookup {
+    return $mondb_lookup_cache if $mondb_lookup_cache;
+    my $mondb = _loadMonsterDropDb();
+    return {} unless $mondb && %$mondb;
+    my %lookup;
+    for my $monster (keys %$mondb) {
+        next if $monster =~ /^Mapa\s+/i;
+        my $entry = $mondb->{$monster} || {};
+        my $drops = $entry->{drops} || [];
+        my $monster_key = _normalizeQueryText($monster);
+        $lookup{$monster_key} = 1 if defined $monster_key && $monster_key ne '';
+        for my $drop (@$drops) {
+            next unless defined $drop && $drop ne '';
+            my $drop_key = _normalizeQueryText($drop);
+            $lookup{$drop_key} = 1 if defined $drop_key && $drop_key ne '';
+        }
+    }
+    $mondb_lookup_cache = \%lookup;
+    return $mondb_lookup_cache;
 }
 
 sub _pickVariant {
@@ -723,6 +761,15 @@ sub generateDropDbRefusal {
     return _randomDropDbRefusal($sender) unless defined $message && $message ne '';
     my $refusal = _generateDropDbRefusalResponse($message, $sender);
     my $response = (defined $refusal && $refusal ne '') ? $refusal : _randomDropDbRefusal($sender);
+    if ($sender) {
+        my $history = AIChat::ConversationHistory::getHistory($sender) || [];
+        my @recent_assistant = grep { ($_->{role} // '') eq 'assistant' } @$history;
+        @recent_assistant = @recent_assistant[-5 .. -1] if @recent_assistant > 5;
+        my %recent = map { _normalizeEchoText($_->{content} // '') => 1 } @recent_assistant;
+        if ($recent{_normalizeEchoText($response)}) {
+            $response = _randomDropDbRefusal($sender);
+        }
+    }
     _setDropDbStance($sender, 'refusal');
     return $response;
 }
@@ -927,6 +974,7 @@ sub _loadMonsterDropDb {
     }
 
     $mondb_cache = \%db;
+    $mondb_lookup_cache = undef;
     return $mondb_cache;
 }
 
@@ -1094,6 +1142,20 @@ sub processMessages {
     }
 
     my $combined_message = join "\n", @$messages;
+    my $stance = _getDropDbStance($sender);
+    if (defined $stance && $stance eq 'refusal') {
+        my $has_dropdb = 0;
+        for my $message (@$messages) {
+            if (_isDropDbQueryMessage($message)) {
+                $has_dropdb = 1;
+                last;
+            }
+        }
+        if ($has_dropdb) {
+            my $refusal = generateDropDbRefusal($combined_message, $sender);
+            return [$refusal] if defined $refusal && $refusal ne '';
+        }
+    }
     my $response;
     eval {
         $response = $api_client->callAPI($combined_message, $sender);
