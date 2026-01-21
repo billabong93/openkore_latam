@@ -760,6 +760,10 @@ sub generateDropDbResponse {
         return generateDropDbRefusal($message, $sender);
     }
 
+    unless (_isDropDbQueryMessage($message) || _isMapQuery($message)) {
+        return dropDbUnknownReply();
+    }
+
     if (_isRepeatedDropDbQuestion($sender, $message)) {
         return _randomDropDbRepeatReply();
     }
@@ -849,6 +853,10 @@ sub generateDropDbChatResponse {
     my $mob_database_enabled = AIChat::Config::get('mob_database');
     if (!defined $mob_database_enabled || !$mob_database_enabled) {
         return generateDropDbRefusal($message, $sender);
+    }
+
+    unless (_isDropDbQueryMessage($message) || _isMapQuery($message)) {
+        return dropDbUnknownReply();
     }
 
     my $include_maps = _isMapQuery($message);

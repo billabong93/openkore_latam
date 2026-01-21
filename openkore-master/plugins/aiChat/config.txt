@@ -48,3 +48,6 @@ aiChat_min_packet_interval 0.6
 
 # Numero de mensagens do jogador antes de tentar encerrar o papo (0 desativa)
 aiChat_conversation_limit 10
+
+# Numero de perguntas seguidas antes de recusar por spam (0 desativa)
+aiChat_spam_question_limit 5

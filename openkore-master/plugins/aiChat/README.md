@@ -36,6 +36,7 @@ Configure as opções no `plugins/aiChat/config.txt` ou via console do OpenKore 
 *   `aiChat_dropdb_refusal_chance`: Chance de recusar perguntas do banco de drops (0.0-1.0, padrão: `0.5`).
 *   `aiChat_min_packet_interval`: Intervalo mínimo entre pacotes enviados (em segundos, padrão: `0.6`).
 *   `aiChat_conversation_limit`: Número de mensagens do jogador antes do bot encerrar o papo (padrão: `10`, `0` desativa).
+*   `aiChat_spam_question_limit`: Número de perguntas seguidas antes de recusar por spam (padrão: `3`, `0` desativa).
 
 ### Banco de monstros/drops (`plugins/aiChat/mondb.txt`)
 
@@ -58,7 +59,7 @@ Orc Zumbi: (Caverna de Geffen, gef_dun01) Pele de Orc, Carta Orc Zumbi
 
 ### B. No Proxy Node.js (`api_proxy.js`)
 
-Abra `plugins/aiChat/api_proxy.js` e **insira sua chave de API diretamente** (ex: `const DEEPSEEK_API_KEY = 'SUA_CHAVE_AQUI';`).
+O proxy usa a chave definida em `aiChat_api_key` no `config.txt`. Como alternativa, você pode definir a variável de ambiente `AICHAT_API_KEY` ou inserir a chave diretamente no `api_proxy.js`.
 
 ## 3. Uso
 

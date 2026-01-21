@@ -26,6 +26,7 @@ use constant {
     DEFAULT_DROPDB_REFUSAL_CHANCE => 0.5, # Chance de recusar perguntas do banco de drops
     DEFAULT_MIN_PACKET_INTERVAL => 0.6, # Intervalo minimo entre pacotes enviados (em segundos)
     DEFAULT_CONVERSATION_LIMIT => 10, # Numero de mensagens do jogador antes de iniciar o encerramento
+    DEFAULT_SPAM_QUESTION_LIMIT => 3, # Numero de perguntas seguidas antes de recusar por spam
 };
 
 # Use a lexically scoped variable for the package's internal config
@@ -48,6 +49,7 @@ my %_file_key_map = (
     aiChat_dropdb_refusal_chance => 'dropdb_refusal_chance',
     aiChat_min_packet_interval => 'min_packet_interval',
     aiChat_conversation_limit => 'conversation_limit',
+    aiChat_spam_question_limit => 'spam_question_limit',
 );
 
 sub _configFilePath {
@@ -74,6 +76,7 @@ sub _loadFromConfigHash {
         'aiChat_dropdb_refusal_chance',
         'aiChat_min_packet_interval',
         'aiChat_conversation_limit',
+        'aiChat_spam_question_limit',
     );
 
     for my $file_key (@load_order) {
@@ -117,6 +120,8 @@ sub _applyValue {
         return unless $value =~ /^\d+(?:\.\d+)?$/;
     } elsif ($key eq 'conversation_limit') {
         return unless $value =~ /^\d+$/;
+    } elsif ($key eq 'spam_question_limit') {
+        return unless $value =~ /^\d+$/;
     }
 
     $_aiChatConfig{$key} = $value;
@@ -142,6 +147,7 @@ BEGIN {
         dropdb_refusal_chance => DEFAULT_DROPDB_REFUSAL_CHANCE,
         min_packet_interval => DEFAULT_MIN_PACKET_INTERVAL,
         conversation_limit => DEFAULT_CONVERSATION_LIMIT,
+        spam_question_limit => DEFAULT_SPAM_QUESTION_LIMIT,
     );
 }
 
@@ -185,6 +191,7 @@ sub save {
     print $fh "aiChat_dropdb_refusal_chance $_aiChatConfig{dropdb_refusal_chance}\n";
     print $fh "aiChat_min_packet_interval $_aiChatConfig{min_packet_interval}\n";
     print $fh "aiChat_conversation_limit $_aiChatConfig{conversation_limit}\n";
+    print $fh "aiChat_spam_question_limit $_aiChatConfig{spam_question_limit}\n";
     close $fh or warning "[aiChat] Não foi possível fechar $config_file: $!\n", "plugin";
 }
 
