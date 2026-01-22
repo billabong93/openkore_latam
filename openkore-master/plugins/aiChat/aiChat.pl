@@ -917,7 +917,7 @@ sub _countWords {
 sub _shouldForceDropDbIntent {
     my ($sender, $intent, $message) = @_;
     return 0 unless defined $sender;
-    return 0 unless $intent && ref $intent eq 'HASH';
+    $intent = {} unless $intent && ref $intent eq 'HASH';
     return 0 if ($intent->{action} // '') eq 'drop_db';
     if (defined $message && $message ne '' && AIChat::MessageHandler::_isDropDbQueryMessage($message)) {
         return 1;
