@@ -1134,6 +1134,9 @@ sub generateDropDbChatResponse {
     my $intent = $analysis->{intent} // '';
     my $entity = $analysis->{entity} // '';
     my $map_only = $analysis->{map_only} ? 1 : 0;
+    if (_isMapQuery($message)) {
+        $map_only = 1;
+    }
     my $normalized_message = _normalizeQueryText($message);
     my $looks_like_item_source = $normalized_message =~ /\bonde\b|\bpego\b|\bpegar\b|\bacha\b|\bacho\b|\barrumo\b/i;
     if ($looks_like_item_source && $intent ne 'item_source') {
