@@ -923,13 +923,12 @@ sub _shouldForceDropDbIntent {
         return 1;
     }
     return 0 unless (_hasLastDropDbSubject($sender) || _hasDropDbIntentHistory($sender));
-    my $stance = _getLastDropDbStance($sender);
-    return 0 unless defined $stance && $stance eq 'answer';
-    return 1 if defined $message && $message =~ /\b(onde|mapa|qual)\b/i;
-    return 1 if ($intent->{is_question} // 0);
-    return 1 if defined $message && $message =~ /[?]/;
-    return 1 if defined $message && $message =~ /\b(onde|mapa|qual|o que|oq|q|q\?)\b/i;
-    return _countWords($message) <= 4;
+    my $normalized = defined $message ? AIChat::MessageHandler::_normalizeQueryText($message) : '';
+    my $has_followup_keyword = $normalized =~ /\b(onde|mapa|qual|local|localizacao|lugar)\b/;
+    return 1 if $has_followup_keyword;
+    return 1 if ($intent->{is_question} // 0) && _countWords($message) <= 4;
+    return 1 if defined $message && $message =~ /[?]/ && _countWords($message) <= 4;
+    return _countWords($message) <= 2;
 }
 
 sub _normalizeSenderKey {
