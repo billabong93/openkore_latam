@@ -1195,7 +1195,8 @@ sub generateDropDbChatResponse {
         return dropDbUnknownReply();
     }
 
-    if (_shouldRefuseDropDbAnswer($tier, $guaranteed_match, $force_refusal)) {
+    my $has_match = ($response ne '' && $subject ne '') ? 1 : 0;
+    if (_shouldRefuseDropDbAnswer($tier, ($guaranteed_match || $has_match), $force_refusal)) {
         return generateDropDbRefusal($message, $sender);
     }
 
