@@ -504,7 +504,6 @@ sub _formatDropDbLocationAnswer {
         ? (
             '%s',
             'no mapa %s',
-            'em %s',
             'la em %s',
             'pode ir em %s',
             'vai em %s',
@@ -512,16 +511,18 @@ sub _formatDropDbLocationAnswer {
         )
         : (
             '%s',
-            'em %s',
-            'la em %s',
-            'ali em %s',
-            'pode ir em %s',
-            'vai em %s',
-            'acho que em %s',
-            'se nao me engano em %s',
+            _formatLocationPhrase($base),
+            _formatLocationPhrase($base, 'la'),
+            _formatLocationPhrase($base, 'ali'),
+            _formatLocationPhrase($base, 'pode ir'),
+            _formatLocationPhrase($base, 'vai'),
+            _formatLocationPhrase($base, 'acho que'),
+            _formatLocationPhrase($base, 'se nao me engano'),
         );
     my $recent_texts = _recentAssistantTexts($sender, 5);
-    my @options = map { sprintf($_, $base) } @templates;
+    my @options = $is_map_code
+        ? map { sprintf($_, $base) } @templates
+        : @templates;
     return _pickVariantAvoidingRecent(\@options, $recent_texts);
 }
 
@@ -550,6 +551,31 @@ sub _isDropDbMapCode {
     return 0 unless $lookup && $lookup->{maps};
     return 1 if $lookup->{maps}{$normalized};
     return 0;
+}
+
+sub _formatLocationPhrase {
+    my ($base, $prefix) = @_;
+    return '' unless defined $base && $base ne '';
+    my $prep = _locationPreposition($base);
+    my $phrase = "$prep $base";
+    return $phrase unless defined $prefix && $prefix ne '';
+    return "$prefix $phrase";
+}
+
+sub _locationPreposition {
+    my ($value) = @_;
+    return 'em' unless defined $value && $value ne '';
+    my $normalized = _normalizeQueryText($value);
+    return 'em' unless $normalized ne '';
+    return 'nos' if $normalized =~ /^arredores\b/;
+    return 'nas' if $normalized =~ /^ruinas\b/;
+    return 'no' if $normalized =~ /^(esgoto|deserto|bosque|campo|castelo|templo|vulcao|cemiterio)\b/;
+    return 'na' if $normalized =~ /^(floresta|piramide|caverna|cidade|ilha|praia|arena|torre|igreja|tumba)\b/;
+    return 'no' if $normalized =~ /^o\s+/;
+    return 'na' if $normalized =~ /^a\s+/;
+    return 'nos' if $normalized =~ /^os\s+/;
+    return 'nas' if $normalized =~ /^as\s+/;
+    return 'em';
 }
 
 sub _recentAssistantTexts {
