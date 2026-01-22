@@ -490,9 +490,11 @@ sub _normalizeDropDbOutput {
     my ($text) = @_;
     return '' unless defined $text;
     my $normalized = lc $text;
+    $normalized =~ s/\\+//g;
     $normalized =~ s/[\"”“]+//g;
     $normalized =~ s/\s+/ /g;
     $normalized =~ s/\s*,\s*/, ", "/g;
+    $normalized =~ s/,\s*,/, ", "/g;
     $normalized =~ s/^\s+//;
     $normalized =~ s/\s+$//;
     return $normalized;
@@ -1171,7 +1173,33 @@ sub generateDropDbChatResponse {
 
     my $last_answer = _getLastDropDbAnswer($sender);
     if ($last_answer && ($last_answer->{subject_type} // '') eq 'monster') {
-        if (defined $normalized_message && $normalized_message =~ /^onde\b/) {
+        if (_isMapQuery($message)) {
+            my $entity = $last_answer->{subject} // $last_answer->{entity} // '';
+            if ($entity ne '') {
+                my $mondb = _loadMonsterDropDb();
+                if ($mondb && %$mondb) {
+                    my $monster = _resolveDropDbMonster($entity) // $entity;
+                    my $entry = $mondb->{$monster} || {};
+                    my $tier = $entry->{tier} // 'chance';
+                    if (_shouldRefuseDropDbAnswer($tier, $guaranteed_match, 0)) {
+                        return generateDropDbRefusal($message, $sender);
+                    }
+                    my $response = _formatDropDbLocationAnswer($entry, 1);
+                    $response = _normalizeDropDbOutput(_limitDropDbList($response));
+                    if ($response ne '') {
+                        _setDropDbStance($sender, 'answer');
+                        _setLastDropDbAnswer($sender, {
+                            intent => 'monster_location',
+                            entity => $monster,
+                            answer_type => 'map',
+                            subject => $monster,
+                            subject_type => 'monster',
+                        });
+                        return $response;
+                    }
+                }
+            }
+        } elsif (defined $normalized_message && $normalized_message =~ /^onde\b/) {
             my $entity = $last_answer->{subject} // $last_answer->{entity} // '';
             if ($entity ne '') {
                 my $mondb = _loadMonsterDropDb();
