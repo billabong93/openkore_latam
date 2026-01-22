@@ -1241,10 +1241,7 @@ sub dropDbUnknownReply {
 
 sub generateDropDbRefusal {
     my ($message, $sender) = @_;
-    return _randomDropDbRefusal($sender) unless defined $message && $message ne '';
-    my $preferred_hint = _pickVariant(_dropDbRefusalReferences());
-    my $refusal = _generateDropDbRefusalResponse($message, $sender, $preferred_hint);
-    my $response = (defined $refusal && $refusal ne '') ? $refusal : ($preferred_hint || _randomDropDbRefusal($sender));
+    my $response = _randomDropDbRefusal($sender);
     _setDropDbStance($sender, 'refusal');
     return $response;
 }
