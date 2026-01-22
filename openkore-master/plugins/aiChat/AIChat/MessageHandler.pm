@@ -500,6 +500,45 @@ sub _normalizeDropDbOutput {
     return $normalized;
 }
 
+sub _responseContainsMapCode {
+    my ($response) = @_;
+    return 0 unless defined $response && $response ne '';
+    my $normalized = _normalizeQueryText($response);
+    return 0 unless $normalized ne '';
+    my $lookup = _loadDropDbEntityLookup();
+    return 0 unless $lookup && $lookup->{maps};
+    for my $key (keys %{$lookup->{maps}}) {
+        next unless defined $key && $key ne '';
+        return 1 if index($normalized, $key) >= 0;
+    }
+    return 0;
+}
+
+sub _resolveDropDbSubjectMonster {
+    my ($analysis, $sender) = @_;
+    my $intent = $analysis && ref $analysis eq 'HASH' ? ($analysis->{intent} // '') : '';
+    my $entity = $analysis && ref $analysis eq 'HASH' ? ($analysis->{entity} // '') : '';
+
+    if ($intent eq 'monster_location' || $intent eq 'monster_drops') {
+        my $monster = _resolveDropDbMonster($entity);
+        return $monster if $monster;
+    }
+
+    if ($intent eq 'item_source') {
+        my $item = _resolveDropDbItem($entity);
+        if ($item) {
+            my $index = _loadDropDbItemIndex();
+            my $item_key = _normalizeQueryText($item);
+            my $monsters = $index->{$item_key} || [];
+            return $monsters->[0] if @$monsters;
+        }
+    }
+
+    my $last_answer = _getLastDropDbAnswer($sender);
+    return $last_answer->{subject} if $last_answer && ($last_answer->{subject} // '') ne '';
+    return;
+}
+
 sub _extractDropDbMonsterFromText {
     my ($text) = @_;
     return unless defined $text && $text ne '';
@@ -1150,6 +1189,8 @@ sub generateDropDbChatResponse {
     return dropDbUnknownReply() unless $drop_context;
 
     my $prompt = AIChat::Config::get('prompt');
+    my $last_answer = _getLastDropDbAnswer($sender);
+    my $last_subject = $last_answer && defined $last_answer->{subject} ? $last_answer->{subject} : '';
     my $combined_prompt = join "\n",
         $prompt,
         "Banco de dados de monstros e drops (formato: Monstro: (Localizacao, Mapa1, Mapa2) Drop1, Drop2):",
@@ -1157,6 +1198,7 @@ sub generateDropDbChatResponse {
         "Use somente as informacoes do banco acima.",
         "Varie o jeito de responder para nao ficar engessado, como player de MMO.",
         "Nunca invente monstros, itens ou mapas.",
+        ($last_subject ne '' ? "Ultimo assunto do banco de drops: $last_subject." : ()),
         "Quando perguntarem onde fica um monstro, responda apenas com a localizacao OU apenas com o monstro, nunca ambos na mesma mensagem.",
         "Quando perguntarem onde pega um item, responda apenas com o monstro OU apenas com a localizacao, nunca ambos na mesma mensagem.",
         "Se a pergunta for \"qual mapa\" ou \"mapa?\", responda somente com o codigo do mapa (o que estiver entre parenteses).",
@@ -1207,6 +1249,17 @@ sub generateDropDbChatResponse {
             $response = _limitDropDbList($response);
             $response = _normalizeDropDbOutput($response);
             if ($response ne '') {
+                if (!_isMapQuery($message) && _responseContainsMapCode($response)) {
+                    my $subject_monster = _resolveDropDbSubjectMonster($analysis, $sender);
+                    if ($subject_monster) {
+                        my $mondb = _loadMonsterDropDb();
+                        my $entry = $mondb->{$subject_monster} || {};
+                        my $location = _formatDropDbLocationAnswer($entry, 0);
+                        if (defined $location && $location ne '') {
+                            $response = _normalizeDropDbOutput($location);
+                        }
+                    }
+                }
                 _setDropDbStance($sender, 'answer');
                 my $monster_from_response = _extractDropDbMonsterFromText($response);
                 if ($analysis && ($analysis->{intent} // '') ne '' && ($analysis->{intent} // '') ne 'unknown') {
