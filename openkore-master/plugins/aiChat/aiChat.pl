@@ -537,7 +537,7 @@ sub onPrivateMessage {
     my $intent_context = { map_name => $field ? $field->baseName : undef, lock_map => $config{lockMap} };
     my $intent;
     $intent = _interpretCommand($message, $sender, $intent_context);
-    if (!_isDropDbIntent($intent) && _isMapFollowUpDropDb($sender, $message)) {
+    if (_shouldForceDropDbIntent($sender, $intent, $message)) {
         $intent = { action => 'drop_db', is_question => 1 };
     }
     if (_handleSpamCheck($sender, $message, 'private', $intent)) {
@@ -619,7 +619,7 @@ sub onPublicMessage {
     my $intent_context = { map_name => $field ? $field->baseName : undef, lock_map => $config{lockMap} };
     my $intent;
     $intent = _interpretCommand($message, $sender, $intent_context);
-    if (!_isDropDbIntent($intent) && _isMapFollowUpDropDb($sender, $message)) {
+    if (_shouldForceDropDbIntent($sender, $intent, $message)) {
         $intent = { action => 'drop_db', is_question => 1 };
     }
     if (_handleSpamCheck($sender, $message, 'public', $intent)) {
@@ -869,12 +869,60 @@ sub _getLastDropDbStance {
     return;
 }
 
-sub _isMapFollowUpDropDb {
-    my ($sender, $message) = @_;
-    return 0 unless defined $message && $message ne '';
-    return 0 unless $message =~ /\bmapa(s)?\b/i;
+sub _hasLastDropDbSubject {
+    my ($sender) = @_;
+    return 0 unless defined $sender;
+    my $history = AIChat::ConversationHistory::getHistory($sender) || [];
+    for (my $i = @$history - 1; $i >= 0; $i--) {
+        my $entry = $history->[$i];
+        next unless ($entry->{type} // '') eq 'drop_db_answer';
+        my $content = $entry->{content};
+        next unless defined $content && $content ne '';
+        my $data;
+        eval { $data = decode_json($content); };
+        next if $@ || !$data || ref $data ne 'HASH';
+        return 1 if defined $data->{subject} && $data->{subject} ne '';
+        return 1 if defined $data->{entity} && $data->{entity} ne '';
+    }
+    return 0;
+}
+
+sub _hasDropDbIntentHistory {
+    my ($sender) = @_;
+    return 0 unless defined $sender;
+    my $history = AIChat::ConversationHistory::getHistory($sender) || [];
+    for (my $i = @$history - 1; $i >= 0; $i--) {
+        my $entry = $history->[$i];
+        next unless ($entry->{type} // '') eq 'intent';
+        my $content = $entry->{content};
+        next unless defined $content && $content ne '';
+        my $data;
+        eval { $data = decode_json($content); };
+        next if $@ || !$data || ref $data ne 'HASH';
+        return 1 if ($data->{action} // '') eq 'drop_db';
+    }
+    return 0;
+}
+
+sub _countWords {
+    my ($text) = @_;
+    return 0 unless defined $text;
+    my @words = grep { length } split /\s+/, $text;
+    return scalar @words;
+}
+
+sub _shouldForceDropDbIntent {
+    my ($sender, $intent, $message) = @_;
+    return 0 unless defined $sender;
+    return 0 unless $intent && ref $intent eq 'HASH';
+    return 0 if ($intent->{action} // '') eq 'drop_db';
+    return 0 unless (_hasLastDropDbSubject($sender) || _hasDropDbIntentHistory($sender));
     my $stance = _getLastDropDbStance($sender);
-    return defined $stance && $stance eq 'answer';
+    return 0 unless defined $stance && $stance eq 'answer';
+    return 1 if ($intent->{is_question} // 0);
+    return 1 if defined $message && $message =~ /[?]/;
+    return 1 if defined $message && $message =~ /\b(onde|mapa|qual|o que|oq|q|q\?)\b/i;
+    return _countWords($message) <= 4;
 }
 
 sub _normalizeSenderKey {

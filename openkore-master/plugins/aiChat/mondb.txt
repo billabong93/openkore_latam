@@ -9,7 +9,6 @@ Drops: (Deserto de Morroc, prt_fild08, prt_fild05, pay_fild04) Jellopy, Garrafa 
 Poporing: (Floresta de Payon, pay_fild04, prt_fild11, mjolnir_06) Muco Pegajoso, Garleta, Maçã, Erva Verde, Uvas, Main Gauche [3], Carta Poporing
 Lunático: (Arredores de Prontera, prt_fild01, prt_fild08, pay_fild03) Trevo, Pluma, Cenoura, Erva Vermelha, Maçã, Cenoura Arco-Íris, Nariz de Palhaço, Carta Lunático
 Pupa: (Arredores de Geffen, prt_fild08, prt_fild07, gef_fild07) Casca, Muco Pegajoso, Minério de Ferro, Fracon, Crisálida, Carta Pupa
-ChonChon: (Arredores de Geffen, gef_fild00, gef_fild04, moc_fild07) Casca, Jellopy, Minério de Ferro, Ferro, Punhal [4], Boneco de Chonchon, Carta ChonChon
 Fabre: (Arredores de Prontera, prt_fild08, prt_fild06, pay_fild03) Felpa, Erva Verde, Trevo, Pluma, Clava [3], Clava [4], Esmeralda, Carta Fabre
 Salgueiro: (Floresta de Payon, pay_fild01, pay_fild07, pay_fild03) Raiz de Árvore, Tronco, Resina, Batata Doce, Tronco Estéril, Tronco Sólido, Tronco de Alta Qualidade, Carta Salgueiro
 Condor: (Deserto de Morroc, moc_fild12, moc_fild11, prt_fild09) Garra de Ave, Carne, Plumas de Ave, Gema Amarela, Flecha, Laranja, Arco [4], Carta Condor
@@ -28,6 +27,7 @@ Familiar: (Pirâmide, moc_pryd01, pay_dun00, prt_sewb1) Dente de Morcego, Erva V
 Pé-Grande: (Floresta de Payon, pay_fild09, pay_fild07) Pata de Urso, Couro de Animal, Batata Doce, Mel, Minério de Oridecon, Boneca de Pelúcia, Chapéu Fedorento, Carta Pé-Grande
 
 [chance]
+ChonChon: (Arredores de Geffen, gef_fild00, gef_fild04, moc_fild07) Casca, Jellopy, Minério de Ferro, Ferro, Punhal [4], Boneco de Chonchon, Carta ChonChon
 Mandrágora: (Arredores de Geffen, prt_fild02, gef_fild04, mjolnir_11) Erva Verde, Broto, Vida Verdejante, Ranseur [4], Trevo de Quatro Folhas, Chicote de Gaia, Carta Mandrágora
 Besouro-Ladrão: (Esgoto de Prontera, prt_sewb2, prt_fild05) Jellopy, Pele de Verme, Erva Vermelha, Minério de Ferro, Gibão, Gibão [1]
 Ovo de Besouro-Ladrão: (Esgoto de Prontera, prt_sewb1, prt_fild05) Muco Pegajoso, Casca Rija, Concha Preta, Minério de Ferro, Fracon, Crisálida, Gema Vermelha, Carta Ovo de Besouro-Ladrão
