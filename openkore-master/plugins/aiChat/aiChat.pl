@@ -903,6 +903,8 @@ sub _shouldForceDropDbIntent {
     my $stance = _getLastDropDbStance($sender);
     return 0 unless defined $stance && $stance eq 'answer';
     return 1 if ($intent->{is_question} // 0);
+    return 1 if defined $message && $message =~ /[?]/;
+    return 1 if defined $message && $message =~ /\b(onde|mapa|qual|o que|oq|q|q\?)\b/i;
     return _countWords($message) <= 4;
 }
 

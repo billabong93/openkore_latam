@@ -319,6 +319,7 @@ sub _interpretDropDbQuestion {
         "Use intent=monster_drops quando perguntarem o que um monstro dropa.",
         "Use intent=item_source quando perguntarem onde pegar um item.",
         "Use map_only=true quando a pergunta pedir mapa ou codigo do mapa.",
+        "Exemplo: \"onde pego jellopy\" -> intent=item_source, entity=jellopy.",
         ($last_subject ne '' ? "Ultimo assunto do banco de drops: $last_subject. Se a pergunta for seguimento, use isso como entity." : ()),
         "Se nao der para identificar, use intent=unknown e entity vazio.",
         "Nao escreva nada fora do JSON.";
