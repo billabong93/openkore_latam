@@ -1118,8 +1118,65 @@ sub generateDropDbChatResponse {
         return generateDropDbRefusal($message, $sender);
     }
 
+    my $normalized_message = _normalizeQueryText($message);
+    my $entity_lookup = _loadDropDbEntityLookup();
+    if ($entity_lookup && $entity_lookup->{monsters} && defined $normalized_message && $normalized_message ne '') {
+        my $best_index;
+        my $monster_from_message;
+        for my $key (keys %{$entity_lookup->{monsters}}) {
+            next unless defined $key && $key ne '';
+            my $idx = index($normalized_message, $key);
+            next if $idx < 0;
+            if (!defined $best_index || $idx < $best_index) {
+                $best_index = $idx;
+                $monster_from_message = $entity_lookup->{monsters}{$key};
+            }
+        }
+        if ($monster_from_message) {
+            _setLastDropDbAnswer($sender, {
+                intent => 'monster_location',
+                entity => $monster_from_message,
+                answer_type => 'unknown',
+                subject => $monster_from_message,
+                subject_type => 'monster',
+            });
+        }
+    }
+
     if ($force_refusal) {
         return generateDropDbRefusal($message, $sender);
+    }
+
+    my $last_answer = _getLastDropDbAnswer($sender);
+    if ($last_answer && ($last_answer->{subject_type} // '') eq 'monster') {
+        if (defined $normalized_message && $normalized_message =~ /^onde\b/) {
+            my $entity = $last_answer->{subject} // $last_answer->{entity} // '';
+            if ($entity ne '') {
+                my $mondb = _loadMonsterDropDb();
+                if ($mondb && %$mondb) {
+                    my $monster = _resolveDropDbMonster($entity) // $entity;
+                    my $entry = $mondb->{$monster} || {};
+                    my $tier = $entry->{tier} // 'chance';
+                    if (_shouldRefuseDropDbAnswer($tier, $guaranteed_match, 0)) {
+                        return generateDropDbRefusal($message, $sender);
+                    }
+                    my $use_map_only = _isMapQuery($message) ? 1 : 0;
+                    my $response = _formatDropDbLocationAnswer($entry, $use_map_only);
+                    $response = _normalizeDropDbOutput(_limitDropDbList($response));
+                    if ($response ne '') {
+                        _setDropDbStance($sender, 'answer');
+                        _setLastDropDbAnswer($sender, {
+                            intent => 'monster_location',
+                            entity => $monster,
+                            answer_type => $use_map_only ? 'map' : 'location',
+                            subject => $monster,
+                            subject_type => 'monster',
+                        });
+                        return $response;
+                    }
+                }
+            }
+        }
     }
 
     my $drop_context = _readMonsterDropDbRaw(1);
@@ -1169,6 +1226,7 @@ sub generateDropDbChatResponse {
             $response =~ s/^\s+//;
             $response =~ s/\s+$//;
             $response = _limitDropDbList($response);
+            $response = _normalizeDropDbOutput($response);
             if ($response ne '') {
                 _setDropDbStance($sender, 'answer');
                 if ($analysis && ($analysis->{intent} // '') ne '' && ($analysis->{intent} // '') ne 'unknown') {
