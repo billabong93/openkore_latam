@@ -1072,6 +1072,54 @@ sub _unknownDropReply {
     return $options[int(rand(@options))];
 }
 
+sub _isUnknownDropReply {
+    my ($text) = @_;
+    return 0 unless defined $text && $text ne '';
+    my $normalized = _normalizeQueryText($text);
+    return 0 unless $normalized ne '';
+    my @options = (
+        'nao sei',
+        'nao conheco',
+        'sei nao',
+        'nao to ligado',
+        'desculpa nao sei',
+        'nao faco ideia',
+        'nao lembro',
+        'desculpa n sei',
+        'vou ficar te devendo',
+        'sei la',
+        'sei la mano',
+        'sei la velho',
+        'n to ligado',
+        'nem ideia',
+        'n sei nao',
+        'nao faco a menor ideia',
+        'nao lembro disso',
+        'nao sei dizer',
+        'n conheco isso',
+        'nem sei',
+        'to por fora',
+        'to boiando',
+        'n faco ideia',
+        'nao faco ideia mesmo',
+        'nao sei mesmo',
+        'nao lembro nao',
+        'nao me recordo',
+        'nem sei mano',
+        'nem sei te falar',
+        'sem ideia',
+        'sem a minima',
+        'nao tenho certeza',
+        'n lembro disso ai',
+        'sei la nao lembro',
+        'to ligado nao',
+    );
+    for my $option (@options) {
+        return 1 if $normalized eq _normalizeQueryText($option);
+    }
+    return 0;
+}
+
 sub _readMonsterDropDbRaw {
     my ($include_maps) = @_;
     $include_maps = 0 unless defined $include_maps;
@@ -1300,12 +1348,32 @@ sub generateDropDbChatResponse {
     my $last_intent = $last_answer ? ($last_answer->{intent} // '') : '';
     my $last_subject = $last_answer ? ($last_answer->{subject} // '') : '';
     my $last_answer_type = $last_answer ? ($last_answer->{answer_type} // '') : '';
+    my $last_unknown_subject = ($last_answer && ($last_answer->{answer_type} // '') eq 'unknown')
+        ? _normalizeQueryText($last_answer->{subject} // '')
+        : '';
     if ($subject_tier eq 'always') {
         $guaranteed_match = 1;
         $force_refusal = 0;
     }
     if ($force_refusal) {
         return generateDropDbRefusal($message, $sender);
+    }
+
+    if ($last_unknown_subject ne '') {
+        my $current_subject = $subject_monster ? _normalizeQueryText($subject_monster) : '';
+        if ($current_subject ne '' && $current_subject eq $last_unknown_subject) {
+            my $response = dropDbUnknownReply();
+            _setDropDbStance($sender, 'refusal');
+            return $response;
+        }
+        if ($resolved_item && $last_answer && ($last_answer->{intent} // '') eq 'item_source') {
+            my $last_entity = _normalizeQueryText($last_answer->{entity} // '');
+            if ($last_entity ne '' && _normalizeQueryText($resolved_item) eq $last_entity) {
+                my $response = dropDbUnknownReply();
+                _setDropDbStance($sender, 'refusal');
+                return $response;
+            }
+        }
     }
 
     if (($is_followup_where || $map_only) && $last_subject ne '' && $last_intent ne '') {
@@ -1385,6 +1453,18 @@ sub generateDropDbChatResponse {
             $response = _limitDropDbList($response);
             $response = _normalizeDropDbOutput($response);
             if ($response ne '') {
+                if (_isUnknownDropReply($response)) {
+                    _setDropDbStance($sender, 'refusal');
+                    my $subject = $subject_monster // ($analysis ? ($analysis->{entity} // '') : '');
+                    _setLastDropDbAnswer($sender, {
+                        intent => ($analysis && ($analysis->{intent} // '') ne '' ? $analysis->{intent} : 'unknown'),
+                        entity => $analysis ? ($analysis->{entity} // '') : '',
+                        answer_type => 'unknown',
+                        subject => $subject,
+                        subject_type => $subject_monster ? 'monster' : ($analysis && ($analysis->{intent} // '') eq 'item_source' ? 'item' : 'monster'),
+                    });
+                    return $response;
+                }
                 if (!_isMapQuery($message) && _responseContainsMapCode($response)) {
                     my $subject_monster = _resolveDropDbSubjectMonster($analysis, $sender);
                     if ($subject_monster) {
