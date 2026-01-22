@@ -490,11 +490,33 @@ sub _normalizeDropDbOutput {
     my ($text) = @_;
     return '' unless defined $text;
     my $normalized = lc $text;
+    $normalized =~ s/[\"”“]+//g;
     $normalized =~ s/\s+/ /g;
     $normalized =~ s/\s*,\s*/, ", "/g;
     $normalized =~ s/^\s+//;
     $normalized =~ s/\s+$//;
     return $normalized;
+}
+
+sub _extractDropDbMonsterFromText {
+    my ($text) = @_;
+    return unless defined $text && $text ne '';
+    my $normalized = _normalizeQueryText($text);
+    return unless $normalized ne '';
+    my $lookup = _loadDropDbEntityLookup();
+    return unless $lookup && $lookup->{monsters};
+    my $best_index;
+    my $best_match;
+    for my $key (keys %{$lookup->{monsters}}) {
+        next unless defined $key && $key ne '';
+        my $idx = index($normalized, $key);
+        next if $idx < 0;
+        if (!defined $best_index || $idx < $best_index) {
+            $best_index = $idx;
+            $best_match = $lookup->{monsters}{$key};
+        }
+    }
+    return $best_match;
 }
 
 sub _pickItemSourceMonster {
@@ -1229,14 +1251,30 @@ sub generateDropDbChatResponse {
             $response = _normalizeDropDbOutput($response);
             if ($response ne '') {
                 _setDropDbStance($sender, 'answer');
+                my $monster_from_response = _extractDropDbMonsterFromText($response);
                 if ($analysis && ($analysis->{intent} // '') ne '' && ($analysis->{intent} // '') ne 'unknown') {
-                    my $subject_type = ($analysis->{intent} // '') eq 'item_source' ? 'item' : 'monster';
+                    my $intent = $analysis->{intent};
+                    my $entity = $analysis->{entity} // '';
+                    my $subject = $intent eq 'item_source' ? $entity : ($entity ne '' ? $entity : '');
+                    my $subject_type = $intent eq 'item_source' ? 'item' : 'monster';
+                    if ($monster_from_response) {
+                        $subject = $monster_from_response;
+                        $subject_type = 'monster';
+                    }
                     _setLastDropDbAnswer($sender, {
-                        intent => $analysis->{intent},
-                        entity => $analysis->{entity} // '',
+                        intent => $intent,
+                        entity => $entity,
                         answer_type => 'unknown',
-                        subject => $analysis->{entity} // '',
+                        subject => $subject,
                         subject_type => $subject_type,
+                    });
+                } elsif ($monster_from_response) {
+                    _setLastDropDbAnswer($sender, {
+                        intent => 'monster_location',
+                        entity => $monster_from_response,
+                        answer_type => 'unknown',
+                        subject => $monster_from_response,
+                        subject_type => 'monster',
                     });
                 }
                 return $response;
