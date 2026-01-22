@@ -1119,6 +1119,16 @@ sub generateDropDbChatResponse {
     }
 
     my $analysis = _interpretDropDbQuestion($message, $sender);
+    if (!$analysis) {
+        my $last_answer = _getLastDropDbAnswer($sender);
+        if ($last_answer && ($last_answer->{subject_type} // '') eq 'monster') {
+            $analysis = {
+                intent => 'monster_location',
+                entity => $last_answer->{subject} // $last_answer->{entity} // '',
+                map_only => _isMapQuery($message) ? 1 : 0,
+            };
+        }
+    }
     return dropDbUnknownReply() unless $analysis;
 
     my $intent = $analysis->{intent} // '';
