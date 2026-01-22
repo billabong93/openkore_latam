@@ -1171,11 +1171,22 @@ sub generateDropDbChatResponse {
             role => "system",
             content => $combined_prompt
         },
-        {
-            role => "user",
-            content => $message,
-        }
     );
+
+    my $history = AIChat::ConversationHistory::getHistory($sender) || [];
+    my @recent = grep { $_->{role} && $_->{role} ne 'system' } @$history;
+    @recent = @recent[-6 .. -1] if @recent > 6;
+    push @messages, map {
+        {
+            role => $_->{role},
+            content => $_->{content},
+        }
+    } @recent;
+
+    push @messages, {
+        role => "user",
+        content => $message,
+    };
 
     my $analysis = _interpretDropDbQuestion($message, $sender);
     my $max_tokens = AIChat::Config::get('max_tokens');
