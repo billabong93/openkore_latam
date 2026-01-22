@@ -481,6 +481,39 @@ sub _formatDropDbLocationAnswer {
     return '';
 }
 
+sub _normalizeDropDbOutput {
+    my ($text) = @_;
+    return '' unless defined $text;
+    my $normalized = lc $text;
+    $normalized =~ s/\s+/ /g;
+    $normalized =~ s/\s*,\s*/, ", "/g;
+    $normalized =~ s/^\s+//;
+    $normalized =~ s/\s+$//;
+    return $normalized;
+}
+
+sub _pickItemSourceMonster {
+    my ($monsters, $mondb) = @_;
+    return unless $monsters && ref $monsters eq 'ARRAY' && @$monsters;
+    return $monsters->[0] unless $mondb && %$mondb;
+    for my $monster (@$monsters) {
+        my $entry = $mondb->{$monster} || {};
+        return $monster if ($entry->{tier} // 'chance') eq 'always';
+    }
+    return $monsters->[0];
+}
+
+sub _shouldRefuseDropDbAnswer {
+    my ($tier, $guaranteed_match, $force_refusal) = @_;
+    $tier = 'chance' unless defined $tier && $tier ne '';
+    return 0 if $tier eq 'always';
+    return 1 if $force_refusal;
+    return 0 if $guaranteed_match;
+    my $refusal_chance = AIChat::Config::get('dropdb_refusal_chance');
+    $refusal_chance = 0.5 unless defined $refusal_chance;
+    return rand() < $refusal_chance ? 1 : 0;
+}
+
 sub _isMapQuery {
     my ($message) = @_;
     return 0 unless defined $message && $message ne '';
@@ -1073,9 +1106,7 @@ sub generateDropDbChatResponse {
 
     my $stance = _getDropDbStance($sender);
     my $guaranteed_match = _isGuaranteedDropDbQuery($message);
-    if (defined $stance && $stance eq 'refusal' && !$guaranteed_match) {
-        return generateDropDbRefusal($message, $sender);
-    }
+    my $force_refusal = defined $stance && $stance eq 'refusal' && !$guaranteed_match;
 
     my $mob_database_enabled = AIChat::Config::get('mob_database');
     if (!defined $mob_database_enabled || !$mob_database_enabled) {
@@ -1095,10 +1126,12 @@ sub generateDropDbChatResponse {
 
     my $response = '';
     my $answer_type = '';
+    my $tier = 'chance';
     if ($intent eq 'monster_location' || $intent eq 'monster_drops') {
         my $monster = _resolveDropDbMonster($entity);
         return dropDbUnknownReply() unless $monster;
         my $entry = $mondb->{$monster} || {};
+        $tier = $entry->{tier} // 'chance';
         if ($intent eq 'monster_location') {
             my $use_map_only = _shouldAnswerWithMapOnly($sender, $intent, $monster, $map_only);
             $response = _formatDropDbLocationAnswer($entry, $use_map_only);
@@ -1114,9 +1147,10 @@ sub generateDropDbChatResponse {
         my $item_key = _normalizeQueryText($item);
         my $monsters = $index->{$item_key} || [];
         return dropDbUnknownReply() unless @$monsters;
-        my $monster = $monsters->[0];
+        my $monster = _pickItemSourceMonster($monsters, $mondb);
+        my $entry = $mondb->{$monster} || {};
+        $tier = $entry->{tier} // 'chance';
         if ($map_only) {
-            my $entry = $mondb->{$monster} || {};
             $response = _formatDropDbLocationAnswer($entry, 1);
             $answer_type = 'map';
         } else {
@@ -1127,7 +1161,12 @@ sub generateDropDbChatResponse {
         return dropDbUnknownReply();
     }
 
+    if (_shouldRefuseDropDbAnswer($tier, $guaranteed_match, $force_refusal)) {
+        return generateDropDbRefusal($message, $sender);
+    }
+
     $response = _limitDropDbList($response);
+    $response = _normalizeDropDbOutput($response);
     return dropDbUnknownReply() unless $response ne '';
     _setDropDbStance($sender, 'answer');
     _setLastDropDbAnswer($sender, {
