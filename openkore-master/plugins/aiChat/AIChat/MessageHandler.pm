@@ -1352,6 +1352,16 @@ sub generateDropDbChatResponse {
         $guaranteed_match = 1;
         $force_refusal = 0;
     }
+    if (!$guaranteed_match && $last_subject ne '') {
+        my $mondb = _loadMonsterDropDb();
+        if ($mondb && %$mondb) {
+            my $entry = $mondb->{$last_subject};
+            if ($entry && ($entry->{tier} // '') eq 'always') {
+                $guaranteed_match = 1;
+                $force_refusal = 0;
+            }
+        }
+    }
     if ($force_refusal) {
         return generateDropDbRefusal($message, $sender);
     }
@@ -1396,6 +1406,17 @@ sub generateDropDbChatResponse {
 
     if ($intent eq 'item_source' && $resolved_item && $subject_monster && $subject_entry) {
         my $response = $map_only ? _formatDropDbLocationAnswer($subject_entry, 1) : $subject_monster;
+        if (!$map_only) {
+            my @templates = (
+                '%s',
+                'dropa de %s',
+                '%s dropa',
+                'acho que %s',
+                '%s, de nao me engano',
+                'se nao me engano, %s',
+            );
+            $response = sprintf($templates[int(rand(@templates))], $subject_monster) if rand() < 0.6;
+        }
         if (!$map_only && (!defined $response || $response eq '')) {
             $response = $subject_monster;
         }
