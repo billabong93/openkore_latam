@@ -1124,6 +1124,11 @@ sub generateDropDbChatResponse {
     my $intent = $analysis->{intent} // '';
     my $entity = $analysis->{entity} // '';
     my $map_only = $analysis->{map_only} ? 1 : 0;
+    my $normalized_message = _normalizeQueryText($message);
+    my $looks_like_item_source = $normalized_message =~ /\bonde\b|\bpego\b|\bpegar\b|\bacha\b|\bacho\b|\barrumo\b/i;
+    if ($looks_like_item_source && $intent ne 'item_source') {
+        $intent = 'item_source';
+    }
     if ($intent eq '' || $intent eq 'unknown' || $entity eq '') {
         my $last_answer = _getLastDropDbAnswer($sender);
         if ($last_answer && ($last_answer->{subject_type} // '') eq 'monster') {

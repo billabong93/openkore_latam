@@ -887,6 +887,23 @@ sub _hasLastDropDbSubject {
     return 0;
 }
 
+sub _hasDropDbIntentHistory {
+    my ($sender) = @_;
+    return 0 unless defined $sender;
+    my $history = AIChat::ConversationHistory::getHistory($sender) || [];
+    for (my $i = @$history - 1; $i >= 0; $i--) {
+        my $entry = $history->[$i];
+        next unless ($entry->{type} // '') eq 'intent';
+        my $content = $entry->{content};
+        next unless defined $content && $content ne '';
+        my $data;
+        eval { $data = decode_json($content); };
+        next if $@ || !$data || ref $data ne 'HASH';
+        return 1 if ($data->{action} // '') eq 'drop_db';
+    }
+    return 0;
+}
+
 sub _countWords {
     my ($text) = @_;
     return 0 unless defined $text;
@@ -899,7 +916,7 @@ sub _shouldForceDropDbIntent {
     return 0 unless defined $sender;
     return 0 unless $intent && ref $intent eq 'HASH';
     return 0 if ($intent->{action} // '') eq 'drop_db';
-    return 0 unless _hasLastDropDbSubject($sender);
+    return 0 unless (_hasLastDropDbSubject($sender) || _hasDropDbIntentHistory($sender));
     my $stance = _getLastDropDbStance($sender);
     return 0 unless defined $stance && $stance eq 'answer';
     return 1 if ($intent->{is_question} // 0);
