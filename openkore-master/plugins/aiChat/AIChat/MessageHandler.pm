@@ -1406,6 +1406,9 @@ sub generateDropDbChatResponse {
 
     if ($intent eq 'item_source' && $resolved_item && $subject_monster && $subject_entry) {
         my $response = $map_only ? _formatDropDbLocationAnswer($subject_entry, 1) : $subject_monster;
+        if (!$map_only && defined $normalized_message && $normalized_message =~ /\b(oi|ola|eae|opa)\b/ && rand() < 0.6) {
+            $response = "oi, dropa de $response";
+        }
         if (!$map_only && (!defined $response || $response eq '')) {
             $response = $subject_monster;
         }
