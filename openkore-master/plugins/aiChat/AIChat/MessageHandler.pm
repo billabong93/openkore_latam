@@ -1229,19 +1229,42 @@ sub generateDropDbChatResponse {
     my $analysis = _interpretDropDbQuestion($message, $sender);
     my $subject_monster = _resolveDropDbSubjectMonster($analysis, $sender);
     my $subject_tier = 'chance';
+    my $subject_entry;
     if ($subject_monster) {
         my $mondb = _loadMonsterDropDb();
         if ($mondb && %$mondb) {
-            my $entry = $mondb->{$subject_monster} || {};
-            $subject_tier = $entry->{tier} // 'chance';
+            $subject_entry = $mondb->{$subject_monster} || {};
+            $subject_tier = $subject_entry->{tier} // 'chance';
         }
     }
+    my $normalized_message = _normalizeQueryText($message);
     if ($subject_tier eq 'always') {
         $guaranteed_match = 1;
         $force_refusal = 0;
     }
     if ($force_refusal) {
         return generateDropDbRefusal($message, $sender);
+    }
+
+    if ($subject_monster && $subject_entry) {
+        my $is_followup_where = defined $normalized_message && $normalized_message =~ /^onde\b/;
+        my $is_map_query = _isMapQuery($message);
+        if ($is_followup_where || $is_map_query) {
+            my $map_only = $is_map_query ? 1 : _shouldAnswerWithMapOnly($sender, 'monster_location', $subject_monster, 0);
+            my $response = _formatDropDbLocationAnswer($subject_entry, $map_only);
+            $response = _normalizeDropDbOutput(_limitDropDbList($response));
+            if ($response ne '') {
+                _setDropDbStance($sender, 'answer');
+                _setLastDropDbAnswer($sender, {
+                    intent => 'monster_location',
+                    entity => $subject_monster,
+                    answer_type => $map_only ? 'map' : 'location',
+                    subject => $subject_monster,
+                    subject_type => 'monster',
+                });
+                return $response;
+            }
+        }
     }
     my $max_tokens = AIChat::Config::get('max_tokens');
     my $temperature = AIChat::Config::get('temperature');
