@@ -1287,6 +1287,18 @@ sub generateDropDbChatResponse {
     }
     my $normalized_message = _normalizeQueryText($message);
     my $is_followup_where = defined $normalized_message && $normalized_message =~ /^onde\b/;
+    my $is_repeat_item_location = 0;
+    if ($is_followup_where && !$map_only && $last_answer && ($last_answer->{intent} // '') eq 'item_source') {
+        my $last_entity = $last_answer->{entity} // '';
+        if (($last_answer->{answer_type} // '') eq 'location') {
+            if ($resolved_item && _normalizeQueryText($resolved_item) eq _normalizeQueryText($last_entity)) {
+                $is_repeat_item_location = 1;
+            } elsif (!$resolved_item && $last_entity ne '') {
+                $resolved_item = $last_entity;
+                $is_repeat_item_location = 1;
+            }
+        }
+    }
     if ($subject_tier eq 'always') {
         $guaranteed_match = 1;
         $force_refusal = 0;
@@ -1296,7 +1308,8 @@ sub generateDropDbChatResponse {
     }
 
     if ($intent eq 'item_source' && $resolved_item && $subject_monster && $subject_entry) {
-        my $response = $map_only ? _formatDropDbLocationAnswer($subject_entry, 1) : _formatDropDbLocationAnswer($subject_entry, 0);
+        my $map_preference = $map_only || $is_repeat_item_location;
+        my $response = $map_preference ? _formatDropDbLocationAnswer($subject_entry, 1) : _formatDropDbLocationAnswer($subject_entry, 0);
         if (!$map_only && (!defined $response || $response eq '')) {
             $response = $subject_monster;
         }
@@ -1306,7 +1319,7 @@ sub generateDropDbChatResponse {
             _setLastDropDbAnswer($sender, {
                 intent => 'item_source',
                 entity => $resolved_item,
-                answer_type => $map_only ? 'map' : 'location',
+                answer_type => $map_preference ? 'map' : 'location',
                 subject => $subject_monster,
                 subject_type => 'monster',
             });
@@ -1326,14 +1339,15 @@ sub generateDropDbChatResponse {
             }
         }
         if ($subject_entry) {
-            my $response = _formatDropDbLocationAnswer($subject_entry, $map_only ? 1 : 0);
+            my $map_preference = $map_only || $is_repeat_item_location;
+            my $response = _formatDropDbLocationAnswer($subject_entry, $map_preference ? 1 : 0);
             $response = _normalizeDropDbOutput(_limitDropDbList($response));
             if ($response ne '') {
                 _setDropDbStance($sender, 'answer');
                 _setLastDropDbAnswer($sender, {
                     intent => 'item_source',
                     entity => $last_answer->{entity} // '',
-                    answer_type => $map_only ? 'map' : 'location',
+                    answer_type => $map_preference ? 'map' : 'location',
                     subject => $subject_monster,
                     subject_type => 'monster',
                 });
