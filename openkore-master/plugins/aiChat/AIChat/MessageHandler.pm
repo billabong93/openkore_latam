@@ -426,7 +426,17 @@ sub _loadDropDbItemIndex {
     return {} unless $mondb && %$mondb;
 
     my %index;
-    for my $monster (keys %$mondb) {
+    my @always = sort {
+        ($mondb->{$a}{order} // 0) <=> ($mondb->{$b}{order} // 0)
+    } grep {
+        ($mondb->{$_}{tier} // '') eq 'always'
+    } keys %$mondb;
+    my @chance = sort {
+        ($mondb->{$a}{order} // 0) <=> ($mondb->{$b}{order} // 0)
+    } grep {
+        ($mondb->{$_}{tier} // '') ne 'always'
+    } keys %$mondb;
+    for my $monster (@always, @chance) {
         next if $monster =~ /^Mapa\s+/i;
         my $entry = $mondb->{$monster} || {};
         my $drops = $entry->{drops} || [];
@@ -1510,6 +1520,7 @@ sub _loadMonsterDropDb {
 
     my %db;
     my $current_tier = 'chance';
+    my $line_order = 0;
     if (open my $fh, '<:encoding(UTF-8)', $path) {
         while (my $line = <$fh>) {
             chomp $line;
@@ -1523,6 +1534,7 @@ sub _loadMonsterDropDb {
             }
             my ($monster, $drop_text) = split /\s*:\s*/, $line, 2;
             next unless defined $monster && defined $drop_text;
+            $line_order++;
             my @maps;
             my $location = '';
             if ($drop_text =~ s/^\(\s*([^)]+)\s*\)\s*//) {
@@ -1548,6 +1560,7 @@ sub _loadMonsterDropDb {
                 maps => \@maps,
                 location => $location,
                 tier => $current_tier,
+                order => $line_order,
             } if @drops || @maps || $location ne '';
         }
         close $fh;
