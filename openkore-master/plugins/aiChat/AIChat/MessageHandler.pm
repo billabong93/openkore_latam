@@ -1119,6 +1119,13 @@ sub generateDropDbChatResponse {
     my $intent = $analysis->{intent} // '';
     my $entity = $analysis->{entity} // '';
     my $map_only = $analysis->{map_only} ? 1 : 0;
+    if ($intent eq '' || $intent eq 'unknown' || $entity eq '') {
+        my $last_answer = _getLastDropDbAnswer($sender);
+        if ($last_answer && ($last_answer->{subject_type} // '') eq 'monster') {
+            $intent = 'monster_location';
+            $entity = $last_answer->{subject} // $last_answer->{entity} // '';
+        }
+    }
     return dropDbUnknownReply() if $intent eq '' || $intent eq 'unknown' || $entity eq '';
 
     my $mondb = _loadMonsterDropDb();
@@ -1127,11 +1134,14 @@ sub generateDropDbChatResponse {
     my $response = '';
     my $answer_type = '';
     my $tier = 'chance';
+    my $subject = '';
+    my $subject_type = 'monster';
     if ($intent eq 'monster_location' || $intent eq 'monster_drops') {
         my $monster = _resolveDropDbMonster($entity);
         return dropDbUnknownReply() unless $monster;
         my $entry = $mondb->{$monster} || {};
         $tier = $entry->{tier} // 'chance';
+        $subject = $monster;
         if ($intent eq 'monster_location') {
             my $use_map_only = _shouldAnswerWithMapOnly($sender, $intent, $monster, $map_only);
             $response = _formatDropDbLocationAnswer($entry, $use_map_only);
@@ -1150,6 +1160,7 @@ sub generateDropDbChatResponse {
         my $monster = _pickItemSourceMonster($monsters, $mondb);
         my $entry = $mondb->{$monster} || {};
         $tier = $entry->{tier} // 'chance';
+        $subject = $monster;
         if ($map_only) {
             $response = _formatDropDbLocationAnswer($entry, 1);
             $answer_type = 'map';
@@ -1169,10 +1180,13 @@ sub generateDropDbChatResponse {
     $response = _normalizeDropDbOutput($response);
     return dropDbUnknownReply() unless $response ne '';
     _setDropDbStance($sender, 'answer');
+    $subject_type = 'monster' if $subject ne '';
     _setLastDropDbAnswer($sender, {
         intent => $intent,
         entity => $entity,
         answer_type => $answer_type,
+        subject => $subject,
+        subject_type => $subject_type,
     });
     return $response;
 }
