@@ -1352,6 +1352,16 @@ sub generateDropDbChatResponse {
         $guaranteed_match = 1;
         $force_refusal = 0;
     }
+    if (!$guaranteed_match && $last_subject ne '') {
+        my $mondb = _loadMonsterDropDb();
+        if ($mondb && %$mondb) {
+            my $entry = $mondb->{$last_subject};
+            if ($entry && ($entry->{tier} // '') eq 'always') {
+                $guaranteed_match = 1;
+                $force_refusal = 0;
+            }
+        }
+    }
     if ($force_refusal) {
         return generateDropDbRefusal($message, $sender);
     }
