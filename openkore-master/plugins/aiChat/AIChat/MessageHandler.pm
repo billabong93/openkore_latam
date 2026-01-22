@@ -1181,10 +1181,6 @@ sub generateDropDbChatResponse {
         return generateDropDbRefusal($message, $sender);
     }
 
-    if ($force_refusal) {
-        return generateDropDbRefusal($message, $sender);
-    }
-
     my $drop_context = _readMonsterDropDbRaw(1);
     return dropDbUnknownReply() unless $drop_context;
 
@@ -1231,6 +1227,22 @@ sub generateDropDbChatResponse {
     };
 
     my $analysis = _interpretDropDbQuestion($message, $sender);
+    my $subject_monster = _resolveDropDbSubjectMonster($analysis, $sender);
+    my $subject_tier = 'chance';
+    if ($subject_monster) {
+        my $mondb = _loadMonsterDropDb();
+        if ($mondb && %$mondb) {
+            my $entry = $mondb->{$subject_monster} || {};
+            $subject_tier = $entry->{tier} // 'chance';
+        }
+    }
+    if ($subject_tier eq 'always') {
+        $guaranteed_match = 1;
+        $force_refusal = 0;
+    }
+    if ($force_refusal) {
+        return generateDropDbRefusal($message, $sender);
+    }
     my $max_tokens = AIChat::Config::get('max_tokens');
     my $temperature = AIChat::Config::get('temperature');
 
