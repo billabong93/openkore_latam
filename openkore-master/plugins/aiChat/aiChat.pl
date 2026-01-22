@@ -537,6 +537,9 @@ sub onPrivateMessage {
     my $intent_context = { map_name => $field ? $field->baseName : undef, lock_map => $config{lockMap} };
     my $intent;
     $intent = _interpretCommand($message, $sender, $intent_context);
+    if (_shouldForceDropDbIntent($sender, $intent)) {
+        $intent = { action => 'drop_db', is_question => 1 };
+    }
     if (_handleSpamCheck($sender, $message, 'private', $intent)) {
         AIChat::Log::log_message(
             direction => 'in',
@@ -616,6 +619,9 @@ sub onPublicMessage {
     my $intent_context = { map_name => $field ? $field->baseName : undef, lock_map => $config{lockMap} };
     my $intent;
     $intent = _interpretCommand($message, $sender, $intent_context);
+    if (_shouldForceDropDbIntent($sender, $intent)) {
+        $intent = { action => 'drop_db', is_question => 1 };
+    }
     if (_handleSpamCheck($sender, $message, 'public', $intent)) {
         AIChat::Log::log_message(
             direction => 'in',
@@ -861,6 +867,33 @@ sub _getLastDropDbStance {
         return $entry->{content};
     }
     return;
+}
+
+sub _hasLastDropDbSubject {
+    my ($sender) = @_;
+    return 0 unless defined $sender;
+    my $history = AIChat::ConversationHistory::getHistory($sender) || [];
+    for (my $i = @$history - 1; $i >= 0; $i--) {
+        my $entry = $history->[$i];
+        next unless ($entry->{type} // '') eq 'drop_db_answer';
+        my $content = $entry->{content};
+        next unless defined $content && $content ne '';
+        my $data;
+        eval { $data = decode_json($content); };
+        next if $@ || !$data || ref $data ne 'HASH';
+        return 1 if defined $data->{subject} && $data->{subject} ne '';
+        return 1 if defined $data->{entity} && $data->{entity} ne '';
+    }
+    return 0;
+}
+
+sub _shouldForceDropDbIntent {
+    my ($sender, $intent) = @_;
+    return 0 unless defined $sender;
+    return 0 unless $intent && ref $intent eq 'HASH';
+    return 0 unless ($intent->{is_question} // 0);
+    return 0 if ($intent->{action} // '') eq 'drop_db';
+    return _hasLastDropDbSubject($sender);
 }
 
 sub _normalizeSenderKey {
