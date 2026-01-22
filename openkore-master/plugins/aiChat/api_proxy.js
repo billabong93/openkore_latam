@@ -24,6 +24,8 @@ const server = http.createServer((req, res) => {
                 const aiApiUrl = provider === 'openai' ? OPENAI_API_URL : DEEPSEEK_API_URL;
 
                 const apiKey = (API_KEY || process.env.AICHAT_API_KEY || requestData.api_key || '')
+                    .replace(/^\s*Bearer\s+/i, '')
+                    .replace(/^"+|"+$/g, '')
                     .replace(/\s+/g, '');
 
                 // Remove campos internos do payload antes de enviar para a API de IA
