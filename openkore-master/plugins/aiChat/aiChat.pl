@@ -916,6 +916,9 @@ sub _shouldForceDropDbIntent {
     return 0 unless defined $sender;
     return 0 unless $intent && ref $intent eq 'HASH';
     return 0 if ($intent->{action} // '') eq 'drop_db';
+    if (defined $message && $message ne '' && AIChat::MessageHandler::_isDropDbQueryMessage($message)) {
+        return 1;
+    }
     return 0 unless (_hasLastDropDbSubject($sender) || _hasDropDbIntentHistory($sender));
     my $stance = _getLastDropDbStance($sender);
     return 0 unless defined $stance && $stance eq 'answer';
