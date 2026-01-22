@@ -492,6 +492,7 @@ sub _normalizeDropDbOutput {
     my $normalized = lc $text;
     $normalized =~ s/\\+//g;
     $normalized =~ s/[\"”“]+//g;
+    $normalized =~ s/[\p{Pi}\p{Pf}]+//g;
     $normalized =~ s/\s+/ /g;
     $normalized =~ s/\s*,\s*/, ", "/g;
     $normalized =~ s/,\s*,/, ", "/g;
