@@ -1287,16 +1287,36 @@ sub generateDropDbChatResponse {
     }
     my $normalized_message = _normalizeQueryText($message);
     my $is_followup_where = defined $normalized_message && $normalized_message =~ /^onde\b/;
-    my $last_item_stage = '';
-    if ($last_answer && ($last_answer->{intent} // '') eq 'item_source') {
-        $last_item_stage = $last_answer->{answer_type} // '';
-    }
+    my $last_intent = $last_answer ? ($last_answer->{intent} // '') : '';
+    my $last_subject = $last_answer ? ($last_answer->{subject} // '') : '';
+    my $last_answer_type = $last_answer ? ($last_answer->{answer_type} // '') : '';
     if ($subject_tier eq 'always') {
         $guaranteed_match = 1;
         $force_refusal = 0;
     }
     if ($force_refusal) {
         return generateDropDbRefusal($message, $sender);
+    }
+
+    if (($is_followup_where || $map_only) && $last_subject ne '' && $last_intent ne '') {
+        my $mondb = _loadMonsterDropDb();
+        my $entry = ($mondb && %$mondb) ? ($mondb->{$last_subject} || {}) : {};
+        if ($entry && ref $entry eq 'HASH') {
+            my $use_map = $map_only || $last_answer_type eq 'location';
+            my $response = _formatDropDbLocationAnswer($entry, $use_map ? 1 : 0);
+            $response = _normalizeDropDbOutput(_limitDropDbList($response));
+            if ($response ne '') {
+                _setDropDbStance($sender, 'answer');
+                _setLastDropDbAnswer($sender, {
+                    intent => $last_intent,
+                    entity => $last_answer->{entity} // $last_subject,
+                    answer_type => $use_map ? 'map' : 'location',
+                    subject => $last_subject,
+                    subject_type => 'monster',
+                });
+                return $response;
+            }
+        }
     }
 
     if ($intent eq 'item_source' && $resolved_item && $subject_monster && $subject_entry) {
@@ -1315,35 +1335,6 @@ sub generateDropDbChatResponse {
                 subject_type => 'monster',
             });
             return $response;
-        }
-    }
-
-    if ($last_answer && ($last_answer->{intent} // '') eq 'item_source' && ($is_followup_where || $map_only)) {
-        my $last_subject = $last_answer->{subject} // '';
-        if ($last_subject ne '' && !$subject_monster) {
-            $subject_monster = $last_subject;
-        }
-        if ($subject_monster) {
-            my $mondb = _loadMonsterDropDb();
-            if ($mondb && %$mondb) {
-                $subject_entry = $mondb->{$subject_monster} || {};
-            }
-        }
-        if ($subject_entry) {
-            my $use_map = $map_only || ($last_item_stage eq 'location' && $is_followup_where);
-            my $response = $use_map ? _formatDropDbLocationAnswer($subject_entry, 1) : _formatDropDbLocationAnswer($subject_entry, 0);
-            $response = _normalizeDropDbOutput(_limitDropDbList($response));
-            if ($response ne '') {
-                _setDropDbStance($sender, 'answer');
-                _setLastDropDbAnswer($sender, {
-                    intent => 'item_source',
-                    entity => $last_answer->{entity} // '',
-                    answer_type => $use_map ? 'map' : 'location',
-                    subject => $subject_monster,
-                    subject_type => 'monster',
-                });
-                return $response;
-            }
         }
     }
 
