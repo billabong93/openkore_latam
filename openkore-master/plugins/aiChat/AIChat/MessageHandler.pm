@@ -1118,100 +1118,134 @@ sub generateDropDbChatResponse {
         return generateDropDbRefusal($message, $sender);
     }
 
-    my $analysis = _interpretDropDbQuestion($message, $sender);
-    if (!$analysis) {
-        my $last_answer = _getLastDropDbAnswer($sender);
-        if ($last_answer && ($last_answer->{subject_type} // '') eq 'monster') {
-            $analysis = {
-                intent => 'monster_location',
-                entity => $last_answer->{subject} // $last_answer->{entity} // '',
-                map_only => _isMapQuery($message) ? 1 : 0,
-            };
-        }
-    }
-    return dropDbUnknownReply() unless $analysis;
-
-    my $intent = $analysis->{intent} // '';
-    my $entity = $analysis->{entity} // '';
-    my $map_only = $analysis->{map_only} ? 1 : 0;
-    if (_isMapQuery($message)) {
-        $map_only = 1;
-    }
     my $normalized_message = _normalizeQueryText($message);
-    my $looks_like_item_source = $normalized_message =~ /\bonde\b|\bpego\b|\bpegar\b|\bacha\b|\bacho\b|\barrumo\b/i;
-    if ($looks_like_item_source && $intent ne 'item_source') {
-        $intent = 'item_source';
-    }
-    if ($intent eq '' || $intent eq 'unknown' || $entity eq '') {
-        my $last_answer = _getLastDropDbAnswer($sender);
-        if ($last_answer && ($last_answer->{subject_type} // '') eq 'monster') {
-            $intent = 'monster_location';
-            $entity = $last_answer->{subject} // $last_answer->{entity} // '';
+    my $entity_lookup = _loadDropDbEntityLookup();
+    if ($entity_lookup && $entity_lookup->{monsters} && defined $normalized_message && $normalized_message ne '') {
+        my $best_index;
+        my $monster_from_message;
+        for my $key (keys %{$entity_lookup->{monsters}}) {
+            next unless defined $key && $key ne '';
+            my $idx = index($normalized_message, $key);
+            next if $idx < 0;
+            if (!defined $best_index || $idx < $best_index) {
+                $best_index = $idx;
+                $monster_from_message = $entity_lookup->{monsters}{$key};
+            }
+        }
+        if ($monster_from_message) {
+            _setLastDropDbAnswer($sender, {
+                intent => 'monster_location',
+                entity => $monster_from_message,
+                answer_type => 'unknown',
+                subject => $monster_from_message,
+                subject_type => 'monster',
+            });
         }
     }
-    return dropDbUnknownReply() if $intent eq '' || $intent eq 'unknown' || $entity eq '';
 
-    my $mondb = _loadMonsterDropDb();
-    return dropDbUnknownReply() unless $mondb && %$mondb;
-
-    my $response = '';
-    my $answer_type = '';
-    my $tier = 'chance';
-    my $subject = '';
-    my $subject_type = 'monster';
-    if ($intent eq 'monster_location' || $intent eq 'monster_drops') {
-        my $monster = _resolveDropDbMonster($entity);
-        return dropDbUnknownReply() unless $monster;
-        my $entry = $mondb->{$monster} || {};
-        $tier = $entry->{tier} // 'chance';
-        $subject = $monster;
-        if ($intent eq 'monster_location') {
-            my $use_map_only = _shouldAnswerWithMapOnly($sender, $intent, $monster, $map_only);
-            $response = _formatDropDbLocationAnswer($entry, $use_map_only);
-            $answer_type = $use_map_only ? 'map' : 'location';
-        } else {
-            $response = _formatDropDbDrops($entry);
-            $answer_type = 'drops';
-        }
-    } elsif ($intent eq 'item_source') {
-        my $item = _resolveDropDbItem($entity);
-        return dropDbUnknownReply() unless $item;
-        my $index = _loadDropDbItemIndex();
-        my $item_key = _normalizeQueryText($item);
-        my $monsters = $index->{$item_key} || [];
-        return dropDbUnknownReply() unless @$monsters;
-        my $monster = _pickItemSourceMonster($monsters, $mondb);
-        my $entry = $mondb->{$monster} || {};
-        $tier = $entry->{tier} // 'chance';
-        $subject = $monster;
-        if ($map_only) {
-            $response = _formatDropDbLocationAnswer($entry, 1);
-            $answer_type = 'map';
-        } else {
-            $response = $monster;
-            $answer_type = 'monster';
-        }
-    } else {
-        return dropDbUnknownReply();
-    }
-
-    if (_shouldRefuseDropDbAnswer($tier, $guaranteed_match, $force_refusal)) {
+    if ($force_refusal) {
         return generateDropDbRefusal($message, $sender);
     }
 
-    $response = _limitDropDbList($response);
-    $response = _normalizeDropDbOutput($response);
-    return dropDbUnknownReply() unless $response ne '';
-    _setDropDbStance($sender, 'answer');
-    $subject_type = 'monster' if $subject ne '';
-    _setLastDropDbAnswer($sender, {
-        intent => $intent,
-        entity => $entity,
-        answer_type => $answer_type,
-        subject => $subject,
-        subject_type => $subject_type,
-    });
-    return $response;
+    my $last_answer = _getLastDropDbAnswer($sender);
+    if ($last_answer && ($last_answer->{subject_type} // '') eq 'monster') {
+        if (defined $normalized_message && $normalized_message =~ /^onde\b/) {
+            my $entity = $last_answer->{subject} // $last_answer->{entity} // '';
+            if ($entity ne '') {
+                my $mondb = _loadMonsterDropDb();
+                if ($mondb && %$mondb) {
+                    my $monster = _resolveDropDbMonster($entity) // $entity;
+                    my $entry = $mondb->{$monster} || {};
+                    my $tier = $entry->{tier} // 'chance';
+                    if (_shouldRefuseDropDbAnswer($tier, $guaranteed_match, 0)) {
+                        return generateDropDbRefusal($message, $sender);
+                    }
+                    my $use_map_only = _isMapQuery($message) ? 1 : 0;
+                    my $response = _formatDropDbLocationAnswer($entry, $use_map_only);
+                    $response = _normalizeDropDbOutput(_limitDropDbList($response));
+                    if ($response ne '') {
+                        _setDropDbStance($sender, 'answer');
+                        _setLastDropDbAnswer($sender, {
+                            intent => 'monster_location',
+                            entity => $monster,
+                            answer_type => $use_map_only ? 'map' : 'location',
+                            subject => $monster,
+                            subject_type => 'monster',
+                        });
+                        return $response;
+                    }
+                }
+            }
+        }
+    }
+
+    my $drop_context = _readMonsterDropDbRaw(1);
+    return dropDbUnknownReply() unless $drop_context;
+
+    my $prompt = AIChat::Config::get('prompt');
+    my $combined_prompt = join "\n",
+        $prompt,
+        "Banco de dados de monstros e drops (formato: Monstro: (Localizacao, Mapa1, Mapa2) Drop1, Drop2):",
+        $drop_context,
+        "Use somente as informacoes do banco acima.",
+        "Varie o jeito de responder para nao ficar engessado, como player de MMO.",
+        "Nunca invente monstros, itens ou mapas.",
+        "Quando perguntarem onde fica um monstro, responda apenas com a localizacao OU apenas com o monstro, nunca ambos na mesma mensagem.",
+        "Quando perguntarem onde pega um item, responda apenas com o monstro OU apenas com a localizacao, nunca ambos na mesma mensagem.",
+        "Se a pergunta for \"qual mapa\" ou \"mapa?\", responda somente com o codigo do mapa (o que estiver entre parenteses).",
+        "Se a pessoa repetir a mesma pergunta depois da localizacao, responda com o codigo do mapa em vez de repetir a localizacao.",
+        "Se precisar enviar duas partes diferentes, use \"||\" para separar em duas mensagens.",
+        "Nunca liste mais de 1 ou 2 monstros/itens/mapas por mensagem.",
+        "Se nao houver informacao clara, responda com uma frase curta de desconhecimento, como um player.",
+        "Exemplos: nao sei, nao conheco, sei nao, nao to ligado, desculpa nao sei.";
+
+    my @messages = (
+        {
+            role => "system",
+            content => $combined_prompt
+        },
+        {
+            role => "user",
+            content => $message,
+        }
+    );
+
+    my $analysis = _interpretDropDbQuestion($message, $sender);
+    my $max_tokens = AIChat::Config::get('max_tokens');
+    my $temperature = AIChat::Config::get('temperature');
+    if (!_shouldRefuseDropDbAnswer('chance', $guaranteed_match, 0)) {
+        my $response;
+        eval {
+            $response = $api_client->callAPIWithMessages(\@messages, {
+                max_tokens => $max_tokens,
+                temperature => $temperature,
+            });
+        };
+        if (!$@ && defined $response && $response ne '') {
+            $response =~ s/\s+/ /g;
+            $response =~ s/^\s+//;
+            $response =~ s/\s+$//;
+            $response = _limitDropDbList($response);
+            $response = _normalizeDropDbOutput($response);
+            if ($response ne '') {
+                _setDropDbStance($sender, 'answer');
+                if ($analysis && ($analysis->{intent} // '') ne '' && ($analysis->{intent} // '') ne 'unknown') {
+                    my $subject_type = ($analysis->{intent} // '') eq 'item_source' ? 'item' : 'monster';
+                    _setLastDropDbAnswer($sender, {
+                        intent => $analysis->{intent},
+                        entity => $analysis->{entity} // '',
+                        answer_type => 'unknown',
+                        subject => $analysis->{entity} // '',
+                        subject_type => $subject_type,
+                    });
+                }
+                return $response;
+            }
+        }
+    }
+
+    return generateDropDbRefusal($message, $sender) unless $guaranteed_match;
+    return dropDbUnknownReply();
 }
 
 sub _limitDropDbList {
