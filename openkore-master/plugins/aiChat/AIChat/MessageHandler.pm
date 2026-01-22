@@ -482,18 +482,47 @@ sub _formatDropDbDrops {
 }
 
 sub _formatDropDbLocationAnswer {
-    my ($entry, $map_only) = @_;
+    my ($entry, $map_only, $sender) = @_;
     return '' unless $entry && ref $entry eq 'HASH';
     my $location = $entry->{location} // '';
     my $maps = $entry->{maps} || [];
 
+    my $base;
     if ($map_only) {
-        return $maps->[0] if $maps && @$maps;
+        $base = $maps->[0] if $maps && @$maps;
+    } elsif ($location ne '') {
+        $base = $location;
+    } elsif ($maps && @$maps) {
+        $base = $maps->[0];
     }
 
-    return $location if $location ne '';
-    return $maps->[0] if $maps && @$maps;
-    return '';
+    return '' unless defined $base && $base ne '';
+    return $base if $map_only;
+
+    my $is_map_code = _isDropDbMapCode($base);
+    my @templates = $is_map_code
+        ? (
+            '%s',
+            'no mapa %s',
+            'em %s',
+            'la em %s',
+            'pode ir em %s',
+            'vai em %s',
+            'mapa %s',
+        )
+        : (
+            '%s',
+            'em %s',
+            'la em %s',
+            'ali em %s',
+            'pode ir em %s',
+            'vai em %s',
+            'acho que em %s',
+            'se nao me engano em %s',
+        );
+    my $recent_texts = _recentAssistantTexts($sender, 5);
+    my @options = map { sprintf($_, $base) } @templates;
+    return _pickVariantAvoidingRecent(\@options, $recent_texts);
 }
 
 sub _normalizeDropDbOutput {
@@ -510,6 +539,27 @@ sub _normalizeDropDbOutput {
     $normalized =~ s/^\s+//;
     $normalized =~ s/\s+$//;
     return $normalized;
+}
+
+sub _isDropDbMapCode {
+    my ($value) = @_;
+    return 0 unless defined $value && $value ne '';
+    my $normalized = _normalizeQueryText($value);
+    return 0 unless $normalized ne '';
+    my $lookup = _loadDropDbEntityLookup();
+    return 0 unless $lookup && $lookup->{maps};
+    return 1 if $lookup->{maps}{$normalized};
+    return 0;
+}
+
+sub _recentAssistantTexts {
+    my ($sender, $limit) = @_;
+    return [] unless defined $sender && $sender ne '';
+    $limit = 5 unless defined $limit && $limit > 0;
+    my $history = AIChat::ConversationHistory::getHistory($sender) || [];
+    my @recent_assistant = grep { ($_->{role} // '') eq 'assistant' } @$history;
+    @recent_assistant = @recent_assistant[-$limit .. -1] if @recent_assistant > $limit;
+    return [map { $_->{content} // '' } @recent_assistant];
 }
 
 sub _findDropDbEntityInMessage {
@@ -1388,7 +1438,7 @@ sub generateDropDbChatResponse {
         my $entry = ($mondb && %$mondb) ? ($mondb->{$last_subject} || {}) : {};
         if ($entry && ref $entry eq 'HASH') {
             my $use_map = $map_only || $last_answer_type eq 'location';
-            my $response = _formatDropDbLocationAnswer($entry, $use_map ? 1 : 0);
+            my $response = _formatDropDbLocationAnswer($entry, $use_map ? 1 : 0, $sender);
             $response = _normalizeDropDbOutput(_limitDropDbList($response));
             if ($response ne '') {
                 _setDropDbStance($sender, 'answer');
@@ -1405,17 +1455,23 @@ sub generateDropDbChatResponse {
     }
 
     if ($intent eq 'item_source' && $resolved_item && $subject_monster && $subject_entry) {
-        my $response = $map_only ? _formatDropDbLocationAnswer($subject_entry, 1) : $subject_monster;
+        my $response = $map_only ? _formatDropDbLocationAnswer($subject_entry, 1, $sender) : $subject_monster;
         if (!$map_only) {
             my @templates = (
                 '%s',
                 'dropa de %s',
                 '%s dropa',
                 'acho que %s',
-                '%s, de nao me engano',
-                'se nao me engano, %s',
+                '%s, se nao me engano',
+                'se nao me engano %s',
+                'talvez %s',
+                'provavelmente %s',
+                'to quase certo que %s',
+                'se pah %s',
             );
-            $response = sprintf($templates[int(rand(@templates))], $subject_monster) if rand() < 0.6;
+            my $recent_texts = _recentAssistantTexts($sender, 5);
+            my @options = map { sprintf($_, $subject_monster) } @templates;
+            $response = _pickVariantAvoidingRecent(\@options, $recent_texts) if rand() < 0.75;
         }
         if (!$map_only && (!defined $response || $response eq '')) {
             $response = $subject_monster;
@@ -1438,7 +1494,7 @@ sub generateDropDbChatResponse {
         my $is_map_query = $map_only;
         if ($is_followup_where || $is_map_query) {
             my $map_only_answer = $is_map_query ? 1 : _shouldAnswerWithMapOnly($sender, 'monster_location', $subject_monster, 0);
-            my $response = _formatDropDbLocationAnswer($subject_entry, $map_only_answer);
+            my $response = _formatDropDbLocationAnswer($subject_entry, $map_only_answer, $sender);
             $response = _normalizeDropDbOutput(_limitDropDbList($response));
             if ($response ne '') {
                 _setDropDbStance($sender, 'answer');
@@ -1488,7 +1544,7 @@ sub generateDropDbChatResponse {
                     if ($subject_monster) {
                         my $mondb = _loadMonsterDropDb();
                         my $entry = $mondb->{$subject_monster} || {};
-                        my $location = _formatDropDbLocationAnswer($entry, 0);
+                        my $location = _formatDropDbLocationAnswer($entry, 0, $sender);
                         if (defined $location && $location ne '') {
                             $response = _normalizeDropDbOutput($location);
                         }
