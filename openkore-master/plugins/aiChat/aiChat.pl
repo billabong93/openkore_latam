@@ -7,7 +7,7 @@ use utf8;
 use Commands;
 use Globals qw(%timeout $messageSender $net %config $char $field $playersList %jobs_lut %emotions_lut %monsters %items %monsters_lut %monsters_name_lut %items_lut);
 use Settings qw(%sys);
-use I18N qw(bytesToString);
+use I18N qw(bytesToString UTF8ToString isUTF8);
 use Log qw(warning message debug);
 use JSON::Tiny qw(decode_json);
 use Plugins;
@@ -138,6 +138,9 @@ sub _sanitizeOutgoingMessage {
     my ($message) = @_;
     return '' unless defined $message;
     my $sanitized = $message;
+    if (!utf8::is_utf8($sanitized) && isUTF8($sanitized)) {
+        $sanitized = UTF8ToString($sanitized);
+    }
     $sanitized =~ s/\s*\r?\n\s*/ /g;
     $sanitized =~ s/[\x00-\x1F\x7F]+/ /g;
     $sanitized =~ s/\s+/ /g;
