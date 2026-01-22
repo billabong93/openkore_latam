@@ -5,7 +5,7 @@
 
 [always]
 Poring: (Arredores de Prontera, prt_fild08, pay_fild04, prt_fild05) Jellopy, Garrafa Vazia, Muco Pegajoso, Maçã, Faca [4], Maçã Verde, Carta Poring
-Drops: (Deserto de Morroc, prt_fild08, prt_fild05, pay_fild04) Jellopy, Garrafa Vazia, Muco Pegajoso, Maçã, Bastão [4], Suco de Laranja, Carta Drops
+Drops: (Deserto de Morroc, moc_fild07, cmd_fild07, moc_fild13) Jellopy, Garrafa Vazia, Muco Pegajoso, Maçã, Bastão [4], Suco de Laranja, Carta Drops
 Poporing: (Floresta de Payon, pay_fild04, prt_fild11, mjolnir_06) Muco Pegajoso, Garleta, Maçã, Erva Verde, Uvas, Main Gauche [3], Carta Poporing
 Lunático: (Arredores de Prontera, prt_fild01, prt_fild08, pay_fild03) Trevo, Pluma, Cenoura, Erva Vermelha, Maçã, Cenoura Arco-Íris, Nariz de Palhaço, Carta Lunático
 Pupa: (Arredores de Geffen, prt_fild08, prt_fild07, gef_fild07) Casca, Muco Pegajoso, Minério de Ferro, Fracon, Crisálida, Carta Pupa
