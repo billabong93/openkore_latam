@@ -1185,13 +1185,8 @@ sub generateDropDbChatResponse {
             $response = _formatDropDbLocationAnswer($entry, 1);
             $answer_type = 'map';
         } else {
-            $response = _formatDropDbLocationAnswer($entry, 0);
-            if ($response eq '') {
-                $response = $monster;
-                $answer_type = 'monster';
-            } else {
-                $answer_type = 'location';
-            }
+            $response = $monster;
+            $answer_type = 'monster';
         }
     } else {
         return dropDbUnknownReply();
