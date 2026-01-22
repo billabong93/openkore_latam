@@ -537,7 +537,7 @@ sub onPrivateMessage {
     my $intent_context = { map_name => $field ? $field->baseName : undef, lock_map => $config{lockMap} };
     my $intent;
     $intent = _interpretCommand($message, $sender, $intent_context);
-    if (_shouldForceDropDbIntent($sender, $intent)) {
+    if (_shouldForceDropDbIntent($sender, $intent, $message)) {
         $intent = { action => 'drop_db', is_question => 1 };
     }
     if (_handleSpamCheck($sender, $message, 'private', $intent)) {
@@ -619,7 +619,7 @@ sub onPublicMessage {
     my $intent_context = { map_name => $field ? $field->baseName : undef, lock_map => $config{lockMap} };
     my $intent;
     $intent = _interpretCommand($message, $sender, $intent_context);
-    if (_shouldForceDropDbIntent($sender, $intent)) {
+    if (_shouldForceDropDbIntent($sender, $intent, $message)) {
         $intent = { action => 'drop_db', is_question => 1 };
     }
     if (_handleSpamCheck($sender, $message, 'public', $intent)) {
@@ -887,13 +887,23 @@ sub _hasLastDropDbSubject {
     return 0;
 }
 
+sub _countWords {
+    my ($text) = @_;
+    return 0 unless defined $text;
+    my @words = grep { length } split /\s+/, $text;
+    return scalar @words;
+}
+
 sub _shouldForceDropDbIntent {
-    my ($sender, $intent) = @_;
+    my ($sender, $intent, $message) = @_;
     return 0 unless defined $sender;
     return 0 unless $intent && ref $intent eq 'HASH';
-    return 0 unless ($intent->{is_question} // 0);
     return 0 if ($intent->{action} // '') eq 'drop_db';
-    return _hasLastDropDbSubject($sender);
+    return 0 unless _hasLastDropDbSubject($sender);
+    my $stance = _getLastDropDbStance($sender);
+    return 0 unless defined $stance && $stance eq 'answer';
+    return 1 if ($intent->{is_question} // 0);
+    return _countWords($message) <= 4;
 }
 
 sub _normalizeSenderKey {
