@@ -426,7 +426,17 @@ sub _loadDropDbItemIndex {
     return {} unless $mondb && %$mondb;
 
     my %index;
-    for my $monster (keys %$mondb) {
+    my @always = sort {
+        ($mondb->{$a}{order} // 0) <=> ($mondb->{$b}{order} // 0)
+    } grep {
+        ($mondb->{$_}{tier} // '') eq 'always'
+    } keys %$mondb;
+    my @chance = sort {
+        ($mondb->{$a}{order} // 0) <=> ($mondb->{$b}{order} // 0)
+    } grep {
+        ($mondb->{$_}{tier} // '') ne 'always'
+    } keys %$mondb;
+    for my $monster (@always, @chance) {
         next if $monster =~ /^Mapa\s+/i;
         my $entry = $mondb->{$monster} || {};
         my $drops = $entry->{drops} || [];
@@ -491,14 +501,36 @@ sub _normalizeDropDbOutput {
     return '' unless defined $text;
     my $normalized = lc $text;
     $normalized =~ s/\\+//g;
-    $normalized =~ s/[\"”“]+//g;
+    $normalized =~ s/[\"”“'‘’`]+//g;
     $normalized =~ s/[\p{Pi}\p{Pf}]+//g;
+    $normalized =~ s/[\[\]\{\}]+//g;
     $normalized =~ s/\s+/ /g;
     $normalized =~ s/\s*,\s*/, ", "/g;
     $normalized =~ s/,\s*,/, ", "/g;
     $normalized =~ s/^\s+//;
     $normalized =~ s/\s+$//;
     return $normalized;
+}
+
+sub _findDropDbEntityInMessage {
+    my ($message, $bucket) = @_;
+    return unless defined $message && $message ne '' && defined $bucket && $bucket ne '';
+    my $normalized = _normalizeQueryText($message);
+    return unless $normalized ne '';
+    my $lookup = _loadDropDbEntityLookup();
+    return unless $lookup && $lookup->{$bucket};
+    my $best;
+    my $best_len = 0;
+    for my $key (keys %{$lookup->{$bucket}}) {
+        next unless defined $key && $key ne '';
+        next unless index($normalized, $key) >= 0;
+        my $len = length $key;
+        if (!$best || $len > $best_len) {
+            $best = $lookup->{$bucket}{$key};
+            $best_len = $len;
+        }
+    }
+    return $best;
 }
 
 sub _responseContainsMapCode {
@@ -1040,6 +1072,54 @@ sub _unknownDropReply {
     return $options[int(rand(@options))];
 }
 
+sub _isUnknownDropReply {
+    my ($text) = @_;
+    return 0 unless defined $text && $text ne '';
+    my $normalized = _normalizeQueryText($text);
+    return 0 unless $normalized ne '';
+    my @options = (
+        'nao sei',
+        'nao conheco',
+        'sei nao',
+        'nao to ligado',
+        'desculpa nao sei',
+        'nao faco ideia',
+        'nao lembro',
+        'desculpa n sei',
+        'vou ficar te devendo',
+        'sei la',
+        'sei la mano',
+        'sei la velho',
+        'n to ligado',
+        'nem ideia',
+        'n sei nao',
+        'nao faco a menor ideia',
+        'nao lembro disso',
+        'nao sei dizer',
+        'n conheco isso',
+        'nem sei',
+        'to por fora',
+        'to boiando',
+        'n faco ideia',
+        'nao faco ideia mesmo',
+        'nao sei mesmo',
+        'nao lembro nao',
+        'nao me recordo',
+        'nem sei mano',
+        'nem sei te falar',
+        'sem ideia',
+        'sem a minima',
+        'nao tenho certeza',
+        'n lembro disso ai',
+        'sei la nao lembro',
+        'to ligado nao',
+    );
+    for my $option (@options) {
+        return 1 if $normalized eq _normalizeQueryText($option);
+    }
+    return 0;
+}
+
 sub _readMonsterDropDbRaw {
     my ($include_maps) = @_;
     $include_maps = 0 unless defined $include_maps;
@@ -1161,10 +1241,7 @@ sub dropDbUnknownReply {
 
 sub generateDropDbRefusal {
     my ($message, $sender) = @_;
-    return _randomDropDbRefusal($sender) unless defined $message && $message ne '';
-    my $preferred_hint = _pickVariant(_dropDbRefusalReferences());
-    my $refusal = _generateDropDbRefusalResponse($message, $sender, $preferred_hint);
-    my $response = (defined $refusal && $refusal ne '') ? $refusal : ($preferred_hint || _randomDropDbRefusal($sender));
+    my $response = _randomDropDbRefusal($sender);
     _setDropDbStance($sender, 'refusal');
     return $response;
 }
@@ -1228,6 +1305,9 @@ sub generateDropDbChatResponse {
     };
 
     my $analysis = _interpretDropDbQuestion($message, $sender);
+    my $intent = $analysis && ref $analysis eq 'HASH' ? ($analysis->{intent} // '') : '';
+    my $map_only = ($analysis && $analysis->{map_only}) ? 1 : 0;
+    $map_only ||= _isMapQuery($message);
     my $subject_monster = _resolveDropDbSubjectMonster($analysis, $sender);
     my $subject_tier = 'chance';
     my $subject_entry;
@@ -1238,7 +1318,36 @@ sub generateDropDbChatResponse {
             $subject_tier = $subject_entry->{tier} // 'chance';
         }
     }
+    my $resolved_item = $intent eq 'item_source' ? _resolveDropDbItem($analysis->{entity}) : undef;
+    $resolved_item ||= _findDropDbEntityInMessage($message, 'items');
+    my $message_monster = _findDropDbEntityInMessage($message, 'monsters');
+    if (!$subject_monster && $message_monster) {
+        $subject_monster = $message_monster;
+    }
+    if (($intent eq '' || $intent eq 'unknown') && $resolved_item && !$message_monster) {
+        $intent = 'item_source';
+    }
+    if (!$subject_monster && $resolved_item) {
+        my $index = _loadDropDbItemIndex();
+        my $item_key = _normalizeQueryText($resolved_item);
+        my $monsters = $index->{$item_key} || [];
+        $subject_monster = $monsters->[0] if @$monsters;
+    }
+    if ($subject_monster && !$subject_entry) {
+        my $mondb = _loadMonsterDropDb();
+        if ($mondb && %$mondb) {
+            $subject_entry = $mondb->{$subject_monster} || {};
+            $subject_tier = $subject_entry->{tier} // 'chance';
+        }
+    }
     my $normalized_message = _normalizeQueryText($message);
+    my $is_followup_where = defined $normalized_message && $normalized_message =~ /^onde\b/;
+    my $last_intent = $last_answer ? ($last_answer->{intent} // '') : '';
+    my $last_subject = $last_answer ? ($last_answer->{subject} // '') : '';
+    my $last_answer_type = $last_answer ? ($last_answer->{answer_type} // '') : '';
+    my $last_unknown_subject = ($last_answer && ($last_answer->{answer_type} // '') eq 'unknown')
+        ? _normalizeQueryText($last_answer->{subject} // '')
+        : '';
     if ($subject_tier eq 'always') {
         $guaranteed_match = 1;
         $force_refusal = 0;
@@ -1247,19 +1356,75 @@ sub generateDropDbChatResponse {
         return generateDropDbRefusal($message, $sender);
     }
 
+    if ($last_unknown_subject ne '') {
+        my $current_subject = $subject_monster ? _normalizeQueryText($subject_monster) : '';
+        if ($current_subject ne '' && $current_subject eq $last_unknown_subject) {
+            my $response = dropDbUnknownReply();
+            _setDropDbStance($sender, 'refusal');
+            return $response;
+        }
+        if ($resolved_item && $last_answer && ($last_answer->{intent} // '') eq 'item_source') {
+            my $last_entity = _normalizeQueryText($last_answer->{entity} // '');
+            if ($last_entity ne '' && _normalizeQueryText($resolved_item) eq $last_entity) {
+                my $response = dropDbUnknownReply();
+                _setDropDbStance($sender, 'refusal');
+                return $response;
+            }
+        }
+    }
+
+    if (($is_followup_where || $map_only) && $last_subject ne '' && $last_intent ne '') {
+        my $mondb = _loadMonsterDropDb();
+        my $entry = ($mondb && %$mondb) ? ($mondb->{$last_subject} || {}) : {};
+        if ($entry && ref $entry eq 'HASH') {
+            my $use_map = $map_only || $last_answer_type eq 'location';
+            my $response = _formatDropDbLocationAnswer($entry, $use_map ? 1 : 0);
+            $response = _normalizeDropDbOutput(_limitDropDbList($response));
+            if ($response ne '') {
+                _setDropDbStance($sender, 'answer');
+                _setLastDropDbAnswer($sender, {
+                    intent => $last_intent,
+                    entity => $last_answer->{entity} // $last_subject,
+                    answer_type => $use_map ? 'map' : 'location',
+                    subject => $last_subject,
+                    subject_type => 'monster',
+                });
+                return $response;
+            }
+        }
+    }
+
+    if ($intent eq 'item_source' && $resolved_item && $subject_monster && $subject_entry) {
+        my $response = $map_only ? _formatDropDbLocationAnswer($subject_entry, 1) : $subject_monster;
+        if (!$map_only && (!defined $response || $response eq '')) {
+            $response = $subject_monster;
+        }
+        $response = _normalizeDropDbOutput(_limitDropDbList($response));
+        if ($response ne '') {
+            _setDropDbStance($sender, 'answer');
+            _setLastDropDbAnswer($sender, {
+                intent => 'item_source',
+                entity => $resolved_item,
+                answer_type => $map_only ? 'map' : 'monster',
+                subject => $subject_monster,
+                subject_type => 'monster',
+            });
+            return $response;
+        }
+    }
+
     if ($subject_monster && $subject_entry) {
-        my $is_followup_where = defined $normalized_message && $normalized_message =~ /^onde\b/;
-        my $is_map_query = _isMapQuery($message);
+        my $is_map_query = $map_only;
         if ($is_followup_where || $is_map_query) {
-            my $map_only = $is_map_query ? 1 : _shouldAnswerWithMapOnly($sender, 'monster_location', $subject_monster, 0);
-            my $response = _formatDropDbLocationAnswer($subject_entry, $map_only);
+            my $map_only_answer = $is_map_query ? 1 : _shouldAnswerWithMapOnly($sender, 'monster_location', $subject_monster, 0);
+            my $response = _formatDropDbLocationAnswer($subject_entry, $map_only_answer);
             $response = _normalizeDropDbOutput(_limitDropDbList($response));
             if ($response ne '') {
                 _setDropDbStance($sender, 'answer');
                 _setLastDropDbAnswer($sender, {
                     intent => 'monster_location',
                     entity => $subject_monster,
-                    answer_type => $map_only ? 'map' : 'location',
+                    answer_type => $map_only_answer ? 'map' : 'location',
                     subject => $subject_monster,
                     subject_type => 'monster',
                 });
@@ -1285,6 +1450,18 @@ sub generateDropDbChatResponse {
             $response = _limitDropDbList($response);
             $response = _normalizeDropDbOutput($response);
             if ($response ne '') {
+                if (_isUnknownDropReply($response)) {
+                    _setDropDbStance($sender, 'refusal');
+                    my $subject = $subject_monster // ($analysis ? ($analysis->{entity} // '') : '');
+                    _setLastDropDbAnswer($sender, {
+                        intent => ($analysis && ($analysis->{intent} // '') ne '' ? $analysis->{intent} : 'unknown'),
+                        entity => $analysis ? ($analysis->{entity} // '') : '',
+                        answer_type => 'unknown',
+                        subject => $subject,
+                        subject_type => $subject_monster ? 'monster' : ($analysis && ($analysis->{intent} // '') eq 'item_source' ? 'item' : 'monster'),
+                    });
+                    return $response;
+                }
                 if (!_isMapQuery($message) && _responseContainsMapCode($response)) {
                     my $subject_monster = _resolveDropDbSubjectMonster($analysis, $sender);
                     if ($subject_monster) {
@@ -1420,6 +1597,7 @@ sub _loadMonsterDropDb {
 
     my %db;
     my $current_tier = 'chance';
+    my $line_order = 0;
     if (open my $fh, '<:encoding(UTF-8)', $path) {
         while (my $line = <$fh>) {
             chomp $line;
@@ -1433,6 +1611,7 @@ sub _loadMonsterDropDb {
             }
             my ($monster, $drop_text) = split /\s*:\s*/, $line, 2;
             next unless defined $monster && defined $drop_text;
+            $line_order++;
             my @maps;
             my $location = '';
             if ($drop_text =~ s/^\(\s*([^)]+)\s*\)\s*//) {
@@ -1458,6 +1637,7 @@ sub _loadMonsterDropDb {
                 maps => \@maps,
                 location => $location,
                 tier => $current_tier,
+                order => $line_order,
             } if @drops || @maps || $location ne '';
         }
         close $fh;

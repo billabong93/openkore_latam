@@ -2,6 +2,7 @@
 # Itens em ingles serao traduzidos via tables/items.txt -> tables/ROla/items.txt
 # [always]: Tudo abaixo desta linha responde sempre (sem chance de recusa).
 # [chance]: Tudo abaixo desta linha segue a chance de recusa (aiChat_dropdb_refusal_chance).
+# A prioridade de monstros em respostas começará sempre pelo topo da lista.
 
 [always]
 Poring: (Arredores de Prontera, prt_fild08, pay_fild04, prt_fild05) Jellopy, Garrafa Vazia, Muco Pegajoso, Maçã, Faca [4], Maçã Verde, Carta Poring
