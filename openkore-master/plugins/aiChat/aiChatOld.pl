@@ -2,18 +2,16 @@ package aiChat;
 
 use strict;
 use warnings;
-use utf8;
 
 use Commands;
-use Globals qw(%timeout $messageSender $net %config $char $field $playersList %jobs_lut %emotions_lut %monsters %items %monsters_lut %monsters_name_lut %items_lut);
+use Globals qw(%timeout $messageSender $net %config $char $field %jobs_lut %emotions_lut %monsters %items %monsters_lut %monsters_name_lut %items_lut);
 use Settings qw(%sys);
-use I18N qw(bytesToString UTF8ToString isUTF8);
+use I18N qw(bytesToString);
 use Log qw(warning message debug);
-use JSON::Tiny qw(decode_json);
 use Plugins;
 use AI;
 use Misc qw(getEmotionByCommand);
-use Utils qw(getHex timeOut distance);
+use Utils qw(getHex timeOut);
 use Cwd 'abs_path';
 use Time::HiRes qw(time);
 use Actor ();
@@ -60,7 +58,6 @@ my $emotionHookID = Plugins::addHook('packet_emotion', \&onEmotion, undef);
 $hooks{packet_emotion_direct} = $emotionHookID;
 
 my %message_buffers;
-my $ack_client = AIChat::APIClient->new();
 my $last_emotion_command;
 my $last_emotion_time;
 my %last_emotion_command_by_sender;
@@ -79,25 +76,6 @@ my %silenced_by_sender;
 my %silence_message_count_by_sender;
 my %blocked_by_sender;
 my %silence_after_response_by_sender;
-my %last_visibility_state_by_sender;
-my %conversation_message_count_by_sender;
-my %conversation_close_stage_by_sender;
-my $last_packet_sent_at = 0;
-
-my %invisibility_statuses = map { $_ => 1 } qw(
-    EFST_HIDING
-    EFST_CLOAKING
-    EFST_INVISIBLE
-    EFST_INVISIBILITY
-    EFST_CLOAKINGEXCEED
-    EFST_HALLUCINATIONWALK
-    EFST_STEALTHFIELD
-    EFST_CAMOUFLAGE
-    EFST_CHASEWALK
-    EFFECTSTATE_BURROW
-    EFFECTSTATE_HIDING
-    EFFECTSTATE_SPECIALHIDING
-);
 
 my @fallback_emotion_commands = qw(
     flg6
@@ -119,7 +97,6 @@ use constant {
     DROP_DB_REFUSAL_MAX => 4,
     SPAM_QUESTION_LIMIT => 3,
     SILENCE_BLOCK_THRESHOLD => 2,
-    MAX_PUBLIC_CHAT_DISTANCE => 8,
 };
 
 sub _getBufferState {
@@ -138,9 +115,6 @@ sub _sanitizeOutgoingMessage {
     my ($message) = @_;
     return '' unless defined $message;
     my $sanitized = $message;
-    if (!utf8::is_utf8($sanitized) && isUTF8($sanitized)) {
-        $sanitized = UTF8ToString($sanitized);
-    }
     $sanitized =~ s/\s*\r?\n\s*/ /g;
     $sanitized =~ s/[\x00-\x1F\x7F]+/ /g;
     $sanitized =~ s/\s+/ /g;
@@ -151,40 +125,6 @@ sub _sanitizeOutgoingMessage {
         $sanitized =~ s/\s+$//;
     }
     return $sanitized;
-}
-
-sub _splitOutgoingResponse {
-    my ($response) = @_;
-    return () unless defined $response;
-    my $split_chance = AIChat::Config::get('split_chance');
-    $split_chance = 0.2 unless defined $split_chance;
-    if ($response =~ /\|\|/) {
-        my @parts = split /\s*\|\|\s*/, $response;
-        @parts = map {
-            my $part = $_;
-            $part =~ s/^\s+//;
-            $part =~ s/\s+$//;
-            $part;
-        } grep { defined $_ && length $_ } @parts;
-        return @parts if @parts;
-    }
-
-    if ($response =~ /\r?\n/) {
-        my @parts = split /\s*\r?\n\s*/, $response;
-        @parts = map {
-            my $part = $_;
-            $part =~ s/^\s+//;
-            $part =~ s/\s+$//;
-            $part;
-        } grep { defined $_ && length $_ } @parts;
-        if (@parts >= 2 && rand() < $split_chance) {
-            my @pair = @parts[0, 1];
-            my $first_words = scalar grep { length } split /\s+/, $pair[0];
-            my $second_words = scalar grep { length } split /\s+/, $pair[1];
-            return @pair if $first_words >= 2 && $second_words >= 2;
-        }
-    }
-    return ($response);
 }
 
 sub _enqueueMessage {
@@ -219,13 +159,7 @@ sub _queueDirectResponse {
     $state->{typing_until} = 0;
     $state->{response_started} = 0;
     $state->{context} = $context;
-    my @parts = _splitOutgoingResponse($response);
-    return unless @parts;
-    my $typing_delay = _calculateTypingDelay($parts[0]);
-    if ($typing_delay > 0) {
-        $state->{typing_until} = time() + $buffer_delay + $typing_delay;
-    }
-    push @{$state->{response_queue}}, @parts;
+    push @{$state->{response_queue}}, $response;
 }
 
 sub _flushBufferedMessages {
@@ -277,9 +211,6 @@ sub _sendQueuedResponse {
     }
 
     return if $state->{typing_until} && time() < $state->{typing_until};
-    if (_shouldThrottleOutgoingPackets($state)) {
-        return;
-    }
 
     $response = shift @{$state->{response_queue}};
     $state->{response_started} = 1;
@@ -288,7 +219,6 @@ sub _sendQueuedResponse {
         my $emotion_id = getEmotionByCommand($emotion_command);
         if (defined $emotion_id) {
             $messageSender->sendEmotion($emotion_id);
-            _recordOutgoingPacketSent();
         } else {
             $response = _sanitizeOutgoingMessage($response);
             if (!$response) {
@@ -298,12 +228,8 @@ sub _sendQueuedResponse {
                 return;
             }
             $messageSender->sendChat($response);
-            _recordOutgoingPacketSent();
         }
     } else {
-        if ($context->{sabotage} || $context->{normalize}) {
-            $response = AIChat::MessageHandler::_normalizeResponseText($response);
-        }
         $response = _sanitizeOutgoingMessage($response);
         if (!$response) {
             debug "[aiChat] Resposta vazia apos sanitizacao para '$sender'\n", "plugin";
@@ -315,7 +241,6 @@ sub _sendQueuedResponse {
 
     if (!$emotion_command && $context->{type} && $context->{type} eq 'public') {
         $messageSender->sendChat($response);
-        _recordOutgoingPacketSent();
         AIChat::Log::log_message(
             direction => 'out',
             visibility => 'public',
@@ -324,7 +249,6 @@ sub _sendQueuedResponse {
         );
     } elsif (!$emotion_command) {
         $messageSender->sendPrivateMsg($sender, $response);
-        _recordOutgoingPacketSent();
         AIChat::Log::log_message(
             direction => 'out',
             visibility => 'private',
@@ -506,9 +430,6 @@ sub onCommand {
         message "Chance de dividir resposta: " . AIChat::Config::get('split_chance'), "list";
         message "Delay do buffer: " . AIChat::Config::get('buffer_delay'), "list";
         message "Responder no chat publico no lockMap: " . AIChat::Config::get('public_on_lockmap'), "list";
-        message "Intervalo minimo entre pacotes: " . AIChat::Config::get('min_packet_interval'), "list";
-        message "Limite de mensagens antes de encerrar papo: " . AIChat::Config::get('conversation_limit'), "list";
-        message "Limite de perguntas seguidas antes de recusar spam: " . AIChat::Config::get('spam_question_limit'), "list";
     } elsif ($arg =~ /^provider\s+(openai|deepseek)$/) {
         if (AIChat::Config::set('provider', $1)) {
             message $translator->translatef("%s Provedor alterado para %s\n", PLUGIN_PREFIX, $1), "list";
@@ -532,27 +453,10 @@ sub onPrivateMessage {
     my $sender = bytesToString($args->{privMsgUser});
     my $message = bytesToString($args->{privMsg});
 
-    my $actor = _getSenderActor($sender);
-    my $visibility_state = _resolveVisibilityState($actor);
-    _ensureVisibilityInfo($sender, $visibility_state);
-    _ensurePlayerInfo($sender, $actor) if $visibility_state eq 'visible';
-
     my $intent_context = { map_name => $field ? $field->baseName : undef, lock_map => $config{lockMap} };
     my $intent;
     $intent = _interpretCommand($message, $sender, $intent_context);
-    if (_shouldForceDropDbIntent($sender, $intent, $message)) {
-        $intent = { action => 'drop_db', is_question => 1 };
-    }
     if (_handleSpamCheck($sender, $message, 'private', $intent)) {
-        AIChat::Log::log_message(
-            direction => 'in',
-            visibility => 'private',
-            sender => $sender,
-            message => $message,
-        );
-        return;
-    }
-    if (_handleConversationLimit($sender, $message, 'private')) {
         AIChat::Log::log_message(
             direction => 'in',
             visibility => 'private',
@@ -612,29 +516,10 @@ sub onPublicMessage {
         return unless $lock_map && $map_name eq $lock_map && $allow_public;
     }
 
-    my $sender_id = $args->{pubID};
-    my $actor = _getSenderActor($sender, $sender_id);
-    my $visibility_state = _resolveVisibilityState($actor);
-    return if $actor && !_isSenderWithinPublicRange($actor);
-    _ensureVisibilityInfo($sender, $visibility_state);
-    _ensurePlayerInfo($sender, $actor) if $visibility_state eq 'visible';
-
     my $intent_context = { map_name => $field ? $field->baseName : undef, lock_map => $config{lockMap} };
     my $intent;
     $intent = _interpretCommand($message, $sender, $intent_context);
-    if (_shouldForceDropDbIntent($sender, $intent, $message)) {
-        $intent = { action => 'drop_db', is_question => 1 };
-    }
     if (_handleSpamCheck($sender, $message, 'public', $intent)) {
-        AIChat::Log::log_message(
-            direction => 'in',
-            visibility => 'public',
-            sender => $sender,
-            message => $message,
-        );
-        return;
-    }
-    if (_handleConversationLimit($sender, $message, 'public')) {
         AIChat::Log::log_message(
             direction => 'in',
             visibility => 'public',
@@ -676,103 +561,6 @@ sub onPublicMessage {
         message => $message,
     );
     _enqueueMessage($sender, $message, { type => 'public' });
-}
-
-sub _getSenderActor {
-    my ($sender, $sender_id) = @_;
-    my $actor;
-    if (defined $sender_id) {
-        $actor = Actor::get($sender_id);
-    }
-    if (!$actor && $playersList && defined $sender) {
-        ($actor) = grep { $_->{name} && $_->{name} eq $sender } @{$playersList->getItems};
-    }
-    return $actor;
-}
-
-sub _resolveActorClass {
-    my ($actor) = @_;
-    return unless $actor;
-    my $job_id = $actor->{jobID};
-    return $jobs_lut{$job_id} if defined $job_id && $jobs_lut{$job_id};
-    return $actor->{job} if defined $actor->{job} && $actor->{job} ne '';
-    return;
-}
-
-sub _isActorInvisible {
-    my ($actor) = @_;
-    return unless $actor;
-    my $statuses = $actor->{statuses};
-    return unless $statuses && ref $statuses eq 'HASH';
-    for my $status (keys %invisibility_statuses) {
-        return 1 if $statuses->{$status};
-    }
-    return;
-}
-
-sub _resolveVisibilityState {
-    my ($actor) = @_;
-    return 'not_visible' unless $actor;
-    return 'not_visible' if _isActorInvisible($actor);
-    return 'visible';
-}
-
-sub _ensurePlayerInfo {
-    my ($sender, $actor) = @_;
-    return unless defined $sender;
-    return unless $actor;
-    my $class = _resolveActorClass($actor) // 'Desconhecida';
-    my $player_info = join "\n",
-        "Informacoes do jogador que esta falando com voce:",
-        "Nome: $sender",
-        "Classe: $class";
-
-    my $history = AIChat::ConversationHistory::getHistory($sender) || [];
-    my $last_info;
-    for (my $i = @$history - 1; $i >= 0; $i--) {
-        my $entry = $history->[$i];
-        next unless $entry->{role} && $entry->{role} eq 'system';
-        next unless ($entry->{type} // '') eq 'player_info';
-        $last_info = $entry->{content};
-        last;
-    }
-    return if defined $last_info && $last_info eq $player_info;
-
-    AIChat::ConversationHistory::addMessage($sender, "system", $player_info, "player_info");
-}
-
-sub _ensureVisibilityInfo {
-    my ($sender, $visibility_state) = @_;
-    return unless defined $sender && defined $visibility_state;
-
-    my $sender_key = _normalizeSenderKey($sender);
-    my $last_state = $last_visibility_state_by_sender{$sender_key};
-    return if defined $last_state && $last_state eq $visibility_state;
-
-    $last_visibility_state_by_sender{$sender_key} = $visibility_state;
-
-    my $visibility_info;
-    if ($visibility_state eq 'visible') {
-        $visibility_info = join "\n",
-            "Informacoes de visibilidade do jogador:",
-            "O jogador esta visivel para voce agora.";
-    } else {
-        $visibility_info = join "\n",
-            "Informacoes de visibilidade do jogador:",
-            "Voce nao esta vendo esse jogador agora (pode estar longe ou invisivel).",
-            "Se a pergunta depender de ver o jogador, responda dizendo que nao esta vendo.";
-    }
-
-    AIChat::ConversationHistory::addMessage($sender, "system", $visibility_info, "visibility_info");
-}
-
-sub _isSenderWithinPublicRange {
-    my ($actor) = @_;
-    return unless $char && $char->{pos_to};
-    return unless $actor && $actor->{pos_to};
-
-    my $dist = distance($char->{pos_to}, $actor->{pos_to});
-    return defined $dist && $dist <= MAX_PUBLIC_CHAT_DISTANCE;
 }
 
 sub onEmotion {
@@ -837,18 +625,27 @@ sub _queueDropDbResponseIfNeeded {
     }
     $response = AIChat::MessageHandler::dropDbUnknownReply() unless defined $response && $response ne '';
     AIChat::ConversationHistory::addMessage($sender, "user", $message, "intent");
-    my @parts = _splitOutgoingResponse($response);
-    if (@parts > 1) {
-        my $state = _getBufferState($sender);
-        $state->{messages} = [];
-        $state->{response_queue} = [];
-        my $buffer_delay = AIChat::Config::get('buffer_delay');
-        $buffer_delay = 2 unless defined $buffer_delay;
-        $state->{buffer_deadline} = time() + $buffer_delay;
-        $state->{typing_until} = 0;
-        $state->{response_started} = 0;
-        $state->{context} = { type => $context };
-        push @{$state->{response_queue}}, @parts;
+    if ($response =~ /\|\|/) {
+        my @parts = grep { defined $_ && length $_ } map {
+            my $part = $_;
+            $part =~ s/^\s+//;
+            $part =~ s/\s+$//;
+            $part;
+        } split /\s*\|\|\s*/, $response;
+        if (@parts) {
+            my $state = _getBufferState($sender);
+            $state->{messages} = [];
+            $state->{response_queue} = [];
+            my $buffer_delay = AIChat::Config::get('buffer_delay');
+            $buffer_delay = 2 unless defined $buffer_delay;
+            $state->{buffer_deadline} = time() + $buffer_delay;
+            $state->{typing_until} = 0;
+            $state->{response_started} = 0;
+            $state->{context} = { type => $context };
+            push @{$state->{response_queue}}, @parts;
+        } else {
+            _queueDirectResponse($sender, $response, { type => $context });
+        }
     } else {
         _queueDirectResponse($sender, $response, { type => $context });
     }
@@ -858,77 +655,6 @@ sub _queueDropDbResponseIfNeeded {
 sub _isDropDbIntent {
     my ($intent) = @_;
     return $intent && ref $intent eq 'HASH' && ($intent->{action} // '') eq 'drop_db';
-}
-
-sub _getLastDropDbStance {
-    my ($sender) = @_;
-    return unless defined $sender;
-    my $history = AIChat::ConversationHistory::getHistory($sender) || [];
-    for (my $i = @$history - 1; $i >= 0; $i--) {
-        my $entry = $history->[$i];
-        next unless ($entry->{type} // '') eq 'drop_db_stance';
-        return $entry->{content};
-    }
-    return;
-}
-
-sub _hasLastDropDbSubject {
-    my ($sender) = @_;
-    return 0 unless defined $sender;
-    my $history = AIChat::ConversationHistory::getHistory($sender) || [];
-    for (my $i = @$history - 1; $i >= 0; $i--) {
-        my $entry = $history->[$i];
-        next unless ($entry->{type} // '') eq 'drop_db_answer';
-        my $content = $entry->{content};
-        next unless defined $content && $content ne '';
-        my $data;
-        eval { $data = decode_json($content); };
-        next if $@ || !$data || ref $data ne 'HASH';
-        return 1 if defined $data->{subject} && $data->{subject} ne '';
-        return 1 if defined $data->{entity} && $data->{entity} ne '';
-    }
-    return 0;
-}
-
-sub _hasDropDbIntentHistory {
-    my ($sender) = @_;
-    return 0 unless defined $sender;
-    my $history = AIChat::ConversationHistory::getHistory($sender) || [];
-    for (my $i = @$history - 1; $i >= 0; $i--) {
-        my $entry = $history->[$i];
-        next unless ($entry->{type} // '') eq 'intent';
-        my $content = $entry->{content};
-        next unless defined $content && $content ne '';
-        my $data;
-        eval { $data = decode_json($content); };
-        next if $@ || !$data || ref $data ne 'HASH';
-        return 1 if ($data->{action} // '') eq 'drop_db';
-    }
-    return 0;
-}
-
-sub _countWords {
-    my ($text) = @_;
-    return 0 unless defined $text;
-    my @words = grep { length } split /\s+/, $text;
-    return scalar @words;
-}
-
-sub _shouldForceDropDbIntent {
-    my ($sender, $intent, $message) = @_;
-    return 0 unless defined $sender;
-    return 0 unless $intent && ref $intent eq 'HASH';
-    return 0 if ($intent->{action} // '') eq 'drop_db';
-    if (defined $message && $message ne '' && AIChat::MessageHandler::_isDropDbQueryMessage($message)) {
-        return 1;
-    }
-    return 0 unless (_hasLastDropDbSubject($sender) || _hasDropDbIntentHistory($sender));
-    my $stance = _getLastDropDbStance($sender);
-    return 0 unless defined $stance && $stance eq 'answer';
-    return 1 if ($intent->{is_question} // 0);
-    return 1 if defined $message && $message =~ /[?]/;
-    return 1 if defined $message && $message =~ /\b(onde|mapa|qual|o que|oq|q|q\?)\b/i;
-    return _countWords($message) <= 4;
 }
 
 sub _normalizeSenderKey {
@@ -1056,10 +782,6 @@ sub _processPendingEmotionRequests {
         my $respond_at = $pending->{respond_at} // 0;
         next unless $respond_at;
         next unless $now >= $respond_at;
-        if (_shouldThrottleOutgoingPackets()) {
-            $pending->{respond_at} = _nextAllowedPacketTime();
-            next;
-        }
 
         my $command;
         if (($pending->{mode} // '') eq 'emote_random') {
@@ -1100,7 +822,6 @@ sub _sendEmotionByCommand {
     my $emotion_id = getEmotionByCommand($command);
     return unless defined $emotion_id;
     $messageSender->sendEmotion($emotion_id);
-    _recordOutgoingPacketSent();
 }
 
 sub _queueEmotionFollowup {
@@ -1139,7 +860,6 @@ sub _processPendingEmotionFollowups {
         my $send_at = $pending->{send_at} // 0;
         next unless $send_at;
         next unless $now >= $send_at;
-        next if _shouldThrottleOutgoingPackets();
 
         my $message = _sanitizeOutgoingMessage($pending->{message});
         if (!$message) {
@@ -1150,7 +870,6 @@ sub _processPendingEmotionFollowups {
         my $sender_name = $pending->{sender_name};
         if ($context && $context eq 'public') {
             $messageSender->sendChat($message);
-            _recordOutgoingPacketSent();
             AIChat::Log::log_message(
                 direction => 'out',
                 visibility => 'public',
@@ -1159,7 +878,6 @@ sub _processPendingEmotionFollowups {
             );
         } else {
             $messageSender->sendPrivateMsg($sender_name, $message);
-            _recordOutgoingPacketSent();
             AIChat::Log::log_message(
                 direction => 'out',
                 visibility => 'private',
@@ -1171,33 +889,6 @@ sub _processPendingEmotionFollowups {
         AIChat::ConversationHistory::addMessage($sender_name, "assistant", $message);
         delete $pending_emotion_followup_by_sender{$sender_key};
     }
-}
-
-sub _minPacketInterval {
-    my $interval = AIChat::Config::get('min_packet_interval');
-    $interval = 0.6 unless defined $interval;
-    return $interval < 0 ? 0 : $interval;
-}
-
-sub _nextAllowedPacketTime {
-    my $interval = _minPacketInterval();
-    return $last_packet_sent_at + $interval;
-}
-
-sub _shouldThrottleOutgoingPackets {
-    my ($state) = @_;
-    my $now = time();
-    my $next_allowed = _nextAllowedPacketTime();
-    return if $now >= $next_allowed;
-    if ($state) {
-        $state->{typing_until} = $next_allowed
-            if !$state->{typing_until} || $state->{typing_until} < $next_allowed;
-    }
-    return 1;
-}
-
-sub _recordOutgoingPacketSent {
-    $last_packet_sent_at = time();
 }
 
 sub _hasPendingEmotionRequest {
@@ -1251,227 +942,6 @@ sub _isBlockedSender {
     return $blocked_by_sender{$sender_key} ? 1 : 0;
 }
 
-sub _shouldHandleConversationLimit {
-    my $limit = AIChat::Config::get('conversation_limit');
-    $limit = 0 unless defined $limit;
-    return $limit > 0 ? $limit : 0;
-}
-
-sub _incrementConversationCount {
-    my ($sender) = @_;
-    return unless defined $sender;
-    my $sender_key = _normalizeSenderKey($sender);
-    return unless $sender_key;
-    $conversation_message_count_by_sender{$sender_key} = ($conversation_message_count_by_sender{$sender_key} // 0) + 1;
-    return $conversation_message_count_by_sender{$sender_key};
-}
-
-sub _conversationCloseStage {
-    my ($sender) = @_;
-    return unless defined $sender;
-    my $sender_key = _normalizeSenderKey($sender);
-    return unless $sender_key;
-    return $conversation_close_stage_by_sender{$sender_key} // 0;
-}
-
-sub _setConversationCloseStage {
-    my ($sender, $stage) = @_;
-    return unless defined $sender;
-    my $sender_key = _normalizeSenderKey($sender);
-    return unless $sender_key;
-    $conversation_close_stage_by_sender{$sender_key} = $stage;
-}
-
-sub _pickConversationCloseWarning {
-    my @messages = (
-        "Mano, vou ter que parar por aqui.",
-        "Foi mal, vou encerrar aqui.",
-        "Aí não dá, vou ficar quieto agora.",
-        "Mal aí, não vou conseguir continuar conversando.",
-        "Mano, agora eu não consigo mais responder.",
-        "Foi mal, vou focar no game e parar de falar.",
-        "Tô no meio do rolê aqui, vou parar de conversar.",
-        "Tá bom, mas vou parar por aqui, valeu.",
-        "A conversa foi boa, mas vou sair do papo agora.",
-        "Deixa eu cortar aqui, tô ocupado.",
-        "Vou dar uma sumida do chat agora.",
-        "Vou ficar off no papo, foi mal.",
-        "Vou mutar aqui e seguir o jogo.",
-        "Vou parar de responder por agora.",
-        "Não dá pra seguir no papo, desculpa.",
-        "Vou ter que te deixar falando sozinho agora, foi mal.",
-        "Mano, não consigo continuar nessa conversa.",
-        "Agora não dá mais, vou ficar na minha.",
-        "Tô farmando, vou parar de conversar.",
-        "Tô ocupado demais, vou encerrar aqui.",
-        "Tô sem tempo pra continuar, vou parar por aqui.",
-        "Vou focar aqui e parar de trocar ideia.",
-        "Vou ficar quieto agora pra não atrapalhar.",
-        "Já deu por hoje, vou parar de conversar.",
-        "Aí já era, vou sair do chat agora.",
-        "Vou deixar esse assunto pra depois, agora não dá.",
-        "Depois a gente continua, agora eu vou parar.",
-        "Mais tarde a gente troca ideia, agora vou encerrar.",
-        "Foi mal, não rola continuar agora.",
-    );
-    return $messages[int(rand(@messages))];
-}
-
-sub _pickConversationCloseFinal {
-    my @messages = (
-        "Mano, já falei que não dá. Flw.",
-        "Já disse que vou parar, tchau.",
-        "Não dá mesmo, vou sair daqui. Flw.",
-        "Já encerrei, para de insistir. Flw.",
-        "Sem papo, mano. Tchau.",
-        "Mano, acabou o assunto. Flw.",
-        "Já deu, tô ocupado. Tchau.",
-        "Não vou continuar respondendo. Flw.",
-        "Mano, para de puxar assunto, já foi.",
-        "Falei que ia parar, lembra? Flw.",
-        "Última vez: não dá. Tchau.",
-        "Chega, mano. Vou ficar quieto agora.",
-        "Já era, vou mutar isso aqui. Flw.",
-        "Tô saindo do chat, insiste não.",
-        "Não adianta insistir, já parei.",
-        "Mano, não força. Já encerrou.",
-        "Acabou, tô off do papo. Flw.",
-        "Vou ignorar agora, valeu.",
-        "Já disse que não dá, então tchau.",
-        "Tu tá insistindo à toa, mano. Flw.",
-        "Pô, respeita aí: eu parei.",
-        "Já falei: não dá pra conversar. Flw.",
-        "Mano, cê não entendeu? Não dá.",
-        "Sem conversa, já falei. Tchau.",
-        "Chega de mensagem, flw.",
-        "Insiste não, vou sair.",
-        "Não vou ficar nisso, tchau.",
-        "A conversa acabou, mano. Flw.",
-        "Se continuar, vou só ignorar.",
-        "Já deu, mano… flw e pronto.",
-    );
-    return $messages[int(rand(@messages))];
-}
-
-sub _pickConversationCloseGoodbye {
-    my @messages = (
-        "Vlw, vlw.",
-        "Falou, bom up aí.",
-        "Blz, bom farm.",
-        "Boa, bom jogo.",
-        "Tmj, boa run.",
-        "É nóis, bom up.",
-        "Fechou, boa sorte.",
-        "Falou, sucesso aí.",
-        "Vlw, fica bem.",
-        "Demorou, boa.",
-        "Boa, bom loot.",
-        "Falou, bons drops.",
-        "Vlw, que venha carta.",
-        "Boa, que drope tudo.",
-        "Bom grind aí.",
-        "Bom corre aí.",
-        "Bom up pra você.",
-        "Falou, bom role.",
-        "Tamo junto, bom jogo.",
-        "É isso, bom up e boa.",
-        "Valeu, até mais.",
-        "Falou, até a próxima.",
-        "Tchau, bom jogo aí.",
-        "Vlw, gg.",
-        "Sucesso no up.",
-        "Boa sorte no farm.",
-        "Bons loots pra você.",
-        "Falou, fica na paz.",
-        "Tmj, se cuida.",
-        "Vlw, abraço.",
-    );
-    return $messages[int(rand(@messages))];
-}
-
-sub _interpretConversationCloseAcknowledgement {
-    my ($sender, $message) = @_;
-    return unless defined $sender && defined $message;
-
-    my $history = AIChat::ConversationHistory::getHistory($sender) || [];
-    my @recent = grep { $_->{role} ne "system" } @$history;
-    @recent = @recent[-6 .. -1] if @recent > 6;
-
-    my @messages = (
-        {
-            role => "system",
-            content => "Voce e um classificador de conversa. Responda apenas com JSON valido no formato {\"acknowledge\":true|false}. Marque true se o jogador concordar em encerrar a conversa, aceitar o encerramento, se despedir, agradecer ou indicar que vai parar o papo. Marque false se ele insistir, pedir para continuar, insistir em assunto, ou ignorar o encerramento. Nao inclua nenhum texto fora do JSON.",
-        }
-    );
-
-    push @messages, map {
-        {
-            role => $_->{role},
-            content => $_->{content},
-        }
-    } @recent;
-
-    push @messages, {
-        role => "user",
-        content => $message,
-    };
-
-    my $response;
-    eval {
-        $response = $ack_client->callAPIWithMessages(\@messages, {
-            max_tokens => 40,
-            temperature => 0,
-        });
-    };
-    if ($@) {
-        warning "[aiChat] Erro ao interpretar encerramento: $@\n", "plugin";
-        return;
-    }
-
-    return unless defined $response && length $response;
-    my $parsed;
-    eval {
-        $parsed = decode_json($response);
-    };
-    if ($@ || !ref $parsed) {
-        debug "[aiChat] Resposta invalida ao interpretar encerramento: $response\n", "plugin";
-        return;
-    }
-
-    return $parsed->{acknowledge} ? 1 : 0;
-}
-
-sub _handleConversationLimit {
-    my ($sender, $message, $context) = @_;
-    return unless defined $sender;
-    my $limit = _shouldHandleConversationLimit();
-    return unless $limit;
-    my $count = _incrementConversationCount($sender);
-    return unless defined $count;
-    my $stage = _conversationCloseStage($sender);
-    return if $count < $limit && !$stage;
-
-    if (!$stage) {
-        my $response = _pickConversationCloseWarning();
-        _queueDirectResponse($sender, $response, { type => $context, normalize => 1 });
-        _setConversationCloseStage($sender, 1);
-        return 1;
-    }
-
-    if ($stage == 1) {
-        my $response = _interpretConversationCloseAcknowledgement($sender, $message)
-            ? _pickConversationCloseGoodbye()
-            : _pickConversationCloseFinal();
-        _queueDirectResponse($sender, $response, { type => $context, normalize => 1 });
-        _setConversationCloseStage($sender, 2);
-        _markSilenceAfterResponse($sender);
-        return 1;
-    }
-
-    return 1 if $stage >= 2;
-    return;
-}
-
 sub _resetQuestionStreak {
     my ($sender) = @_;
     return unless defined $sender;
@@ -1498,24 +968,14 @@ sub _handleSpamCheck {
         return 1;
     }
 
-    if (_isSabotageIntent($intent)) {
-        my $queued = _queueSabotageRefusal($sender, $context);
-        $queued = _queueSabotageRefusalFallback($sender, $context) unless $queued;
-        _markSilenceAfterResponse($sender) if $queued;
-        return 1;
-    }
-
     my $should_count = _shouldCountSpamQuestion($intent);
     if (!$should_count) {
         _resetQuestionStreak($sender);
         return;
     }
 
-    my $spam_limit = _getSpamQuestionLimit();
-    return if $spam_limit <= 0;
-
     $question_streak_by_sender{$sender_key} = ($question_streak_by_sender{$sender_key} // 0) + 1;
-    if ($question_streak_by_sender{$sender_key} >= $spam_limit) {
+    if ($question_streak_by_sender{$sender_key} >= SPAM_QUESTION_LIMIT) {
         my $queued = _queueSpamRefusal($sender, $message, $context);
         $queued = _queueSpamRefusalFallback($sender, $context) unless $queued;
         _markSilenceAfterResponse($sender) if $queued;
@@ -1523,12 +983,6 @@ sub _handleSpamCheck {
     }
 
     return;
-}
-
-sub _getSpamQuestionLimit {
-    my $limit = AIChat::Config::get('spam_question_limit');
-    $limit = SPAM_QUESTION_LIMIT unless defined $limit && $limit =~ /^\d+$/;
-    return $limit;
 }
 
 sub _buildSpamRefusalMessage {
@@ -1548,15 +1002,9 @@ sub _queueSpamRefusal {
     $buffer_delay = 2 unless defined $buffer_delay;
     $state->{typing_until} = 0;
     $state->{response_started} = 0;
-    $state->{context} = { type => $context, sabotage => 1 };
+    $state->{context} = { type => $context };
     $state->{buffer_deadline} = time() + $buffer_delay;
-    my @parts = _splitOutgoingResponse($response);
-    return unless @parts;
-    my $typing_delay = _calculateTypingDelay($parts[0]);
-    if ($typing_delay > 0) {
-        $state->{typing_until} = time() + $buffer_delay + $typing_delay;
-    }
-    push @{$state->{response_queue}}, @parts;
+    push @{$state->{response_queue}}, $response;
     return 1;
 }
 
@@ -1572,15 +1020,9 @@ sub _queueSpamRefusalFallback {
     $buffer_delay = 2 unless defined $buffer_delay;
     $state->{typing_until} = 0;
     $state->{response_started} = 0;
-    $state->{context} = { type => $context, sabotage => 1 };
+    $state->{context} = { type => $context };
     $state->{buffer_deadline} = time() + $buffer_delay;
-    my @parts = _splitOutgoingResponse($message);
-    return unless @parts;
-    my $typing_delay = _calculateTypingDelay($parts[0]);
-    if ($typing_delay > 0) {
-        $state->{typing_until} = time() + $buffer_delay + $typing_delay;
-    }
-    push @{$state->{response_queue}}, @parts;
+    push @{$state->{response_queue}}, $message;
     return 1;
 }
 
@@ -1609,6 +1051,7 @@ sub _pickSpamRefusalReference {
         "Bora jogar em vez de ficar perguntando.",
         "Vai caçar mob que passa.",
         "Vai fazer uma quest aí, pô.",
+        "Vai treinar/fechar instância e relaxa.",
         "Vai pro grind e para com esse interrogatório.",
         "Cara, não tô afim de papo agora.",
         "Tô de boa, sem conversa.",
@@ -1632,108 +1075,6 @@ sub _pickSpamRefusalReference {
     return $messages[int(rand(@messages))];
 }
 
-sub _pickSabotageRefusalReference {
-    my @messages = (
-        "Nem vem com essa, mano.",
-        "Sai fora com esse papo.",
-        "Aham, senta lá.",
-        "Para de forçar, velho.",
-        "Mano, que ideia torta.",
-        "Curiosidade demais é suspeito.",
-        "Pô, já deu, né?",
-        "Olha o Sherlock Holmes do servidor.",
-        "Lá vem o CSI do chat.",
-        "Tá achando que é interrogatório?",
-        "Tá em modo investigação agora, é?",
-        "Menos, detetive.",
-        "Maluco tá em missão secreta.",
-        "Quer o quê, CPF também?",
-        "Tá querendo o dossiê completo, é?",
-        "Que chatice, mano.",
-        "Vai arrumar o que fazer.",
-        "Tô sem paciência pra isso.",
-        "Muda de assunto ou para por aqui.",
-        "Tá enchendo já, na moral.",
-        "Para de caçar treta.",
-        "Tá tentando sabotar, só pode.",
-        "Corta essa viagem aí.",
-        "Vai jogar e para de palhaçada.",
-        "Ah, pronto… lá vem.",
-        "Menos, investigador.",
-        "Calma, agente secreto.",
-        "Tá achando que é polícia do chat?",
-        "Vai com calma aí, delegado.",
-        "Ô perito, relaxa.",
-        "Lá vem o interrogatório 2.0.",
-        "Tá coletando prova pra quê, mano?",
-        "Quer abrir inquérito agora?",
-        "Tá querendo atenção, né?",
-        "Tá carente, mano?",
-        "Vai caçar mob e larga do meu pé.",
-        "Vai farmar e para de arrumar assunto.",
-        "Vai upar, parça, na moral.",
-        "Vai fazer quest, mano.",
-        "Chega, já saturou.",
-        "Já deu dessa palhaçada.",
-        "Muda esse assunto aí.",
-        "Tá chato já.",
-        "Dá um tempo, velho.",
-        "Me poupa, mano.",
-        "Não viaja.",
-        "Para de inventar moda.",
-        "Mano, sério isso?",
-        "Tá de brincadeira comigo?",
-        "Tá me tirando, né?",
-        "Nossa, que insistência.",
-        "Cê não desencana não?",
-        "Já tá feio isso aí.",
-        "Tá passando vergonha, mano.",
-        "Para de graça.",
-        "Que papinho torto.",
-        "Tá tentando pagar de esperto, né?",
-        "Boa tentativa, espertão.",
-        "Vai lá, tenta com outro.",
-        "Comigo não cola.",
-        "Aqui não, campeão.",
-        "Boa sorte com essa aí… longe daqui.",
-    );
-    return $messages[int(rand(@messages))];
-}
-
-sub _buildSabotageRefusalMessage {
-    my $message = _pickSabotageRefusalReference();
-    return AIChat::MessageHandler::_normalizeResponseText($message);
-}
-
-sub _queueSabotageRefusal {
-    my ($sender, $context) = @_;
-    return unless defined $sender;
-    my $message = _buildSabotageRefusalMessage();
-    return unless defined $message && $message ne '';
-    my $state = _getBufferState($sender);
-    $state->{messages} = [];
-    $state->{response_queue} = [];
-    my $buffer_delay = AIChat::Config::get('buffer_delay');
-    $buffer_delay = 2 unless defined $buffer_delay;
-    $state->{typing_until} = 0;
-    $state->{response_started} = 0;
-    $state->{context} = { type => $context, sabotage => 1 };
-    $state->{buffer_deadline} = time() + $buffer_delay;
-    my @parts = _splitOutgoingResponse($message);
-    return unless @parts;
-    my $typing_delay = _calculateTypingDelay($parts[0]);
-    if ($typing_delay > 0) {
-        $state->{typing_until} = time() + $buffer_delay + $typing_delay;
-    }
-    push @{$state->{response_queue}}, @parts;
-    return 1;
-}
-
-sub _queueSabotageRefusalFallback {
-    my ($sender, $context) = @_;
-    return _queueSabotageRefusal($sender, $context);
-}
-
 sub _markSilenceAfterResponse {
     my ($sender) = @_;
     return unless defined $sender;
@@ -1742,15 +1083,6 @@ sub _markSilenceAfterResponse {
     $silence_after_response_by_sender{$sender_key} = 1;
     $silence_message_count_by_sender{$sender_key} = 0;
     $question_streak_by_sender{$sender_key} = 0;
-}
-
-sub _calculateTypingDelay {
-    my ($message) = @_;
-    return 0 unless defined $message;
-    my $typing_speed = AIChat::Config::get('typing_speed');
-    return 0 unless $typing_speed && $typing_speed > 0;
-    my $delay = length($message) / $typing_speed;
-    return $delay > 0 ? $delay : 0;
 }
 
 sub _finalizeSilenceIfNeeded {
@@ -1770,8 +1102,6 @@ sub _silenceSender {
     $silenced_by_sender{$sender_key} = 1;
     $silence_message_count_by_sender{$sender_key} = 0;
     $question_streak_by_sender{$sender_key} = 0;
-    delete $conversation_message_count_by_sender{$sender_key};
-    delete $conversation_close_stage_by_sender{$sender_key};
     delete $message_buffers{$sender};
     delete $pending_emotion_request_by_sender{$sender_key};
     delete $pending_emotion_followup_by_sender{$sender_key};
@@ -1786,23 +1116,15 @@ sub _blockSender {
     return if $blocked_by_sender{$sender_key};
     Commands::run("ignore 1 $sender");
     $blocked_by_sender{$sender_key} = 1;
-    delete $conversation_message_count_by_sender{$sender_key};
-    delete $conversation_close_stage_by_sender{$sender_key};
 }
 
 sub _shouldCountSpamQuestion {
     my ($intent) = @_;
     return unless $intent && ref $intent eq 'HASH';
     my $action = $intent->{action} // '';
-    return 1 if $action eq 'chat' && $intent->{is_question};
+    return 1 if $action eq 'chat';
     return 1 if $action eq 'drop_db';
     return;
-}
-
-sub _isSabotageIntent {
-    my ($intent) = @_;
-    return unless $intent && ref $intent eq 'HASH';
-    return ($intent->{action} // '') eq 'sabotage';
 }
 
 sub _injectEmotionHint {
@@ -1830,4 +1152,4 @@ sub _injectEmotionHint {
     $last_emotion_hint_by_sender{$sender_key} = $hint;
 }
 
-1;
+1; 
