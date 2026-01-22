@@ -491,14 +491,36 @@ sub _normalizeDropDbOutput {
     return '' unless defined $text;
     my $normalized = lc $text;
     $normalized =~ s/\\+//g;
-    $normalized =~ s/[\"”“]+//g;
+    $normalized =~ s/[\"”“'‘’`]+//g;
     $normalized =~ s/[\p{Pi}\p{Pf}]+//g;
+    $normalized =~ s/[\[\]\{\}]+//g;
     $normalized =~ s/\s+/ /g;
     $normalized =~ s/\s*,\s*/, ", "/g;
     $normalized =~ s/,\s*,/, ", "/g;
     $normalized =~ s/^\s+//;
     $normalized =~ s/\s+$//;
     return $normalized;
+}
+
+sub _findDropDbEntityInMessage {
+    my ($message, $bucket) = @_;
+    return unless defined $message && $message ne '' && defined $bucket && $bucket ne '';
+    my $normalized = _normalizeQueryText($message);
+    return unless $normalized ne '';
+    my $lookup = _loadDropDbEntityLookup();
+    return unless $lookup && $lookup->{$bucket};
+    my $best;
+    my $best_len = 0;
+    for my $key (keys %{$lookup->{$bucket}}) {
+        next unless defined $key && $key ne '';
+        next unless index($normalized, $key) >= 0;
+        my $len = length $key;
+        if (!$best || $len > $best_len) {
+            $best = $lookup->{$bucket}{$key};
+            $best_len = $len;
+        }
+    }
+    return $best;
 }
 
 sub _responseContainsMapCode {
@@ -1228,10 +1250,35 @@ sub generateDropDbChatResponse {
     };
 
     my $analysis = _interpretDropDbQuestion($message, $sender);
+    my $intent = $analysis && ref $analysis eq 'HASH' ? ($analysis->{intent} // '') : '';
+    my $map_only = ($analysis && $analysis->{map_only}) ? 1 : 0;
+    $map_only ||= _isMapQuery($message);
     my $subject_monster = _resolveDropDbSubjectMonster($analysis, $sender);
     my $subject_tier = 'chance';
     my $subject_entry;
     if ($subject_monster) {
+        my $mondb = _loadMonsterDropDb();
+        if ($mondb && %$mondb) {
+            $subject_entry = $mondb->{$subject_monster} || {};
+            $subject_tier = $subject_entry->{tier} // 'chance';
+        }
+    }
+    my $resolved_item = $intent eq 'item_source' ? _resolveDropDbItem($analysis->{entity}) : undef;
+    $resolved_item ||= _findDropDbEntityInMessage($message, 'items');
+    my $message_monster = _findDropDbEntityInMessage($message, 'monsters');
+    if (!$subject_monster && $message_monster) {
+        $subject_monster = $message_monster;
+    }
+    if (($intent eq '' || $intent eq 'unknown') && $resolved_item && !$message_monster) {
+        $intent = 'item_source';
+    }
+    if (!$subject_monster && $resolved_item) {
+        my $index = _loadDropDbItemIndex();
+        my $item_key = _normalizeQueryText($resolved_item);
+        my $monsters = $index->{$item_key} || [];
+        $subject_monster = $monsters->[0] if @$monsters;
+    }
+    if ($subject_monster && !$subject_entry) {
         my $mondb = _loadMonsterDropDb();
         if ($mondb && %$mondb) {
             $subject_entry = $mondb->{$subject_monster} || {};
@@ -1247,19 +1294,35 @@ sub generateDropDbChatResponse {
         return generateDropDbRefusal($message, $sender);
     }
 
+    if ($intent eq 'item_source' && $resolved_item && $subject_monster && $subject_entry) {
+        my $response = $map_only ? _formatDropDbLocationAnswer($subject_entry, 1) : $subject_monster;
+        $response = _normalizeDropDbOutput(_limitDropDbList($response));
+        if ($response ne '') {
+            _setDropDbStance($sender, 'answer');
+            _setLastDropDbAnswer($sender, {
+                intent => 'item_source',
+                entity => $resolved_item,
+                answer_type => $map_only ? 'map' : 'monster',
+                subject => $subject_monster,
+                subject_type => 'monster',
+            });
+            return $response;
+        }
+    }
+
     if ($subject_monster && $subject_entry) {
         my $is_followup_where = defined $normalized_message && $normalized_message =~ /^onde\b/;
-        my $is_map_query = _isMapQuery($message);
+        my $is_map_query = $map_only;
         if ($is_followup_where || $is_map_query) {
-            my $map_only = $is_map_query ? 1 : _shouldAnswerWithMapOnly($sender, 'monster_location', $subject_monster, 0);
-            my $response = _formatDropDbLocationAnswer($subject_entry, $map_only);
+            my $map_only_answer = $is_map_query ? 1 : _shouldAnswerWithMapOnly($sender, 'monster_location', $subject_monster, 0);
+            my $response = _formatDropDbLocationAnswer($subject_entry, $map_only_answer);
             $response = _normalizeDropDbOutput(_limitDropDbList($response));
             if ($response ne '') {
                 _setDropDbStance($sender, 'answer');
                 _setLastDropDbAnswer($sender, {
                     intent => 'monster_location',
                     entity => $subject_monster,
-                    answer_type => $map_only ? 'map' : 'location',
+                    answer_type => $map_only_answer ? 'map' : 'location',
                     subject => $subject_monster,
                     subject_type => 'monster',
                 });
