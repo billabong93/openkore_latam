@@ -124,7 +124,7 @@ sub _applyValue {
     } elsif ($key eq 'min_packet_interval') {
         return unless $value =~ /^\d+(?:\.\d+)?$/;
     } elsif ($key eq 'conversation_limit') {
-        return unless $value =~ /^\d+$/;
+        return unless $value =~ /^(?:\d+|\d+\s*\.\.\s*\d+)$/;
     } elsif ($key eq 'spam_question_limit') {
         return unless $value =~ /^(?:\d+|\d+\s*\.\.\s*\d+)$/;
     }

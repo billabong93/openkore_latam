@@ -49,7 +49,7 @@ aiChat_dropdb_question_limit 0
 # Intervalo minimo entre pacotes enviados (em segundos)
 aiChat_min_packet_interval 0.6
 
-# Numero de mensagens do jogador antes de tentar encerrar o papo (0 desativa)
+# Numero de mensagens do jogador antes de tentar encerrar o papo (0 desativa, ex: 8..12)
 aiChat_conversation_limit 10
 
 # Numero de perguntas seguidas antes de recusar por spam (0 desativa, ex: 3..5)

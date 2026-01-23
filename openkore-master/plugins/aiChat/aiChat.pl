@@ -1278,8 +1278,7 @@ sub _isBlockedSender {
 
 sub _shouldHandleConversationLimit {
     my $limit = AIChat::Config::get('conversation_limit');
-    $limit = 0 unless defined $limit;
-    return $limit > 0 ? $limit : 0;
+    return _resolveRangeLimit($limit, 0);
 }
 
 sub _incrementConversationCount {
