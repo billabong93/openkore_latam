@@ -509,6 +509,7 @@ sub onCommand {
         message "Intervalo minimo entre pacotes: " . AIChat::Config::get('min_packet_interval'), "list";
         message "Limite de mensagens antes de encerrar papo: " . AIChat::Config::get('conversation_limit'), "list";
         message "Limite de perguntas seguidas antes de recusar spam: " . AIChat::Config::get('spam_question_limit'), "list";
+        message "Limite de perguntas do dropdb antes de recusar: " . AIChat::Config::get('dropdb_question_limit'), "list";
     } elsif ($arg =~ /^provider\s+(openai|deepseek)$/) {
         if (AIChat::Config::set('provider', $1)) {
             message $translator->translatef("%s Provedor alterado para %s\n", PLUGIN_PREFIX, $1), "list";
@@ -946,11 +947,19 @@ sub _recordDropDbQuestion {
     my $key = _normalizeSenderKey($sender);
     return unless $key;
     $drop_db_question_count{$key} = ($drop_db_question_count{$key} // 0) + 1;
-    $drop_db_refusal_limit{$key} = DROP_DB_REFUSAL_MIN + int(rand(DROP_DB_REFUSAL_MAX - DROP_DB_REFUSAL_MIN + 1))
+    $drop_db_refusal_limit{$key} = _getDropDbQuestionLimit()
         unless defined $drop_db_refusal_limit{$key};
     if ($drop_db_question_count{$key} >= $drop_db_refusal_limit{$key}) {
         $drop_db_force_refusal{$key} = 1;
     }
+}
+
+sub _getDropDbQuestionLimit {
+    my $limit = AIChat::Config::get('dropdb_question_limit');
+    if (defined $limit && $limit =~ /^\d+$/ && $limit > 0) {
+        return $limit;
+    }
+    return DROP_DB_REFUSAL_MIN + int(rand(DROP_DB_REFUSAL_MAX - DROP_DB_REFUSAL_MIN + 1));
 }
 
 sub _shouldForceDropDbRefusal {

@@ -43,6 +43,9 @@ aiChat_mob_database 1
 # Chance de recusar perguntas do banco de drops (0.0 - 1.0)
 aiChat_dropdb_refusal_chance 0.5
 
+# Limite fixo de perguntas sobre dropdb antes de recusar (0 usa aleatorio)
+aiChat_dropdb_question_limit 0
+
 # Intervalo minimo entre pacotes enviados (em segundos)
 aiChat_min_packet_interval 0.6
 

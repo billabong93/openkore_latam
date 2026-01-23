@@ -34,6 +34,7 @@ Configure as opções no `plugins/aiChat/config.txt` ou via console do OpenKore 
 *   `aiChat_typing_speed`: Velocidade de digitação em caracteres/segundo (padrão: `20`)
 *   `aiChat_mob_database`: Habilita respostas usando o banco de dados de monstros/drops (`1` para habilitar, `0` para sempre recusar).
 *   `aiChat_dropdb_refusal_chance`: Chance de recusar perguntas do banco de drops (0.0-1.0, padrão: `0.5`).
+*   `aiChat_dropdb_question_limit`: Limite fixo de perguntas sobre dropdb antes de recusar (padrão: `0` usa aleatório).
 *   `aiChat_min_packet_interval`: Intervalo mínimo entre pacotes enviados (em segundos, padrão: `0.6`).
 *   `aiChat_conversation_limit`: Número de mensagens do jogador antes do bot encerrar o papo (padrão: `10`, `0` desativa).
 *   `aiChat_spam_question_limit`: Número de perguntas seguidas antes de recusar por spam (padrão: `3`, `0` desativa).
