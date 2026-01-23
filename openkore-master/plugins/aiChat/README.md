@@ -22,9 +22,9 @@ Para usar o plugin, você precisará:
 
 ## 2. Configuração
 
-### A. No plugin (`plugins/aiChat/config.txt` ou comandos `aichat set`)
+### A. No plugin (`plugins/aiChat/config/config.txt` ou comandos `aichat set`)
 
-Configure as opções no `plugins/aiChat/config.txt` ou via console do OpenKore (`aichat set <chave> <valor>`). Os comandos `aichat set` atualizam o arquivo automaticamente.
+Configure as opções no `plugins/aiChat/config/config.txt` ou via console do OpenKore (`aichat set <chave> <valor>`). Os comandos `aichat set` atualizam o arquivo automaticamente.
 
 *   `aiChat_provider`: `openai` ou `deepseek` (padrão: `deepseek`)
 *   `aiChat_model`: `gpt-3.5-turbo` ou `deepseek-chat` (ajustado ao `provider`)
@@ -39,7 +39,7 @@ Configure as opções no `plugins/aiChat/config.txt` ou via console do OpenKore 
 *   `aiChat_conversation_limit`: Número de mensagens do jogador antes do bot encerrar o papo (padrão: `10`, `0` desativa, ex: `8..12`).
 *   `aiChat_spam_question_limit`: Número de perguntas seguidas antes de recusar por spam (padrão: `3`, `0` desativa, ex: `3..5`).
 
-### Banco de monstros/drops (`plugins/aiChat/mondb.txt`)
+### Banco de monstros/drops (`plugins/aiChat/config/mondb.txt`)
 
 Você pode separar o banco em duas partes: uma com respostas garantidas e outra sujeita à chance de recusa. Use os marcadores abaixo em linhas próprias:
 
@@ -60,7 +60,7 @@ Orc Zumbi: (Caverna de Geffen, gef_dun01) Pele de Orc, Carta Orc Zumbi
 
 ### B. No Proxy Node.js (`api_proxy.js`)
 
-O proxy usa a chave definida em `aiChat_api_key` no `config.txt`. Como alternativa, você pode definir a variável de ambiente `AICHAT_API_KEY` ou inserir a chave diretamente no `api_proxy.js`.
+O proxy usa a chave definida em `aiChat_api_key` no `config/config.txt`. Como alternativa, você pode definir a variável de ambiente `AICHAT_API_KEY` ou inserir a chave diretamente no `api_proxy.js`.
 
 ## 3. Uso
 

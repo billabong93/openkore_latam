@@ -1544,7 +1544,7 @@ sub _buildBasicDropContext {
 sub _loadMonsterDropDb {
     return $mondb_cache if $mondb_cache;
 
-    my $path = File::Spec->catfile(_pluginBaseDir(), 'mondb.txt');
+    my $path = File::Spec->catfile(_pluginBaseDir(), 'config', 'mondb.txt');
     unless (-e $path) {
         $mondb_cache = {};
         return $mondb_cache;
@@ -1618,7 +1618,7 @@ sub updateMondbFromMap {
     return if defined $mondb_map_cache{$map_name} && $mondb_map_cache{$map_name} eq $signature;
     $mondb_map_cache{$map_name} = $signature;
 
-    my $path = File::Spec->catfile(_pluginBaseDir(), 'mondb.txt');
+    my $path = File::Spec->catfile(_pluginBaseDir(), 'config', 'mondb.txt');
     return unless -e $path;
 
     my @lines = ();

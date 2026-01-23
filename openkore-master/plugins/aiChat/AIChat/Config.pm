@@ -56,7 +56,7 @@ my %_file_key_map = (
 
 sub _configFilePath {
     my $base = $Plugins::current_plugin_folder || File::Spec->catdir("plugins", "aiChat");
-    return File::Spec->catfile($base, "config.txt");
+    return File::Spec->catfile($base, "config", "config.txt");
 }
 
 sub _loadFromConfigHash {
