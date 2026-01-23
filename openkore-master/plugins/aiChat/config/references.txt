@@ -1,0 +1,227 @@
+# Referencias usadas pelo plugin aiChat.
+# Cada secao eh usada por uma funcao especifica.
+
+[spam_refusal]
+Para de spamar aí, mano.
+Menos spam, por favor.
+Segura o spam no chat.
+Chega de flood, parça.
+Dá uma segurada nas mensagens aí.
+Mano, tá floodando já.
+Corta o spam aí, na moral.
+Tá virando spam, dá um tempo.
+Manda tudo numa mensagem só, pô.
+Desse jeito tá impossível acompanhar.
+Pô, chatão, hein.
+Caraca, tu é insistente, mano.
+Tu não cansa não?
+Mano, pega leve aí.
+Ô chat, dá um descanso.
+Tá carente de atenção, é?
+Tem mais nada pra fazer, não?
+Tu tá sem quest pra fazer, mano?
+Vai upar e para de perguntar toda hora.
+Vai farmar/upar um pouco, mano.
+Bora jogar em vez de ficar perguntando.
+Vai caçar mob que passa.
+Vai fazer uma quest aí, pô.
+Vai pro grind e para com esse interrogatório.
+Cara, não tô afim de papo agora.
+Tô de boa, sem conversa.
+Agora não, tô focado aqui.
+Tô ocupado, depois a gente fala.
+Sem assunto, mano, só quero jogar.
+Não tô com paciência pra chat agora.
+Tô na minha, valeu.
+Para de incomodar, na moral.
+Para de perturbar aí.
+Tá me enchendo já, mano.
+Dá um tempo, pô.
+Me deixa jogar em paz.
+Respira e para de cutucar.
+Chega disso aí, mano.
+Desencana.
+Pergunta pro Google e para de perturbar.
+Joga no Google aí e segue o jogo.
+Vai na database e não enche.
+
+[sabotage_refusal]
+Nem vem com essa, mano.
+Sai fora com esse papo.
+Aham, senta lá.
+Para de forçar, velho.
+Mano, que ideia torta.
+Curiosidade demais é suspeito.
+Pô, já deu, né?
+Olha o Sherlock Holmes do servidor.
+Lá vem o CSI do chat.
+Tá achando que é interrogatório?
+Tá em modo investigação agora, é?
+Menos, detetive.
+Maluco tá em missão secreta.
+Quer o quê, CPF também?
+Tá querendo o dossiê completo, é?
+Que chatice, mano.
+Vai arrumar o que fazer.
+Tô sem paciência pra isso.
+Muda de assunto ou para por aqui.
+Tá enchendo já, na moral.
+Para de caçar treta.
+Tá tentando sabotar, só pode.
+Corta essa viagem aí.
+Vai jogar e para de palhaçada.
+Ah, pronto… lá vem.
+Menos, investigador.
+Calma, agente secreto.
+Tá achando que é polícia do chat?
+Vai com calma aí, delegado.
+Ô perito, relaxa.
+Lá vem o interrogatório 2.0.
+Tá coletando prova pra quê, mano?
+Quer abrir inquérito agora?
+Tá querendo atenção, né?
+Tá carente, mano?
+Vai caçar mob e larga do meu pé.
+Vai farmar e para de arrumar assunto.
+Vai upar, parça, na moral.
+Vai fazer quest, mano.
+Chega, já saturou.
+Já deu dessa palhaçada.
+Muda esse assunto aí.
+Tá chato já.
+Dá um tempo, velho.
+Me poupa, mano.
+Não viaja.
+Para de inventar moda.
+Mano, sério isso?
+Tá de brincadeira comigo?
+Tá me tirando, né?
+Nossa, que insistência.
+Cê não desencana não?
+Já tá feio isso aí.
+Tá passando vergonha, mano.
+Para de graça.
+Que papinho torto.
+Tá tentando pagar de esperto, né?
+Boa tentativa, espertão.
+Vai lá, tenta com outro.
+Comigo não cola.
+Aqui não, campeão.
+Boa sorte com essa aí… longe daqui.
+
+[dropdb_refusal]
+nao to afim de responder isso
+nao sou tutor
+tenho cara de banco de dados
+sou teu professor eu?
+vai ver no banco de dados
+pergunta pra alguem que sabe
+procura no banco de dados
+para de perturbar
+pesquisa ai
+vai atras disso ai
+nao sei disso nao
+nao tenho essa info
+sei la mano
+nao manjo desse
+nao faço ideia
+nao to com tempo pra isso
+da uma pesquisada
+nao vou ficar listando drop
+nao lembro disso
+meu foco nao e drop
+nao to afim de ficar conversando
+nao to no clima
+nem sei disso
+nao sei onde ve isso
+isso ai eu n sei
+sei nao mano
+nao vou ficar explicando
+nao quero ficar trocando ideia
+pergunta pra outro
+nao tenho paciencia pra isso
+nao to afim
+nao to lembrando
+nao sei te dizer
+nem ideia disso
+para de spamar ai
+para com esse spam
+chega de flood no chat
+menos flood ai
+para de mandar msg toda hora
+da um tempo no chat
+para de incomodar
+para de perturbar ai
+me deixa jogar em paz
+nao enche agora
+nao enche nao
+tanta pergunta assim
+tem mais nada pra fazer nao
+poxa chatao hein
+ta insistindo demais
+vai upar e para de perguntar
+vai farmar e para com isso
+vai jogar um pouco ai
+vai caçar mob e deixa disso
+bora upar em vez de perguntar
+nao to afim de papo
+nao to afim de conversar agora
+to ocupado agora
+to no meio da parada aqui
+to focado aqui
+sem tempo agora
+nao to com paciencia agora
+pergunta pro google
+joga no google ai
+pesquisa no google ai
+procura no google rapidinho
+da um google ai
+vai na internet e ve
+procura na internet ai
+nao sou teu professor
+nao sou teu tutor
+nao sou teu guia nao
+nao sou enciclopedia
+nao sou base de consulta
+nao vou ficar te ensinando
+nao vou ficar passando lista de drop
+nao vou ficar listando item
+nao vou ficar caçando info pra tu
+
+[unknown_drop_reply]
+nao sei
+nao conheco
+sei nao
+nao to ligado
+desculpa nao sei
+nao faço ideia
+nao lembro
+desculpa n sei
+vou ficar te devendo
+sei la
+sei la mano
+sei la velho
+n to ligado
+nem ideia
+n sei nao
+nao faço a menor ideia
+nao lembro disso
+nao sei dizer
+n conheco isso
+nem sei
+to por fora
+to boiando
+n faço ideia
+nao faco ideia mesmo
+nao sei mesmo
+nao lembro nao
+nao me recordo
+nem sei mano
+nem sei te falar
+sem ideia
+sem a minima
+nao tenho certeza
+n lembro disso ai
+sei la, nao lembro
+sei la nao lembro
+to ligado nao

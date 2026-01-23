@@ -25,6 +25,7 @@ use AIChat::MessageHandler;
 use AIChat::ConversationHistory;
 use AIChat::HookManager;
 use AIChat::Log;
+use AIChat::References;
 
 use constant {
     PLUGIN_PREFIX => "[aiChat]",
@@ -1626,118 +1627,14 @@ sub _queueSpamRefusalFallback {
 }
 
 sub _pickSpamRefusalReference {
-    my @messages = (
-        "Para de spamar aí, mano.",
-        "Menos spam, por favor.",
-        "Segura o spam no chat.",
-        "Chega de flood, parça.",
-        "Dá uma segurada nas mensagens aí.",
-        "Mano, tá floodando já.",
-        "Corta o spam aí, na moral.",
-        "Tá virando spam, dá um tempo.",
-        "Manda tudo numa mensagem só, pô.",
-        "Desse jeito tá impossível acompanhar.",
-        "Pô, chatão, hein.",
-        "Caraca, tu é insistente, mano.",
-        "Tu não cansa não?",
-        "Mano, pega leve aí.",
-        "Ô chat, dá um descanso.",
-        "Tá carente de atenção, é?",
-        "Tem mais nada pra fazer, não?",
-        "Tu tá sem quest pra fazer, mano?",
-        "Vai upar e para de perguntar toda hora.",
-        "Vai farmar/upar um pouco, mano.",
-        "Bora jogar em vez de ficar perguntando.",
-        "Vai caçar mob que passa.",
-        "Vai fazer uma quest aí, pô.",
-        "Vai pro grind e para com esse interrogatório.",
-        "Cara, não tô afim de papo agora.",
-        "Tô de boa, sem conversa.",
-        "Agora não, tô focado aqui.",
-        "Tô ocupado, depois a gente fala.",
-        "Sem assunto, mano, só quero jogar.",
-        "Não tô com paciência pra chat agora.",
-        "Tô na minha, valeu.",
-        "Para de incomodar, na moral.",
-        "Para de perturbar aí.",
-        "Tá me enchendo já, mano.",
-        "Dá um tempo, pô.",
-        "Me deixa jogar em paz.",
-        "Respira e para de cutucar.",
-        "Chega disso aí, mano.",
-        "Desencana.",
-        "Pergunta pro Google e para de perturbar.",
-        "Joga no Google aí e segue o jogo.",
-        "Vai na database e não enche.",
-    );
+    my @messages = AIChat::References::get('spam_refusal');
+    return '' unless @messages;
     return $messages[int(rand(@messages))];
 }
 
 sub _pickSabotageRefusalReference {
-    my @messages = (
-        "Nem vem com essa, mano.",
-        "Sai fora com esse papo.",
-        "Aham, senta lá.",
-        "Para de forçar, velho.",
-        "Mano, que ideia torta.",
-        "Curiosidade demais é suspeito.",
-        "Pô, já deu, né?",
-        "Olha o Sherlock Holmes do servidor.",
-        "Lá vem o CSI do chat.",
-        "Tá achando que é interrogatório?",
-        "Tá em modo investigação agora, é?",
-        "Menos, detetive.",
-        "Maluco tá em missão secreta.",
-        "Quer o quê, CPF também?",
-        "Tá querendo o dossiê completo, é?",
-        "Que chatice, mano.",
-        "Vai arrumar o que fazer.",
-        "Tô sem paciência pra isso.",
-        "Muda de assunto ou para por aqui.",
-        "Tá enchendo já, na moral.",
-        "Para de caçar treta.",
-        "Tá tentando sabotar, só pode.",
-        "Corta essa viagem aí.",
-        "Vai jogar e para de palhaçada.",
-        "Ah, pronto… lá vem.",
-        "Menos, investigador.",
-        "Calma, agente secreto.",
-        "Tá achando que é polícia do chat?",
-        "Vai com calma aí, delegado.",
-        "Ô perito, relaxa.",
-        "Lá vem o interrogatório 2.0.",
-        "Tá coletando prova pra quê, mano?",
-        "Quer abrir inquérito agora?",
-        "Tá querendo atenção, né?",
-        "Tá carente, mano?",
-        "Vai caçar mob e larga do meu pé.",
-        "Vai farmar e para de arrumar assunto.",
-        "Vai upar, parça, na moral.",
-        "Vai fazer quest, mano.",
-        "Chega, já saturou.",
-        "Já deu dessa palhaçada.",
-        "Muda esse assunto aí.",
-        "Tá chato já.",
-        "Dá um tempo, velho.",
-        "Me poupa, mano.",
-        "Não viaja.",
-        "Para de inventar moda.",
-        "Mano, sério isso?",
-        "Tá de brincadeira comigo?",
-        "Tá me tirando, né?",
-        "Nossa, que insistência.",
-        "Cê não desencana não?",
-        "Já tá feio isso aí.",
-        "Tá passando vergonha, mano.",
-        "Para de graça.",
-        "Que papinho torto.",
-        "Tá tentando pagar de esperto, né?",
-        "Boa tentativa, espertão.",
-        "Vai lá, tenta com outro.",
-        "Comigo não cola.",
-        "Aqui não, campeão.",
-        "Boa sorte com essa aí… longe daqui.",
-    );
+    my @messages = AIChat::References::get('sabotage_refusal');
+    return '' unless @messages;
     return $messages[int(rand(@messages))];
 }
 
