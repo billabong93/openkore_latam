@@ -18,11 +18,11 @@ use constant {
     DEFAULT_PROMPT_GM => "voce é um jogador tentando parecer humano ao falar com GMs dentro do mapa sec_pri, responda curto e educado, evite discutir bots, siga instrucoes e mantenha respostas objetivas",
     DEFAULT_MAX_TOKENS => 150,
     DEFAULT_TEMPERATURE => 0.6,
-    DEFAULT_TYPING_SPEED => 8, # Caracteres por segundo (para simular digitação)
+    DEFAULT_TYPING_SPEED => 20, # Caracteres por segundo (para simular digitação)
     DEFAULT_SPLIT_CHANCE => 0.2, # Chance de dividir resposta em duas mensagens
     DEFAULT_BUFFER_DELAY => 2, # Segundos para aguardar novas mensagens antes de responder
     DEFAULT_PUBLIC_ON_LOCKMAP => 1, # Permitir respostas no chat publico quando estiver no lockMap
-    DEFAULT_MOB_DATABASE => 0, # Habilitar respostas usando o banco de dados de monstros
+    DEFAULT_MOB_DATABASE => 1, # Habilitar respostas usando o banco de dados de monstros
     DEFAULT_DROPDB_REFUSAL_CHANCE => 0.5, # Chance de recusar perguntas do banco de drops
     DEFAULT_DROPDB_QUESTION_LIMIT => 3, # Limite fixo de perguntas de drop antes de recusar (0 usa aleatorio)
     DEFAULT_MIN_PACKET_INTERVAL => 0.6, # Intervalo minimo entre pacotes enviados (em segundos)

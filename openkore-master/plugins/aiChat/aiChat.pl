@@ -530,8 +530,12 @@ sub onCommand {
 
 sub onPrivateMessage {
     my (undef, $args) = @_;
-    my $sender = bytesToString($args->{privMsgUser});
-    my $message = bytesToString($args->{privMsg});
+    my $sender = _resolvePacketField($args, qw(privMsgUser MsgUser));
+    my $message = _resolvePacketField($args, qw(privMsg Msg));
+    $sender = bytesToString($args->{privMsgUser}) if (!defined $sender || $sender eq '') && defined $args->{privMsgUser};
+    $message = bytesToString($args->{privMsg}) if (!defined $message || $message eq '') && defined $args->{privMsg};
+    return unless defined $sender && $sender ne '';
+    return unless defined $message && $message ne '';
 
     my $actor = _getSenderActor($sender);
     my $visibility_state = _resolveVisibilityState($actor);
@@ -600,8 +604,12 @@ sub onPrivateMessage {
 sub onPublicMessage {
     my (undef, $args) = @_;
     return unless defined $field;
-    my $sender = bytesToString($args->{pubMsgUser} || $args->{MsgUser});
-    my $message = bytesToString($args->{pubMsg} || $args->{Msg});
+    my $sender = _resolvePacketField($args, qw(pubMsgUser MsgUser));
+    my $message = _resolvePacketField($args, qw(pubMsg Msg));
+    $sender = bytesToString($args->{pubMsgUser}) if (!defined $sender || $sender eq '') && defined $args->{pubMsgUser};
+    $message = bytesToString($args->{pubMsg}) if (!defined $message || $message eq '') && defined $args->{pubMsg};
+    return unless defined $sender && $sender ne '';
+    return unless defined $message && $message ne '';
 
     return unless defined $sender && defined $message;
     return if $char && defined $char->{name} && $sender eq $char->{name};
@@ -939,6 +947,16 @@ sub _normalizeSenderKey {
     $key =~ s/^\s+//;
     $key =~ s/\s+$//;
     return lc $key;
+}
+
+sub _resolvePacketField {
+    my ($args, @keys) = @_;
+    return undef unless $args && ref $args eq 'HASH';
+    for my $key (@keys) {
+        my $value = $args->{$key};
+        return $value if defined $value && $value ne '';
+    }
+    return undef;
 }
 
 sub _recordDropDbQuestion {
