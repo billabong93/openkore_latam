@@ -43,11 +43,14 @@ aiChat_mob_database 1
 # Chance de recusar perguntas do banco de drops (0.0 - 1.0)
 aiChat_dropdb_refusal_chance 0.5
 
+# Limite de perguntas sobre dropdb antes de recusar (0 usa aleatorio, aceita range ex: 2..4)
+aiChat_dropdb_question_limit 2..4
+
 # Intervalo minimo entre pacotes enviados (em segundos)
 aiChat_min_packet_interval 0.6
 
-# Numero de mensagens do jogador antes de tentar encerrar o papo (0 desativa)
-aiChat_conversation_limit 10
+# Numero de mensagens do jogador antes de tentar encerrar o papo (0 desativa, aceita range ex: 8..12)
+aiChat_conversation_limit 8..10
 
-# Numero de perguntas seguidas antes de recusar por spam (0 desativa)
-aiChat_spam_question_limit 5
+# Numero de perguntas seguidas antes de recusar por spam (0 desativa, aceita range ex: 3..5)
+aiChat_spam_question_limit 3..5

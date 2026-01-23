@@ -18,12 +18,13 @@ use constant {
     DEFAULT_PROMPT_GM => "voce é um jogador tentando parecer humano ao falar com GMs dentro do mapa sec_pri, responda curto e educado, evite discutir bots, siga instrucoes e mantenha respostas objetivas",
     DEFAULT_MAX_TOKENS => 150,
     DEFAULT_TEMPERATURE => 0.6,
-    DEFAULT_TYPING_SPEED => 20, # Caracteres por segundo (para simular digitação)
+    DEFAULT_TYPING_SPEED => 8, # Caracteres por segundo (para simular digitação)
     DEFAULT_SPLIT_CHANCE => 0.2, # Chance de dividir resposta em duas mensagens
     DEFAULT_BUFFER_DELAY => 2, # Segundos para aguardar novas mensagens antes de responder
     DEFAULT_PUBLIC_ON_LOCKMAP => 1, # Permitir respostas no chat publico quando estiver no lockMap
-    DEFAULT_MOB_DATABASE => 1, # Habilitar respostas usando o banco de dados de monstros
+    DEFAULT_MOB_DATABASE => 0, # Habilitar respostas usando o banco de dados de monstros
     DEFAULT_DROPDB_REFUSAL_CHANCE => 0.5, # Chance de recusar perguntas do banco de drops
+    DEFAULT_DROPDB_QUESTION_LIMIT => 3, # Limite fixo de perguntas de drop antes de recusar (0 usa aleatorio)
     DEFAULT_MIN_PACKET_INTERVAL => 0.6, # Intervalo minimo entre pacotes enviados (em segundos)
     DEFAULT_CONVERSATION_LIMIT => 10, # Numero de mensagens do jogador antes de iniciar o encerramento
     DEFAULT_SPAM_QUESTION_LIMIT => 3, # Numero de perguntas seguidas antes de recusar por spam
@@ -47,6 +48,7 @@ my %_file_key_map = (
     aiChat_public_on_lockmap => 'public_on_lockmap',
     aiChat_mob_database => 'mob_database',
     aiChat_dropdb_refusal_chance => 'dropdb_refusal_chance',
+    aiChat_dropdb_question_limit => 'dropdb_question_limit',
     aiChat_min_packet_interval => 'min_packet_interval',
     aiChat_conversation_limit => 'conversation_limit',
     aiChat_spam_question_limit => 'spam_question_limit',
@@ -74,6 +76,7 @@ sub _loadFromConfigHash {
         'aiChat_public_on_lockmap',
         'aiChat_mob_database',
         'aiChat_dropdb_refusal_chance',
+        'aiChat_dropdb_question_limit',
         'aiChat_min_packet_interval',
         'aiChat_conversation_limit',
         'aiChat_spam_question_limit',
@@ -116,12 +119,14 @@ sub _applyValue {
     } elsif ($key eq 'dropdb_refusal_chance') {
         return unless $value =~ /^-?\d+(?:\.\d+)?$/;
         return if $value < 0 || $value > 1;
+    } elsif ($key eq 'dropdb_question_limit') {
+        return unless $value =~ /^(?:\d+|\d+\s*\.\.\s*\d+)$/;
     } elsif ($key eq 'min_packet_interval') {
         return unless $value =~ /^\d+(?:\.\d+)?$/;
     } elsif ($key eq 'conversation_limit') {
-        return unless $value =~ /^\d+$/;
+        return unless $value =~ /^(?:\d+|\d+\s*\.\.\s*\d+)$/;
     } elsif ($key eq 'spam_question_limit') {
-        return unless $value =~ /^\d+$/;
+        return unless $value =~ /^(?:\d+|\d+\s*\.\.\s*\d+)$/;
     }
 
     $_aiChatConfig{$key} = $value;
@@ -145,6 +150,7 @@ BEGIN {
         public_on_lockmap => DEFAULT_PUBLIC_ON_LOCKMAP,
         mob_database => DEFAULT_MOB_DATABASE,
         dropdb_refusal_chance => DEFAULT_DROPDB_REFUSAL_CHANCE,
+        dropdb_question_limit => DEFAULT_DROPDB_QUESTION_LIMIT,
         min_packet_interval => DEFAULT_MIN_PACKET_INTERVAL,
         conversation_limit => DEFAULT_CONVERSATION_LIMIT,
         spam_question_limit => DEFAULT_SPAM_QUESTION_LIMIT,
@@ -189,6 +195,7 @@ sub save {
     print $fh "aiChat_public_on_lockmap $_aiChatConfig{public_on_lockmap}\n";
     print $fh "aiChat_mob_database $_aiChatConfig{mob_database}\n";
     print $fh "aiChat_dropdb_refusal_chance $_aiChatConfig{dropdb_refusal_chance}\n";
+    print $fh "aiChat_dropdb_question_limit $_aiChatConfig{dropdb_question_limit}\n";
     print $fh "aiChat_min_packet_interval $_aiChatConfig{min_packet_interval}\n";
     print $fh "aiChat_conversation_limit $_aiChatConfig{conversation_limit}\n";
     print $fh "aiChat_spam_question_limit $_aiChatConfig{spam_question_limit}\n";

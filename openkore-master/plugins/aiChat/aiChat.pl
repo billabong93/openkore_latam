@@ -509,6 +509,7 @@ sub onCommand {
         message "Intervalo minimo entre pacotes: " . AIChat::Config::get('min_packet_interval'), "list";
         message "Limite de mensagens antes de encerrar papo: " . AIChat::Config::get('conversation_limit'), "list";
         message "Limite de perguntas seguidas antes de recusar spam: " . AIChat::Config::get('spam_question_limit'), "list";
+        message "Limite de perguntas do dropdb antes de recusar: " . AIChat::Config::get('dropdb_question_limit'), "list";
     } elsif ($arg =~ /^provider\s+(openai|deepseek)$/) {
         if (AIChat::Config::set('provider', $1)) {
             message $translator->translatef("%s Provedor alterado para %s\n", PLUGIN_PREFIX, $1), "list";
@@ -946,11 +947,35 @@ sub _recordDropDbQuestion {
     my $key = _normalizeSenderKey($sender);
     return unless $key;
     $drop_db_question_count{$key} = ($drop_db_question_count{$key} // 0) + 1;
-    $drop_db_refusal_limit{$key} = DROP_DB_REFUSAL_MIN + int(rand(DROP_DB_REFUSAL_MAX - DROP_DB_REFUSAL_MIN + 1))
+    $drop_db_refusal_limit{$key} = _getDropDbQuestionLimit()
         unless defined $drop_db_refusal_limit{$key};
     if ($drop_db_question_count{$key} >= $drop_db_refusal_limit{$key}) {
         $drop_db_force_refusal{$key} = 1;
     }
+}
+
+sub _getDropDbQuestionLimit {
+    my $limit = AIChat::Config::get('dropdb_question_limit');
+    my $resolved = _resolveRangeLimit($limit, 0);
+    return $resolved if $resolved && $resolved > 0;
+    return DROP_DB_REFUSAL_MIN + int(rand(DROP_DB_REFUSAL_MAX - DROP_DB_REFUSAL_MIN + 1));
+}
+
+sub _resolveRangeLimit {
+    my ($value, $fallback) = @_;
+    $fallback = 0 unless defined $fallback;
+    return $fallback unless defined $value;
+    my $trimmed = $value;
+    $trimmed =~ s/^\s+//;
+    $trimmed =~ s/\s+$//;
+    if ($trimmed =~ /^(\d+)\s*\.\.\s*(\d+)$/) {
+        my ($min, $max) = ($1, $2);
+        return $min if $min == $max;
+        ($min, $max) = ($max, $min) if $min > $max;
+        return $min + int(rand($max - $min + 1));
+    }
+    return $trimmed if $trimmed =~ /^\d+$/;
+    return $fallback;
 }
 
 sub _shouldForceDropDbRefusal {
@@ -1253,8 +1278,7 @@ sub _isBlockedSender {
 
 sub _shouldHandleConversationLimit {
     my $limit = AIChat::Config::get('conversation_limit');
-    $limit = 0 unless defined $limit;
-    return $limit > 0 ? $limit : 0;
+    return _resolveRangeLimit($limit, 0);
 }
 
 sub _incrementConversationCount {
@@ -1527,8 +1551,7 @@ sub _handleSpamCheck {
 
 sub _getSpamQuestionLimit {
     my $limit = AIChat::Config::get('spam_question_limit');
-    $limit = SPAM_QUESTION_LIMIT unless defined $limit && $limit =~ /^\d+$/;
-    return $limit;
+    return _resolveRangeLimit($limit, SPAM_QUESTION_LIMIT);
 }
 
 sub _buildSpamRefusalMessage {
