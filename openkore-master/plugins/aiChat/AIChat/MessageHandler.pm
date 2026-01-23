@@ -980,34 +980,9 @@ sub _generateDropDbRefusalResponse {
 }
 
 sub _randomDropDbRepeatReply {
-    return _normalizeResponseText(_pickVariant(
-        'po ta de brincadeira',
-        'denovo isso',
-        'ja falei isso',
-        'vai ficar perguntando a mesma coisa',
-        'ta de sacanagem',
-        'ta repetindo',
-        'de novo isso ai',
-        'de novo a mesma coisa',
-        'mesma pergunta de novo',
-        'mano denovo',
-        'poxa denovo mano',
-        'ja respondi isso',
-        'ja expliquei isso',
-        'acabei de falar isso',
-        'ja te disse isso',
-        'ja falei isso ai',
-        'vai repetir ate quando',
-        'vai insistir nisso',
-        'ta perguntando igual papagaio',
-        'serio isso de novo',
-        'ta de zoeira ne',
-        'tu nao leu o que eu falei',
-        'c ta trollando so pode',
-        'ta batendo na mesma tecla',
-        'de novo essa pergunta',
-        'tu ta repetindo mano',
-    ));
+    my @options = AIChat::References::get('dropdb_repeat_reply');
+    return '' unless @options;
+    return _normalizeResponseText(_pickVariant(@options));
 }
 
 sub _isRepeatedDropDbQuestion {

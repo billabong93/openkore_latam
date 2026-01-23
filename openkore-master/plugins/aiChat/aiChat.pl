@@ -1326,109 +1326,20 @@ sub _setConversationCloseStage {
 }
 
 sub _pickConversationCloseWarning {
-    my @messages = (
-        "Mano, vou ter que parar por aqui.",
-        "Foi mal, vou encerrar aqui.",
-        "Aí não dá, vou ficar quieto agora.",
-        "Mal aí, não vou conseguir continuar conversando.",
-        "Mano, agora eu não consigo mais responder.",
-        "Foi mal, vou focar no game e parar de falar.",
-        "Tô no meio do rolê aqui, vou parar de conversar.",
-        "Tá bom, mas vou parar por aqui, valeu.",
-        "A conversa foi boa, mas vou sair do papo agora.",
-        "Deixa eu cortar aqui, tô ocupado.",
-        "Vou dar uma sumida do chat agora.",
-        "Vou ficar off no papo, foi mal.",
-        "Vou mutar aqui e seguir o jogo.",
-        "Vou parar de responder por agora.",
-        "Não dá pra seguir no papo, desculpa.",
-        "Vou ter que te deixar falando sozinho agora, foi mal.",
-        "Mano, não consigo continuar nessa conversa.",
-        "Agora não dá mais, vou ficar na minha.",
-        "Tô farmando, vou parar de conversar.",
-        "Tô ocupado demais, vou encerrar aqui.",
-        "Tô sem tempo pra continuar, vou parar por aqui.",
-        "Vou focar aqui e parar de trocar ideia.",
-        "Vou ficar quieto agora pra não atrapalhar.",
-        "Já deu por hoje, vou parar de conversar.",
-        "Aí já era, vou sair do chat agora.",
-        "Vou deixar esse assunto pra depois, agora não dá.",
-        "Depois a gente continua, agora eu vou parar.",
-        "Mais tarde a gente troca ideia, agora vou encerrar.",
-        "Foi mal, não rola continuar agora.",
-    );
+    my @messages = AIChat::References::get('conversation_close_warning');
+    return '' unless @messages;
     return $messages[int(rand(@messages))];
 }
 
 sub _pickConversationCloseFinal {
-    my @messages = (
-        "Mano, já falei que não dá. Flw.",
-        "Já disse que vou parar, tchau.",
-        "Não dá mesmo, vou sair daqui. Flw.",
-        "Já encerrei, para de insistir. Flw.",
-        "Sem papo, mano. Tchau.",
-        "Mano, acabou o assunto. Flw.",
-        "Já deu, tô ocupado. Tchau.",
-        "Não vou continuar respondendo. Flw.",
-        "Mano, para de puxar assunto, já foi.",
-        "Falei que ia parar, lembra? Flw.",
-        "Última vez: não dá. Tchau.",
-        "Chega, mano. Vou ficar quieto agora.",
-        "Já era, vou mutar isso aqui. Flw.",
-        "Tô saindo do chat, insiste não.",
-        "Não adianta insistir, já parei.",
-        "Mano, não força. Já encerrou.",
-        "Acabou, tô off do papo. Flw.",
-        "Vou ignorar agora, valeu.",
-        "Já disse que não dá, então tchau.",
-        "Tu tá insistindo à toa, mano. Flw.",
-        "Pô, respeita aí: eu parei.",
-        "Já falei: não dá pra conversar. Flw.",
-        "Mano, cê não entendeu? Não dá.",
-        "Sem conversa, já falei. Tchau.",
-        "Chega de mensagem, flw.",
-        "Insiste não, vou sair.",
-        "Não vou ficar nisso, tchau.",
-        "A conversa acabou, mano. Flw.",
-        "Se continuar, vou só ignorar.",
-        "Já deu, mano… flw e pronto.",
-    );
+    my @messages = AIChat::References::get('conversation_close_final');
+    return '' unless @messages;
     return $messages[int(rand(@messages))];
 }
 
 sub _pickConversationCloseGoodbye {
-    my @messages = (
-        "Vlw, vlw.",
-        "Falou, bom up aí.",
-        "Blz, bom farm.",
-        "Boa, bom jogo.",
-        "Tmj, boa run.",
-        "É nóis, bom up.",
-        "Fechou, boa sorte.",
-        "Falou, sucesso aí.",
-        "Vlw, fica bem.",
-        "Demorou, boa.",
-        "Boa, bom loot.",
-        "Falou, bons drops.",
-        "Vlw, que venha carta.",
-        "Boa, que drope tudo.",
-        "Bom grind aí.",
-        "Bom corre aí.",
-        "Bom up pra você.",
-        "Falou, bom role.",
-        "Tamo junto, bom jogo.",
-        "É isso, bom up e boa.",
-        "Valeu, até mais.",
-        "Falou, até a próxima.",
-        "Tchau, bom jogo aí.",
-        "Vlw, gg.",
-        "Sucesso no up.",
-        "Boa sorte no farm.",
-        "Bons loots pra você.",
-        "Falou, fica na paz.",
-        "Tmj, se cuida.",
-        "Vlw, abraço.",
-    );
+    my @messages = AIChat::References::get('conversation_close_goodbye');
+    return '' unless @messages;
     return $messages[int(rand(@messages))];
 }
 
