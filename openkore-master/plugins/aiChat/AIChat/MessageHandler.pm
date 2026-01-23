@@ -1419,7 +1419,7 @@ sub generateDropDbChatResponse {
     my $normalized_message = _normalizeQueryText($message);
     my $is_followup_where = defined $normalized_message && $normalized_message =~ /^onde\b/;
     my $last_intent = $last_answer ? ($last_answer->{intent} // '') : '';
-    my $last_subject = $last_answer ? ($last_answer->{subject} // '') : '';
+    $last_subject = $last_answer ? ($last_answer->{subject} // '') : '';
     my $last_answer_type = $last_answer ? ($last_answer->{answer_type} // '') : '';
     my $last_unknown_subject = ($last_answer && ($last_answer->{answer_type} // '') eq 'unknown')
         ? _normalizeQueryText($last_answer->{subject} // '')
