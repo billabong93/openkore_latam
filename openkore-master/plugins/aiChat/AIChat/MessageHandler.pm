@@ -16,6 +16,7 @@ use Plugins;
 use AIChat::APIClient;
 use AIChat::Config;
 use AIChat::ConversationHistory;
+use AIChat::References;
 
 # Global hash to store the bot's character data
 our %bot_character_data;
@@ -875,85 +876,7 @@ sub _pickVariant {
 }
 
 sub _dropDbRefusalReferences {
-    return (
-        'nao to afim de responder isso',
-        'nao sou tutor',
-        'tenho cara de banco de dados',
-        'sou teu professor eu?',
-        'vai ver no banco de dados',
-        'pergunta pra alguem que sabe',
-        'procura no banco de dados',
-        'para de perturbar',
-        'pesquisa ai',
-        'vai atras disso ai',
-        'nao sei disso nao',
-        'nao tenho essa info',
-        'sei la mano',
-        'nao manjo desse',
-        'nao faço ideia',
-        'nao to com tempo pra isso',
-        'da uma pesquisada',
-        'nao vou ficar listando drop',
-        'nao lembro disso',
-        'meu foco nao e drop',
-        'nao to afim de ficar conversando',
-        'nao to no clima',
-        'nem sei disso',
-        'nao sei onde ve isso',
-        'isso ai eu n sei',
-        'sei nao mano',
-        'nao vou ficar explicando',
-        'nao quero ficar trocando ideia',
-        'pergunta pra outro',
-        'nao tenho paciencia pra isso',
-        'nao to afim',
-        'nao to lembrando',
-        'nao sei te dizer',
-        'nem ideia disso',
-        'para de spamar ai',
-        'para com esse spam',
-        'chega de flood no chat',
-        'menos flood ai',
-        'para de mandar msg toda hora',
-        'da um tempo no chat',
-        'para de incomodar',
-        'para de perturbar ai',
-        'me deixa jogar em paz',
-        'nao enche agora',
-        'nao enche nao',
-        'tanta pergunta assim',
-        'tem mais nada pra fazer nao',
-        'poxa chatao hein',
-        'ta insistindo demais',
-        'vai upar e para de perguntar',
-        'vai farmar e para com isso',
-        'vai jogar um pouco ai',
-        'vai caçar mob e deixa disso',
-        'bora upar em vez de perguntar',
-        'nao to afim de papo',
-        'nao to afim de conversar agora',
-        'to ocupado agora',
-        'to no meio da parada aqui',
-        'to focado aqui',
-        'sem tempo agora',
-        'nao to com paciencia agora',
-        'pergunta pro google',
-        'joga no google ai',
-        'pesquisa no google ai',
-        'procura no google rapidinho',
-        'da um google ai',
-        'vai na internet e ve',
-        'procura na internet ai',
-        'nao sou teu professor',
-        'nao sou teu tutor',
-        'nao sou teu guia nao',
-        'nao sou enciclopedia',
-        'nao sou base de consulta',
-        'nao vou ficar te ensinando',
-        'nao vou ficar passando lista de drop',
-        'nao vou ficar listando item',
-        'nao vou ficar caçando info pra tu',
-    );
+    return AIChat::References::get('dropdb_refusal');
 }
 
 sub _pickVariantAvoidingRecent {
@@ -1057,34 +980,9 @@ sub _generateDropDbRefusalResponse {
 }
 
 sub _randomDropDbRepeatReply {
-    return _normalizeResponseText(_pickVariant(
-        'po ta de brincadeira',
-        'denovo isso',
-        'ja falei isso',
-        'vai ficar perguntando a mesma coisa',
-        'ta de sacanagem',
-        'ta repetindo',
-        'de novo isso ai',
-        'de novo a mesma coisa',
-        'mesma pergunta de novo',
-        'mano denovo',
-        'poxa denovo mano',
-        'ja respondi isso',
-        'ja expliquei isso',
-        'acabei de falar isso',
-        'ja te disse isso',
-        'ja falei isso ai',
-        'vai repetir ate quando',
-        'vai insistir nisso',
-        'ta perguntando igual papagaio',
-        'serio isso de novo',
-        'ta de zoeira ne',
-        'tu nao leu o que eu falei',
-        'c ta trollando so pode',
-        'ta batendo na mesma tecla',
-        'de novo essa pergunta',
-        'tu ta repetindo mano',
-    ));
+    my @options = AIChat::References::get('dropdb_repeat_reply');
+    return '' unless @options;
+    return _normalizeResponseText(_pickVariant(@options));
 }
 
 sub _isRepeatedDropDbQuestion {
@@ -1108,43 +1006,8 @@ sub _isRepeatedDropDbQuestion {
 }
 
 sub _unknownDropReply {
-    my @options = (
-        'nao sei',
-        'nao conheco',
-        'sei nao',
-        'nao to ligado',
-        'desculpa nao sei',
-        'nao faço ideia',
-        'nao lembro',
-        'desculpa n sei',
-        'vou ficar te devendo',
-        'sei la',
-        'sei la mano',
-        'sei la velho',
-        'n to ligado',
-        'nem ideia',
-        'n sei nao',
-        'nao faço a menor ideia',
-        'nao lembro disso',
-        'nao sei dizer',
-        'n conheco isso',
-        'nem sei',
-        'to por fora',
-        'to boiando',
-        'n faço ideia',
-        'nao faco ideia mesmo',
-        'nao sei mesmo',
-        'nao lembro nao',
-        'nao me recordo',
-        'nem sei mano',
-        'nem sei te falar',
-        'sem ideia',
-        'sem a minima',
-        'nao tenho certeza',
-        'n lembro disso ai',
-        'sei la, nao lembro',
-        'to ligado nao',
-    );
+    my @options = AIChat::References::get('unknown_drop_reply');
+    return '' unless @options;
     return $options[int(rand(@options))];
 }
 
@@ -1153,43 +1016,7 @@ sub _isUnknownDropReply {
     return 0 unless defined $text && $text ne '';
     my $normalized = _normalizeQueryText($text);
     return 0 unless $normalized ne '';
-    my @options = (
-        'nao sei',
-        'nao conheco',
-        'sei nao',
-        'nao to ligado',
-        'desculpa nao sei',
-        'nao faco ideia',
-        'nao lembro',
-        'desculpa n sei',
-        'vou ficar te devendo',
-        'sei la',
-        'sei la mano',
-        'sei la velho',
-        'n to ligado',
-        'nem ideia',
-        'n sei nao',
-        'nao faco a menor ideia',
-        'nao lembro disso',
-        'nao sei dizer',
-        'n conheco isso',
-        'nem sei',
-        'to por fora',
-        'to boiando',
-        'n faco ideia',
-        'nao faco ideia mesmo',
-        'nao sei mesmo',
-        'nao lembro nao',
-        'nao me recordo',
-        'nem sei mano',
-        'nem sei te falar',
-        'sem ideia',
-        'sem a minima',
-        'nao tenho certeza',
-        'n lembro disso ai',
-        'sei la nao lembro',
-        'to ligado nao',
-    );
+    my @options = AIChat::References::get('unknown_drop_reply');
     for my $option (@options) {
         return 1 if $normalized eq _normalizeQueryText($option);
     }
@@ -1692,7 +1519,7 @@ sub _buildBasicDropContext {
 sub _loadMonsterDropDb {
     return $mondb_cache if $mondb_cache;
 
-    my $path = File::Spec->catfile(_pluginBaseDir(), 'mondb.txt');
+    my $path = File::Spec->catfile(_pluginBaseDir(), 'config', 'mondb.txt');
     unless (-e $path) {
         $mondb_cache = {};
         return $mondb_cache;
@@ -1766,7 +1593,7 @@ sub updateMondbFromMap {
     return if defined $mondb_map_cache{$map_name} && $mondb_map_cache{$map_name} eq $signature;
     $mondb_map_cache{$map_name} = $signature;
 
-    my $path = File::Spec->catfile(_pluginBaseDir(), 'mondb.txt');
+    my $path = File::Spec->catfile(_pluginBaseDir(), 'config', 'mondb.txt');
     return unless -e $path;
 
     my @lines = ();

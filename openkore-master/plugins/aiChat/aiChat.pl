@@ -25,6 +25,7 @@ use AIChat::MessageHandler;
 use AIChat::ConversationHistory;
 use AIChat::HookManager;
 use AIChat::Log;
+use AIChat::References;
 
 use constant {
     PLUGIN_PREFIX => "[aiChat]",
@@ -1325,109 +1326,20 @@ sub _setConversationCloseStage {
 }
 
 sub _pickConversationCloseWarning {
-    my @messages = (
-        "Mano, vou ter que parar por aqui.",
-        "Foi mal, vou encerrar aqui.",
-        "Aí não dá, vou ficar quieto agora.",
-        "Mal aí, não vou conseguir continuar conversando.",
-        "Mano, agora eu não consigo mais responder.",
-        "Foi mal, vou focar no game e parar de falar.",
-        "Tô no meio do rolê aqui, vou parar de conversar.",
-        "Tá bom, mas vou parar por aqui, valeu.",
-        "A conversa foi boa, mas vou sair do papo agora.",
-        "Deixa eu cortar aqui, tô ocupado.",
-        "Vou dar uma sumida do chat agora.",
-        "Vou ficar off no papo, foi mal.",
-        "Vou mutar aqui e seguir o jogo.",
-        "Vou parar de responder por agora.",
-        "Não dá pra seguir no papo, desculpa.",
-        "Vou ter que te deixar falando sozinho agora, foi mal.",
-        "Mano, não consigo continuar nessa conversa.",
-        "Agora não dá mais, vou ficar na minha.",
-        "Tô farmando, vou parar de conversar.",
-        "Tô ocupado demais, vou encerrar aqui.",
-        "Tô sem tempo pra continuar, vou parar por aqui.",
-        "Vou focar aqui e parar de trocar ideia.",
-        "Vou ficar quieto agora pra não atrapalhar.",
-        "Já deu por hoje, vou parar de conversar.",
-        "Aí já era, vou sair do chat agora.",
-        "Vou deixar esse assunto pra depois, agora não dá.",
-        "Depois a gente continua, agora eu vou parar.",
-        "Mais tarde a gente troca ideia, agora vou encerrar.",
-        "Foi mal, não rola continuar agora.",
-    );
+    my @messages = AIChat::References::get('conversation_close_warning');
+    return '' unless @messages;
     return $messages[int(rand(@messages))];
 }
 
 sub _pickConversationCloseFinal {
-    my @messages = (
-        "Mano, já falei que não dá. Flw.",
-        "Já disse que vou parar, tchau.",
-        "Não dá mesmo, vou sair daqui. Flw.",
-        "Já encerrei, para de insistir. Flw.",
-        "Sem papo, mano. Tchau.",
-        "Mano, acabou o assunto. Flw.",
-        "Já deu, tô ocupado. Tchau.",
-        "Não vou continuar respondendo. Flw.",
-        "Mano, para de puxar assunto, já foi.",
-        "Falei que ia parar, lembra? Flw.",
-        "Última vez: não dá. Tchau.",
-        "Chega, mano. Vou ficar quieto agora.",
-        "Já era, vou mutar isso aqui. Flw.",
-        "Tô saindo do chat, insiste não.",
-        "Não adianta insistir, já parei.",
-        "Mano, não força. Já encerrou.",
-        "Acabou, tô off do papo. Flw.",
-        "Vou ignorar agora, valeu.",
-        "Já disse que não dá, então tchau.",
-        "Tu tá insistindo à toa, mano. Flw.",
-        "Pô, respeita aí: eu parei.",
-        "Já falei: não dá pra conversar. Flw.",
-        "Mano, cê não entendeu? Não dá.",
-        "Sem conversa, já falei. Tchau.",
-        "Chega de mensagem, flw.",
-        "Insiste não, vou sair.",
-        "Não vou ficar nisso, tchau.",
-        "A conversa acabou, mano. Flw.",
-        "Se continuar, vou só ignorar.",
-        "Já deu, mano… flw e pronto.",
-    );
+    my @messages = AIChat::References::get('conversation_close_final');
+    return '' unless @messages;
     return $messages[int(rand(@messages))];
 }
 
 sub _pickConversationCloseGoodbye {
-    my @messages = (
-        "Vlw, vlw.",
-        "Falou, bom up aí.",
-        "Blz, bom farm.",
-        "Boa, bom jogo.",
-        "Tmj, boa run.",
-        "É nóis, bom up.",
-        "Fechou, boa sorte.",
-        "Falou, sucesso aí.",
-        "Vlw, fica bem.",
-        "Demorou, boa.",
-        "Boa, bom loot.",
-        "Falou, bons drops.",
-        "Vlw, que venha carta.",
-        "Boa, que drope tudo.",
-        "Bom grind aí.",
-        "Bom corre aí.",
-        "Bom up pra você.",
-        "Falou, bom role.",
-        "Tamo junto, bom jogo.",
-        "É isso, bom up e boa.",
-        "Valeu, até mais.",
-        "Falou, até a próxima.",
-        "Tchau, bom jogo aí.",
-        "Vlw, gg.",
-        "Sucesso no up.",
-        "Boa sorte no farm.",
-        "Bons loots pra você.",
-        "Falou, fica na paz.",
-        "Tmj, se cuida.",
-        "Vlw, abraço.",
-    );
+    my @messages = AIChat::References::get('conversation_close_goodbye');
+    return '' unless @messages;
     return $messages[int(rand(@messages))];
 }
 
@@ -1626,118 +1538,14 @@ sub _queueSpamRefusalFallback {
 }
 
 sub _pickSpamRefusalReference {
-    my @messages = (
-        "Para de spamar aí, mano.",
-        "Menos spam, por favor.",
-        "Segura o spam no chat.",
-        "Chega de flood, parça.",
-        "Dá uma segurada nas mensagens aí.",
-        "Mano, tá floodando já.",
-        "Corta o spam aí, na moral.",
-        "Tá virando spam, dá um tempo.",
-        "Manda tudo numa mensagem só, pô.",
-        "Desse jeito tá impossível acompanhar.",
-        "Pô, chatão, hein.",
-        "Caraca, tu é insistente, mano.",
-        "Tu não cansa não?",
-        "Mano, pega leve aí.",
-        "Ô chat, dá um descanso.",
-        "Tá carente de atenção, é?",
-        "Tem mais nada pra fazer, não?",
-        "Tu tá sem quest pra fazer, mano?",
-        "Vai upar e para de perguntar toda hora.",
-        "Vai farmar/upar um pouco, mano.",
-        "Bora jogar em vez de ficar perguntando.",
-        "Vai caçar mob que passa.",
-        "Vai fazer uma quest aí, pô.",
-        "Vai pro grind e para com esse interrogatório.",
-        "Cara, não tô afim de papo agora.",
-        "Tô de boa, sem conversa.",
-        "Agora não, tô focado aqui.",
-        "Tô ocupado, depois a gente fala.",
-        "Sem assunto, mano, só quero jogar.",
-        "Não tô com paciência pra chat agora.",
-        "Tô na minha, valeu.",
-        "Para de incomodar, na moral.",
-        "Para de perturbar aí.",
-        "Tá me enchendo já, mano.",
-        "Dá um tempo, pô.",
-        "Me deixa jogar em paz.",
-        "Respira e para de cutucar.",
-        "Chega disso aí, mano.",
-        "Desencana.",
-        "Pergunta pro Google e para de perturbar.",
-        "Joga no Google aí e segue o jogo.",
-        "Vai na database e não enche.",
-    );
+    my @messages = AIChat::References::get('spam_refusal');
+    return '' unless @messages;
     return $messages[int(rand(@messages))];
 }
 
 sub _pickSabotageRefusalReference {
-    my @messages = (
-        "Nem vem com essa, mano.",
-        "Sai fora com esse papo.",
-        "Aham, senta lá.",
-        "Para de forçar, velho.",
-        "Mano, que ideia torta.",
-        "Curiosidade demais é suspeito.",
-        "Pô, já deu, né?",
-        "Olha o Sherlock Holmes do servidor.",
-        "Lá vem o CSI do chat.",
-        "Tá achando que é interrogatório?",
-        "Tá em modo investigação agora, é?",
-        "Menos, detetive.",
-        "Maluco tá em missão secreta.",
-        "Quer o quê, CPF também?",
-        "Tá querendo o dossiê completo, é?",
-        "Que chatice, mano.",
-        "Vai arrumar o que fazer.",
-        "Tô sem paciência pra isso.",
-        "Muda de assunto ou para por aqui.",
-        "Tá enchendo já, na moral.",
-        "Para de caçar treta.",
-        "Tá tentando sabotar, só pode.",
-        "Corta essa viagem aí.",
-        "Vai jogar e para de palhaçada.",
-        "Ah, pronto… lá vem.",
-        "Menos, investigador.",
-        "Calma, agente secreto.",
-        "Tá achando que é polícia do chat?",
-        "Vai com calma aí, delegado.",
-        "Ô perito, relaxa.",
-        "Lá vem o interrogatório 2.0.",
-        "Tá coletando prova pra quê, mano?",
-        "Quer abrir inquérito agora?",
-        "Tá querendo atenção, né?",
-        "Tá carente, mano?",
-        "Vai caçar mob e larga do meu pé.",
-        "Vai farmar e para de arrumar assunto.",
-        "Vai upar, parça, na moral.",
-        "Vai fazer quest, mano.",
-        "Chega, já saturou.",
-        "Já deu dessa palhaçada.",
-        "Muda esse assunto aí.",
-        "Tá chato já.",
-        "Dá um tempo, velho.",
-        "Me poupa, mano.",
-        "Não viaja.",
-        "Para de inventar moda.",
-        "Mano, sério isso?",
-        "Tá de brincadeira comigo?",
-        "Tá me tirando, né?",
-        "Nossa, que insistência.",
-        "Cê não desencana não?",
-        "Já tá feio isso aí.",
-        "Tá passando vergonha, mano.",
-        "Para de graça.",
-        "Que papinho torto.",
-        "Tá tentando pagar de esperto, né?",
-        "Boa tentativa, espertão.",
-        "Vai lá, tenta com outro.",
-        "Comigo não cola.",
-        "Aqui não, campeão.",
-        "Boa sorte com essa aí… longe daqui.",
-    );
+    my @messages = AIChat::References::get('sabotage_refusal');
+    return '' unless @messages;
     return $messages[int(rand(@messages))];
 }
 

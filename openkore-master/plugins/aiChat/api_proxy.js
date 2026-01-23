@@ -34,7 +34,7 @@ const server = http.createServer((req, res) => {
 
                 if (!apiKey) {
                     res.writeHead(400, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ error: 'API key ausente. Configure no config.txt ou defina AICHAT_API_KEY.' }));
+                    res.end(JSON.stringify({ error: 'API key ausente. Configure no config/config.txt ou defina AICHAT_API_KEY.' }));
                     return;
                 }
 
