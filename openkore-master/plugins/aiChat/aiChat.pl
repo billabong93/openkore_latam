@@ -956,10 +956,26 @@ sub _recordDropDbQuestion {
 
 sub _getDropDbQuestionLimit {
     my $limit = AIChat::Config::get('dropdb_question_limit');
-    if (defined $limit && $limit =~ /^\d+$/ && $limit > 0) {
-        return $limit;
-    }
+    my $resolved = _resolveRangeLimit($limit, 0);
+    return $resolved if $resolved && $resolved > 0;
     return DROP_DB_REFUSAL_MIN + int(rand(DROP_DB_REFUSAL_MAX - DROP_DB_REFUSAL_MIN + 1));
+}
+
+sub _resolveRangeLimit {
+    my ($value, $fallback) = @_;
+    $fallback = 0 unless defined $fallback;
+    return $fallback unless defined $value;
+    my $trimmed = $value;
+    $trimmed =~ s/^\s+//;
+    $trimmed =~ s/\s+$//;
+    if ($trimmed =~ /^(\d+)\s*\.\.\s*(\d+)$/) {
+        my ($min, $max) = ($1, $2);
+        return $min if $min == $max;
+        ($min, $max) = ($max, $min) if $min > $max;
+        return $min + int(rand($max - $min + 1));
+    }
+    return $trimmed if $trimmed =~ /^\d+$/;
+    return $fallback;
 }
 
 sub _shouldForceDropDbRefusal {
@@ -1536,8 +1552,7 @@ sub _handleSpamCheck {
 
 sub _getSpamQuestionLimit {
     my $limit = AIChat::Config::get('spam_question_limit');
-    $limit = SPAM_QUESTION_LIMIT unless defined $limit && $limit =~ /^\d+$/;
-    return $limit;
+    return _resolveRangeLimit($limit, SPAM_QUESTION_LIMIT);
 }
 
 sub _buildSpamRefusalMessage {

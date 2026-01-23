@@ -120,13 +120,13 @@ sub _applyValue {
         return unless $value =~ /^-?\d+(?:\.\d+)?$/;
         return if $value < 0 || $value > 1;
     } elsif ($key eq 'dropdb_question_limit') {
-        return unless $value =~ /^\d+$/;
+        return unless $value =~ /^(?:\d+|\d+\s*\.\.\s*\d+)$/;
     } elsif ($key eq 'min_packet_interval') {
         return unless $value =~ /^\d+(?:\.\d+)?$/;
     } elsif ($key eq 'conversation_limit') {
         return unless $value =~ /^\d+$/;
     } elsif ($key eq 'spam_question_limit') {
-        return unless $value =~ /^\d+$/;
+        return unless $value =~ /^(?:\d+|\d+\s*\.\.\s*\d+)$/;
     }
 
     $_aiChatConfig{$key} = $value;
