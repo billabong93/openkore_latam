@@ -46,6 +46,12 @@ Você pode separar o banco em duas partes: uma com respostas garantidas e outra 
 *   `[always]`: Tudo abaixo desta linha responde sempre (sem chance de recusa).
 *   `[chance]`: Tudo abaixo desta linha segue a chance de recusa (`aiChat_dropdb_refusal_chance`).
 
+### Banco de classes/niveis (`plugins/aiChat/config/db.txt`)
+
+*   `requirements`: Regras de nivel/base/job e requisitos para quests ou mudancas de classe.
+*   `general`: Informacoes gerais sobre o jogo.
+*   `evolutions`: Lista de evolucoes disponiveis por classe (com aliases PT/EN).
+
 Se não houver marcador, o comportamento padrão é `chance`.
 
 Exemplo:

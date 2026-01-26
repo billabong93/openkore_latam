@@ -188,6 +188,22 @@ sub _splitOutgoingResponse {
     return ($response);
 }
 
+sub _enqueueResponseParts {
+    my ($state, $parts_ref, $context) = @_;
+    return unless $state && $parts_ref && ref $parts_ref eq 'ARRAY';
+    my $context_ref = {};
+    if ($context && ref $context eq 'HASH') {
+        $context_ref = { %{$context} };
+    }
+    for my $part (@{$parts_ref}) {
+        next unless defined $part && $part ne '';
+        push @{$state->{response_queue}}, {
+            text => $part,
+            context => $context_ref,
+        };
+    }
+}
+
 sub _enqueueMessage {
     my ($sender, $message, $context) = @_;
     my $state = _getBufferState($sender);
@@ -226,7 +242,7 @@ sub _queueDirectResponse {
     if ($typing_delay > 0) {
         $state->{typing_until} = time() + $buffer_delay + $typing_delay;
     }
-    push @{$state->{response_queue}}, @parts;
+    _enqueueResponseParts($state, \@parts, $context);
 }
 
 sub _flushBufferedMessages {
@@ -239,7 +255,7 @@ sub _flushBufferedMessages {
     if ($responses && ref $responses eq 'ARRAY' && @$responses) {
         my @filtered = grep { defined $_ && $_ ne '' } @$responses;
         if (@filtered) {
-            push @{$state->{response_queue}}, @filtered;
+            _enqueueResponseParts($state, \@filtered, $state->{context});
         }
         $state->{response_started} = 0;
     } else {
@@ -262,7 +278,13 @@ sub _sendQueuedResponse {
     return if _isSilenced($sender) && !_shouldAllowSilenceResponse($sender);
     return if _isBlockedSender($sender);
 
-    my $response = $state->{response_queue}[0];
+    my $queued = $state->{response_queue}[0];
+    my $response = $queued;
+    my $context = $state->{context} || {};
+    if (ref $queued eq 'HASH') {
+        $response = $queued->{text};
+        $context = $queued->{context} || {};
+    }
     my $emotion_command = _extractEmotionCommand($response);
     if (!$state->{typing_until}) {
         my $delay = 0;
@@ -282,9 +304,14 @@ sub _sendQueuedResponse {
         return;
     }
 
-    $response = shift @{$state->{response_queue}};
+    $queued = shift @{$state->{response_queue}};
+    $response = $queued;
+    $context = $state->{context} || {};
+    if (ref $queued eq 'HASH') {
+        $response = $queued->{text};
+        $context = $queued->{context} || {};
+    }
     $state->{response_started} = 1;
-    my $context = $state->{context} || {};
     if ($emotion_command) {
         my $emotion_id = getEmotionByCommand($emotion_command);
         if (defined $emotion_id) {
@@ -860,7 +887,7 @@ sub _queueDropDbResponseIfNeeded {
         $state->{typing_until} = 0;
         $state->{response_started} = 0;
         $state->{context} = { type => $context };
-        push @{$state->{response_queue}}, @parts;
+        _enqueueResponseParts($state, \@parts, $state->{context});
     } else {
         _queueDirectResponse($sender, $response, { type => $context });
     }
@@ -1511,7 +1538,7 @@ sub _queueSpamRefusal {
     if ($typing_delay > 0) {
         $state->{typing_until} = time() + $buffer_delay + $typing_delay;
     }
-    push @{$state->{response_queue}}, @parts;
+    _enqueueResponseParts($state, \@parts, $state->{context});
     return 1;
 }
 
@@ -1535,7 +1562,7 @@ sub _queueSpamRefusalFallback {
     if ($typing_delay > 0) {
         $state->{typing_until} = time() + $buffer_delay + $typing_delay;
     }
-    push @{$state->{response_queue}}, @parts;
+    _enqueueResponseParts($state, \@parts, $state->{context});
     return 1;
 }
 
@@ -1576,7 +1603,7 @@ sub _queueSabotageRefusal {
     if ($typing_delay > 0) {
         $state->{typing_until} = time() + $buffer_delay + $typing_delay;
     }
-    push @{$state->{response_queue}}, @parts;
+    _enqueueResponseParts($state, \@parts, $state->{context});
     return 1;
 }
 
