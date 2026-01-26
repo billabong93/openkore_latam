@@ -29,6 +29,7 @@ my $mondb_lookup_cache;
 my %mondb_tier_lookup_cache;
 my $mondb_entity_lookup_cache;
 my $mondb_item_index_cache;
+my $classdb_cache;
 
 BEGIN {
     $api_client = AIChat::APIClient->new();
@@ -217,6 +218,27 @@ sub _ensureDropDbContext {
     return if defined $last_context && $last_context eq $drop_context;
 
     AIChat::ConversationHistory::addMessage($sender, "system", $drop_context, "drop_db_context");
+}
+
+sub _ensureClassDbContext {
+    my ($sender) = @_;
+    return unless defined $sender;
+
+    my $class_context = _buildClassDbContext();
+    return unless $class_context;
+
+    my $history = AIChat::ConversationHistory::getHistory($sender) || [];
+    my $last_context;
+    for (my $i = @$history - 1; $i >= 0; $i--) {
+        my $entry = $history->[$i];
+        next unless $entry->{role} && $entry->{role} eq 'system';
+        next unless ($entry->{type} // '') eq 'class_db_context';
+        $last_context = $entry->{content};
+        last;
+    }
+    return if defined $last_context && $last_context eq $class_context;
+
+    AIChat::ConversationHistory::addMessage($sender, "system", $class_context, "class_db_context");
 }
 
 sub _buildDropDbContext {
@@ -1519,6 +1541,27 @@ sub _buildWorldContext {
         "Regras para drops: se perguntarem onde pega um item, responda com os monstros listados aqui. Se perguntarem o que um monstro dropa, responda com os itens listados aqui. Se nao houver informacao, diga que nao sabe ou nao tem certeza. Use os nomes oficiais de monstros e itens desta lista (tabelas do servidor) e responda em linguagem popular.";
 }
 
+sub _buildClassDbContext {
+    my $classdb = _loadClassDb();
+    return undef unless $classdb && %$classdb;
+
+    my @requirements = @{$classdb->{requirements} || []};
+    my @evolution_lines;
+    for my $class (sort keys %{$classdb->{evolutions} || {}}) {
+        my $evolutions = $classdb->{evolutions}{$class} || [];
+        next unless @$evolutions;
+        push @evolution_lines, "$class: " . join(', ', @$evolutions);
+    }
+
+    return undef unless @requirements || @evolution_lines;
+
+    return join "\n",
+        "Conhecimento basico de classes e niveis:",
+        (@requirements ? ("Requisitos importantes:", @requirements) : ()),
+        (@evolution_lines ? ("Evolucoes de classes:", @evolution_lines) : ()),
+        "Regras: responda usando apenas essas informacoes. Se faltar dado, diga que nao sabe ou que pode variar no servidor. Use nomes de classe listados acima.";
+}
+
 sub _normalizeList {
     my ($value) = @_;
     return [] unless defined $value;
@@ -1715,6 +1758,156 @@ sub _translateItemName {
     return $normalized;
 }
 
+sub _normalizeClassKey {
+    my ($text) = @_;
+    return '' unless defined $text;
+    my $normalized = lc $text;
+    $normalized = NFD($normalized);
+    $normalized =~ s/\pM//g;
+    $normalized =~ s/[^a-z0-9]+//g;
+    return $normalized;
+}
+
+sub _parseClassAliases {
+    my ($raw) = @_;
+    $raw //= '';
+    my $name = $raw;
+    my @aliases;
+    if ($raw =~ /^(.*?)\s*\(([^)]+)\)\s*$/) {
+        $name = $1;
+        @aliases = split /\s*,\s*/, $2;
+    }
+    $name =~ s/^\s+//;
+    $name =~ s/\s+$//;
+    return ($name, @aliases);
+}
+
+sub _loadClassDb {
+    return $classdb_cache if $classdb_cache;
+
+    my $path = File::Spec->catfile(_pluginBaseDir(), 'config', 'db.txt');
+    unless (-e $path) {
+        $classdb_cache = {};
+        return $classdb_cache;
+    }
+
+    my %db = (
+        evolutions => {},
+        requirements => [],
+        aliases => {},
+    );
+    my $section = '';
+    if (open my $fh, '<:encoding(UTF-8)', $path) {
+        while (my $line = <$fh>) {
+            chomp $line;
+            $line =~ s/\r//g;
+            $line =~ s/^\s+//;
+            $line =~ s/\s+$//;
+            next if $line eq '' || $line =~ /^\s*#/;
+            if ($line =~ /^\s*\[(.+)\]\s*$/) {
+                $section = lc $1;
+                next;
+            }
+            if ($section eq 'general') {
+                push @{$db{requirements}}, $line;
+                next;
+            }
+            next unless $section eq 'evolutions';
+            my ($raw_class, $evo_text) = split /\s*:\s*/, $line, 2;
+            next unless defined $raw_class && defined $evo_text;
+            my ($class_name, @aliases) = _parseClassAliases($raw_class);
+            my @evolutions = map {
+                my $item = $_;
+                $item =~ s/^\s+//;
+                $item =~ s/\s+$//;
+                $item;
+            } split /\s*,\s*/, $evo_text;
+            @evolutions = grep { $_ ne '' } @evolutions;
+            $db{evolutions}{$class_name} = \@evolutions if @evolutions;
+
+            my @all_aliases = ($class_name, @aliases);
+            for my $alias (@all_aliases) {
+                my $key = _normalizeClassKey($alias);
+                next unless $key ne '';
+                $db{aliases}{$key} = $class_name;
+            }
+        }
+        close $fh;
+    }
+
+    $classdb_cache = \%db;
+    return $classdb_cache;
+}
+
+sub _lookupClassEvolutions {
+    my ($class_name) = @_;
+    return undef unless defined $class_name && $class_name ne '';
+    my $classdb = _loadClassDb();
+    return undef unless $classdb && %$classdb;
+    my $key = _normalizeClassKey($class_name);
+    return undef if $key eq '';
+    my $canonical = $classdb->{aliases}{$key} || $class_name;
+    my $evolutions = $classdb->{evolutions}{$canonical};
+    return undef unless $evolutions && @$evolutions;
+    return ($canonical, $evolutions);
+}
+
+sub _extractClassFromMessage {
+    my ($message) = @_;
+    return undef unless defined $message;
+    my $classdb = _loadClassDb();
+    return undef unless $classdb && %$classdb;
+    my $normalized_message = _normalizeClassKey($message);
+    return undef if $normalized_message eq '';
+    for my $alias (keys %{$classdb->{aliases} || {}}) {
+        next unless $alias ne '';
+        if (index($normalized_message, $alias) >= 0) {
+            return $classdb->{aliases}{$alias};
+        }
+    }
+    return undef;
+}
+
+sub _isClassEvolutionQuery {
+    my ($message) = @_;
+    return 0 unless defined $message;
+    return 1 if $message =~ /\bevolu[cç][aã]o\b/i;
+    return 1 if $message =~ /\bevolu[cç][oõ]es\b/i;
+    return 1 if $message =~ /\bvir(ar)?\b.*\bclasse\b/i;
+    return 1 if $message =~ /\bclasse\b.*\bseguir\b/i;
+    return 0;
+}
+
+sub _isSecondClassRequirementQuery {
+    my ($message) = @_;
+    return 0 unless defined $message;
+    return 1 if $message =~ /\bclasse\s*(2|ii|segunda|2a)\b/i;
+    return 1 if $message =~ /\bsegunda\s+classe\b/i;
+    return 1 if $message =~ /\bclasse\s+2\b/i;
+    return 0;
+}
+
+sub _isRebirthRequirementQuery {
+    my ($message) = @_;
+    return 0 unless defined $message;
+    return 1 if $message =~ /\brenasc/i;
+    return 1 if $message =~ /\breborn\b/i;
+    return 1 if $message =~ /\btransclasse\b/i;
+    return 0;
+}
+
+sub _answerClassEvolution {
+    my ($message) = @_;
+    my $class_name = _extractClassFromMessage($message);
+    if (!defined $class_name || $class_name eq '') {
+        $class_name = $bot_character_data{job} if defined $bot_character_data{job};
+    }
+    return undef unless defined $class_name;
+    my ($canonical, $evolutions) = _lookupClassEvolutions($class_name);
+    return undef unless $canonical && $evolutions && @$evolutions;
+    return "$canonical pode evoluir para: " . join(', ', @$evolutions);
+}
+
 sub _loadItemTranslationMap {
     return $item_translation_cache if $item_translation_cache;
 
@@ -1783,12 +1976,24 @@ sub processMessages {
     _ensureCharacterInfo($sender);
     _ensureWorldContext($sender);
     _ensureDropDbContext($sender);
+    _ensureClassDbContext($sender);
 
     for my $message (@$messages) {
         AIChat::ConversationHistory::addMessage($sender, "user", $message);
     }
 
     my $combined_message = join "\n", @$messages;
+    if (_isSecondClassRequirementQuery($combined_message)) {
+        return ["pra virar classe 2 so precisa job 40 no minimo"];
+    }
+    if (_isRebirthRequirementQuery($combined_message)) {
+        return ["pra renascer precisa base 99 e job 50"];
+    }
+    if (_isClassEvolutionQuery($combined_message)) {
+        my $answer = _answerClassEvolution($combined_message);
+        return [$answer] if defined $answer && $answer ne '';
+    }
+
     my $stance = _getDropDbStance($sender);
     if (defined $stance && $stance eq 'refusal') {
         my $has_dropdb = 0;

@@ -1,0 +1,32 @@
+# Base de conhecimento simples sobre classes e niveis.
+
+[general]
+O nivel minimo para a primeira classe e job 10.
+O nivel minimo para troca/evolucao/quest da segunda classe e job 40, e o maximo e job 50.
+O nivel necessario para reborn/rebirth/renascimento e base 99 e job 50.
+A cidade onde acontece o reborn/rebirth/renascimento e Juno.
+O aprendiz inicia no navio naufragado.
+
+[evolutions]
+Novice (Aprendiz): Swordsman (Espadachim), Mage (Mago), Archer (Arqueiro), Acolyte (Acolito), Thief (Gatuno), Merchant (Mercador)
+Swordsman (Espadachim): Knight (Cavaleiro), Crusader (Templario)
+Mage (Mago): Wizard (Bruxo), Sage (Sabio)
+Archer (Arqueiro): Hunter (Cacador), Bard (Bardo), Dancer (Dancarina)
+Acolyte (Acolito): Priest (Sacerdote), Monk (Monge)
+Thief (Gatuno): Assassin (Mercenario), Rogue (Arruaceiro)
+Merchant (Mercador): Blacksmith (Ferreiro), Alchemist (Alquimista)
+Super Novice (Super Aprendiz): nenhuma
+Taekwon (Taekwon): Taekwon Master (Mestre Taekwon), Soul Linker (Espiritualista)
+Knight (Cavaleiro): Lord Knight (Lorde)
+Crusader (Templario): Paladin (Paladino)
+Wizard (Bruxo): High Wizard (Arquimago)
+Sage (Sabio): Professor
+Hunter (Cacador): Sniper (Atirador)
+Bard (Bardo): Clown (Menestrel)
+Dancer (Dancarina): Gypsy (Cigana)
+Priest (Sacerdote): High Priest (Sumo Sacerdote)
+Monk (Monge): Champion (Mestre)
+Assassin (Mercenario): Assassin Cross (Algoz)
+Rogue (Arruaceiro): Stalker (Desordeiro)
+Blacksmith (Ferreiro): Whitesmith (Mestre Ferreiro)
+Alchemist (Alquimista): Creator (Criador)
