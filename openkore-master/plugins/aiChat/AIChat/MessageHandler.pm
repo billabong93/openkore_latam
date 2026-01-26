@@ -776,8 +776,15 @@ sub _normalizeResponseText {
     return '' unless defined $text;
     my $normalized = NFD($text);
     $normalized =~ s/\pM//g;
-    $normalized = lc $normalized;
-    $normalized =~ s/[^\pL\pN_]+/ /g;
+    $normalized =~ s/\p{Sk}+//g;
+    $normalized =~ s/[\x00-\x1F\x7F]+/ /g;
+	$normalized = lc $normalized;
+    $normalized =~ s/\.{3}/__AICHAT_ELLIPSIS3__/g;
+    $normalized =~ s/\.{2}/__AICHAT_ELLIPSIS2__/g;
+    $normalized =~ s/\.//g;
+    $normalized =~ s/__AICHAT_ELLIPSIS3__/.../g;
+    $normalized =~ s/__AICHAT_ELLIPSIS2__/../g;
+    $normalized =~ s/[^\pL\pN\s~'?]+/ /g;
     $normalized =~ s/\s+/ /g;
     $normalized =~ s/^\s+//;
     $normalized =~ s/\s+$//;
