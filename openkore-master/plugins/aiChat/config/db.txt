@@ -1,9 +1,11 @@
 # Base de conhecimento simples sobre classes e niveis.
 
-[general]
+[requirements]
 O nivel minimo para a primeira classe e job 10.
 O nivel minimo para troca/evolucao/quest da segunda classe e job 40, e o maximo e job 50.
 O nivel necessario para reborn/rebirth/renascimento e base 99 e job 50.
+
+[general]
 A cidade onde acontece o reborn/rebirth/renascimento e Juno.
 O aprendiz inicia no navio naufragado.
 

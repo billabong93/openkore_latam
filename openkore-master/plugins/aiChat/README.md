@@ -48,7 +48,8 @@ Você pode separar o banco em duas partes: uma com respostas garantidas e outra 
 
 ### Banco de classes/niveis (`plugins/aiChat/config/db.txt`)
 
-*   `general`: Regras gerais de nivel/base/job e informacoes importantes do jogo.
+*   `requirements`: Regras de nivel/base/job e requisitos para quests ou mudancas de classe.
+*   `general`: Informacoes gerais sobre o jogo.
 *   `evolutions`: Lista de evolucoes disponiveis por classe (com aliases PT/EN).
 
 Se não houver marcador, o comportamento padrão é `chance`.

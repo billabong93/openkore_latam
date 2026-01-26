@@ -1546,6 +1546,7 @@ sub _buildClassDbContext {
     return undef unless $classdb && %$classdb;
 
     my @requirements = @{$classdb->{requirements} || []};
+    my @general = @{$classdb->{general} || []};
     my @evolution_lines;
     for my $class (sort keys %{$classdb->{evolutions} || {}}) {
         my $evolutions = $classdb->{evolutions}{$class} || [];
@@ -1553,11 +1554,12 @@ sub _buildClassDbContext {
         push @evolution_lines, "$class: " . join(', ', @$evolutions);
     }
 
-    return undef unless @requirements || @evolution_lines;
+    return undef unless @requirements || @general || @evolution_lines;
 
     return join "\n",
         "Conhecimento basico de classes e niveis:",
         (@requirements ? ("Requisitos importantes:", @requirements) : ()),
+        (@general ? ("Informacoes gerais:", @general) : ()),
         (@evolution_lines ? ("Evolucoes de classes:", @evolution_lines) : ()),
         "Regras: responda usando apenas essas informacoes. Se faltar dado, diga que nao sabe ou que pode variar no servidor. Use nomes de classe listados acima.";
 }
@@ -1794,6 +1796,7 @@ sub _loadClassDb {
     my %db = (
         evolutions => {},
         requirements => [],
+        general => [],
         aliases => {},
     );
     my $section = '';
@@ -1808,8 +1811,12 @@ sub _loadClassDb {
                 $section = lc $1;
                 next;
             }
-            if ($section eq 'general') {
+            if ($section eq 'requirements') {
                 push @{$db{requirements}}, $line;
+                next;
+            }
+            if ($section eq 'general') {
+                push @{$db{general}}, $line;
                 next;
             }
             next unless $section eq 'evolutions';
