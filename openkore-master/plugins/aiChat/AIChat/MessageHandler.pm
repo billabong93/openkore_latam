@@ -536,7 +536,7 @@ sub _normalizeDropDbOutput {
     $normalized =~ s/[\p{Pi}\p{Pf}]+//g;
     $normalized =~ s/[\[\]\{\}]+//g;
     $normalized =~ s/\s+/ /g;
-    $normalized =~ s/\s*,\s*/, ", "/g;
+    $normalized =~ s/\s*,\s*/, , /g;
     $normalized =~ s/(?:,\s*){2,}/, /g;
     $normalized =~ s/^\s*,\s*//;
     $normalized =~ s/\s*,\s*$//;
