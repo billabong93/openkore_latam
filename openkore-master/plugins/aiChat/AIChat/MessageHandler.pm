@@ -537,7 +537,9 @@ sub _normalizeDropDbOutput {
     $normalized =~ s/[\[\]\{\}]+//g;
     $normalized =~ s/\s+/ /g;
     $normalized =~ s/\s*,\s*/, ", "/g;
-    $normalized =~ s/,\s*,/, ", "/g;
+    $normalized =~ s/(?:,\s*){2,}/, /g;
+    $normalized =~ s/^\s*,\s*//;
+    $normalized =~ s/\s*,\s*$//;
     $normalized =~ s/^\s+//;
     $normalized =~ s/\s+$//;
     return $normalized;
@@ -598,9 +600,11 @@ sub _findDropDbEntityInMessage {
     return unless $lookup && $lookup->{$bucket};
     my $best;
     my $best_len = 0;
+	my $normalized_padded = " $normalized ";
     for my $key (keys %{$lookup->{$bucket}}) {
         next unless defined $key && $key ne '';
-        next unless index($normalized, $key) >= 0;
+        my $pattern = qr/(?:^|\s)\Q$key\E(?:\s|$)/;
+        next unless $normalized_padded =~ $pattern;
         my $len = length $key;
         if (!$best || $len > $best_len) {
             $best = $lookup->{$bucket}{$key};
@@ -698,6 +702,14 @@ sub _isMapQuery {
     my $normalized = _normalizeQueryText($message);
     return 0 unless $normalized ne '';
     return $normalized =~ /\bmapa(s)?\b/;
+}
+
+sub _isDropDbDropQuestion {
+    my ($message) = @_;
+    return 0 unless defined $message && $message ne '';
+    my $normalized = _normalizeQueryText($message);
+    return 0 unless $normalized ne '';
+    return $normalized =~ /\b(dropa|drops|drop|dropar|loot|loots)\b/;
 }
 
 sub _getDropDbStance {
@@ -1244,7 +1256,8 @@ sub generateDropDbChatResponse {
         }
     }
     my $normalized_message = _normalizeQueryText($message);
-    my $is_followup_where = defined $normalized_message && $normalized_message =~ /^onde\b/;
+    my $is_followup_where = defined $normalized_message
+		&& $normalized_message =~ /\b(onde|local|localizacao|lugar)\b/;
     my $last_intent = $last_answer ? ($last_answer->{intent} // '') : '';
     $last_subject = $last_answer ? ($last_answer->{subject} // '') : '';
     my $last_answer_type = $last_answer ? ($last_answer->{answer_type} // '') : '';
@@ -1343,6 +1356,36 @@ sub generateDropDbChatResponse {
         }
     }
 
+	if ($subject_monster && $subject_entry && ($intent eq 'monster_drops' || _isDropDbDropQuestion($message))) {
+		my $drops = _formatDropDbDrops($subject_entry);
+		if ($drops ne '') {
+			my $response = $drops;
+			my $recent_texts = _recentAssistantTexts($sender, 5);
+			my @templates = (
+				'%s',
+				'%s dropa',
+				'dropa %s',
+				'acho que %s',
+				'se nao me engano %s',
+				'provavelmente %s',
+			);
+			my @options = map { sprintf($_, $drops) } @templates;
+			$response = _pickVariantAvoidingRecent(\@options, $recent_texts) if rand() < 0.6;
+			$response = _normalizeDropDbOutput(_limitDropDbList($response));
+			if ($response ne '') {
+				_setDropDbStance($sender, 'answer');
+				_setLastDropDbAnswer($sender, {
+					intent => 'monster_drops',
+					entity => $subject_monster,
+					answer_type => 'drops',
+					subject => $subject_monster,
+					subject_type => 'monster',
+				});
+				return $response;
+			}
+		}
+	}
+	
     if ($subject_monster && $subject_entry) {
         my $is_map_query = $map_only;
         if ($is_followup_where || $is_map_query) {

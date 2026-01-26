@@ -846,6 +846,8 @@ sub _queueDropDbResponseIfNeeded {
         $response = AIChat::MessageHandler::generateDropDbChatResponse($message, $sender);
     }
     $response = AIChat::MessageHandler::dropDbUnknownReply() unless defined $response && $response ne '';
+	$response = AIChat::MessageHandler::_normalizeDropDbOutput($response)
+		if defined $response && $response ne '';
     AIChat::ConversationHistory::addMessage($sender, "user", $message, "intent");
     my @parts = _splitOutgoingResponse($response);
     if (@parts > 1) {
