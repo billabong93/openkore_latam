@@ -543,9 +543,10 @@ sub _formatDropDbLocationAnswer {
             _formatLocationPhrase($base, 'se nao me engano'),
         );
     my $recent_texts = _recentAssistantTexts($sender, 5);
-    my @options = $is_map_code
-        ? map { sprintf($_, $base) } @templates
-        : @templates;
+    my @options = map {
+        my $option = $_;
+        $option =~ /%s/ ? sprintf($option, $base) : $option;
+    } @templates;
     return _pickVariantAvoidingRecent(\@options, $recent_texts);
 }
 
@@ -1904,8 +1905,11 @@ sub _isRebirthRequirementQuery {
 }
 
 sub _answerClassEvolution {
-    my ($message) = @_;
+    my ($message, $sender) = @_;
     my $class_name = _extractClassFromMessage($message);
+    if (!defined $class_name || $class_name eq '') {
+        $class_name = _getPlayerClassFromHistory($sender) if defined $sender;
+    }
     if (!defined $class_name || $class_name eq '') {
         $class_name = $bot_character_data{job} if defined $bot_character_data{job};
     }
@@ -1913,6 +1917,25 @@ sub _answerClassEvolution {
     my ($canonical, $evolutions) = _lookupClassEvolutions($class_name);
     return undef unless $canonical && $evolutions && @$evolutions;
     return "$canonical pode evoluir para: " . join(', ', @$evolutions);
+}
+
+sub _getPlayerClassFromHistory {
+    my ($sender) = @_;
+    return undef unless defined $sender && $sender ne '';
+    my $history = AIChat::ConversationHistory::getHistory($sender) || [];
+    for (my $i = @$history - 1; $i >= 0; $i--) {
+        my $entry = $history->[$i];
+        next unless ($entry->{role} // '') eq 'system';
+        next unless ($entry->{type} // '') eq 'player_info';
+        my $content = $entry->{content} // '';
+        if ($content =~ /Classe:\s*(.+)/i) {
+            my $class = $1;
+            $class =~ s/^\s+//;
+            $class =~ s/\s+$//;
+            return $class if $class ne '';
+        }
+    }
+    return undef;
 }
 
 sub _loadItemTranslationMap {
@@ -1997,7 +2020,7 @@ sub processMessages {
         return ["pra renascer precisa base 99 e job 50"];
     }
     if (_isClassEvolutionQuery($combined_message)) {
-        my $answer = _answerClassEvolution($combined_message);
+        my $answer = _answerClassEvolution($combined_message, $sender);
         return [$answer] if defined $answer && $answer ne '';
     }
 
