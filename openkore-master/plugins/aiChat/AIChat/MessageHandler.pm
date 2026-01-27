@@ -1254,9 +1254,6 @@ sub generateDropDbChatResponse {
     my $analysis = _interpretDropDbQuestion($message, $sender);
     my $intent = $analysis && ref $analysis eq 'HASH' ? ($analysis->{intent} // '') : '';
     my $map_only = ($analysis && $analysis->{map_only}) ? 1 : 0;
-    if ($intent eq '' || $intent eq 'unknown') {
-        $map_only ||= _isMapQuery($message);
-    }
     my $subject_monster = _resolveDropDbSubjectMonster($analysis, $sender);
     my $subject_tier = 'chance';
     my $subject_entry;
@@ -1289,12 +1286,7 @@ sub generateDropDbChatResponse {
             $subject_tier = $subject_entry->{tier} // 'chance';
         }
     }
-    my $normalized_message = _normalizeQueryText($message);
     my $is_followup_where = ($intent eq 'monster_location') ? 1 : 0;
-    if (!$is_followup_where && ($intent eq '' || $intent eq 'unknown')) {
-		$is_followup_where = defined $normalized_message
-			&& $normalized_message =~ /\b(onde|local|localizacao|lugar)\b/;
-    }
     my $last_intent = $last_answer ? ($last_answer->{intent} // '') : '';
     $last_subject = $last_answer ? ($last_answer->{subject} // '') : '';
     my $last_answer_type = $last_answer ? ($last_answer->{answer_type} // '') : '';
@@ -1393,7 +1385,7 @@ sub generateDropDbChatResponse {
         }
     }
 
-	if ($subject_monster && $subject_entry && ($intent eq 'monster_drops' || (($intent eq '' || $intent eq 'unknown') && _isDropDbDropQuestion($message)))) {
+	if ($subject_monster && $subject_entry && $intent eq 'monster_drops') {
 		my $drops = _formatDropDbDrops($subject_entry);
 		if ($drops ne '') {
 			my $response = $drops;
@@ -1472,11 +1464,7 @@ sub generateDropDbChatResponse {
                     });
                     return $response;
                 }
-                my $map_hint = $map_only;
-                if (!$map_hint && ($intent eq '' || $intent eq 'unknown')) {
-                    $map_hint = _isMapQuery($message);
-                }
-                if (!$map_hint && _responseContainsMapCode($response)) {
+                if (!$map_only && _responseContainsMapCode($response)) {
                     my $subject_monster = _resolveDropDbSubjectMonster($analysis, $sender);
                     if ($subject_monster) {
                         my $mondb = _loadMonsterDropDb();
@@ -2031,27 +2019,11 @@ sub processMessages {
     }
 
     my $combined_message = join "\n", @$messages;
-    if (_isSecondClassRequirementQuery($combined_message)) {
-        return ["pra virar classe 2 so precisa job 40 no minimo"];
-    }
-    if (_isRebirthRequirementQuery($combined_message)) {
-        return ["pra renascer precisa base 99 e job 50"];
-    }
-    if (_isClassEvolutionQuery($combined_message)) {
-        my $answer = _answerClassEvolution($combined_message, $sender);
-        return [$answer] if defined $answer && $answer ne '';
-    }
-
     my $stance = _getDropDbStance($sender);
     if (defined $stance && $stance eq 'refusal') {
-        my $has_dropdb = 0;
-        for my $message (@$messages) {
-            if (_isDropDbQueryMessage($message)) {
-                $has_dropdb = 1;
-                last;
-            }
-        }
-        if ($has_dropdb) {
+        my $analysis = _interpretDropDbQuestion($combined_message, $sender);
+        my $analysis_intent = $analysis && ref $analysis eq 'HASH' ? ($analysis->{intent} // '') : '';
+        if ($analysis_intent ne '' && $analysis_intent ne 'unknown') {
             my $refusal = generateDropDbRefusal($combined_message, $sender);
             return [$refusal] if defined $refusal && $refusal ne '';
         }
