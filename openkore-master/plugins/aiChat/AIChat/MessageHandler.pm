@@ -23,13 +23,19 @@ our %bot_character_data;
 
 my $api_client;
 my $mondb_cache;
+my $mondb_cache_mtime;
 my $item_translation_cache;
 my %mondb_map_cache;
 my $mondb_lookup_cache;
 my %mondb_tier_lookup_cache;
 my $mondb_entity_lookup_cache;
 my $mondb_item_index_cache;
+my $drop_db_context_cache;
+my $drop_db_context_mtime;
 my $classdb_cache;
+my $classdb_cache_mtime;
+my $class_db_context_cache;
+my $class_db_context_mtime;
 
 BEGIN {
     $api_client = AIChat::APIClient->new();
@@ -241,9 +247,30 @@ sub _ensureClassDbContext {
     AIChat::ConversationHistory::addMessage($sender, "system", $class_context, "class_db_context");
 }
 
+sub preloadReferenceContexts {
+    _buildDropDbContext();
+    _buildClassDbContext();
+}
+
+sub _getFileMtime {
+    my ($path) = @_;
+    return 0 unless defined $path && -e $path;
+    return (stat($path))[9] || 0;
+}
+
 sub _buildDropDbContext {
+    my $path = File::Spec->catfile(_pluginBaseDir(), 'config', 'mondb.txt');
+    my $mtime = _getFileMtime($path);
+    if (defined $drop_db_context_cache && defined $drop_db_context_mtime && $mtime == $drop_db_context_mtime) {
+        return $drop_db_context_cache;
+    }
+
     my $mondb = _loadMonsterDropDb();
-    return undef unless $mondb && %$mondb;
+    unless ($mondb && %$mondb) {
+        $drop_db_context_cache = undef;
+        $drop_db_context_mtime = $mtime;
+        return undef;
+    }
 
     my @entries;
     for my $key (sort keys %$mondb) {
@@ -255,15 +282,21 @@ sub _buildDropDbContext {
         my $map_text = _formatDropDbLocation($entry, 1);
         push @entries, "$key:$map_text" . join(', ', @$drops);
     }
-    return undef unless @entries;
+    unless (@entries) {
+        $drop_db_context_cache = undef;
+        $drop_db_context_mtime = $mtime;
+        return undef;
+    }
 
     my $item_index = _buildDropItemIndex($mondb);
 
-    return join "\n",
+    $drop_db_context_cache = join "\n",
         "Banco de drops conhecido (use somente essas informacoes):",
         @entries,
         (@$item_index ? ("Indice de itens (item -> monstros que dropam):", @$item_index) : ()),
         "Se nao houver informacao, diga que nao sabe ou nao tem certeza.";
+    $drop_db_context_mtime = $mtime;
+    return $drop_db_context_cache;
 }
 
 sub _formatDropDbLocation {
@@ -1543,8 +1576,18 @@ sub _buildWorldContext {
 }
 
 sub _buildClassDbContext {
+    my $path = File::Spec->catfile(_pluginBaseDir(), 'config', 'db.txt');
+    my $mtime = _getFileMtime($path);
+    if (defined $class_db_context_cache && defined $class_db_context_mtime && $mtime == $class_db_context_mtime) {
+        return $class_db_context_cache;
+    }
+
     my $classdb = _loadClassDb();
-    return undef unless $classdb && %$classdb;
+    unless ($classdb && %$classdb) {
+        $class_db_context_cache = undef;
+        $class_db_context_mtime = $mtime;
+        return undef;
+    }
 
     my @requirements = @{$classdb->{requirements} || []};
     my @general = @{$classdb->{general} || []};
@@ -1555,14 +1598,20 @@ sub _buildClassDbContext {
         push @evolution_lines, "$class: " . join(', ', @$evolutions);
     }
 
-    return undef unless @requirements || @general || @evolution_lines;
+    unless (@requirements || @general || @evolution_lines) {
+        $class_db_context_cache = undef;
+        $class_db_context_mtime = $mtime;
+        return undef;
+    }
 
-    return join "\n",
+    $class_db_context_cache = join "\n",
         "Conhecimento basico de classes e niveis:",
         (@requirements ? ("Requisitos importantes:", @requirements) : ()),
         (@general ? ("Informacoes gerais:", @general) : ()),
         (@evolution_lines ? ("Evolucoes de classes:", @evolution_lines) : ()),
         "Regras: responda usando apenas essas informacoes. Se faltar dado, diga que nao sabe ou que pode variar no servidor. Use nomes de classe listados acima.";
+    $class_db_context_mtime = $mtime;
+    return $class_db_context_cache;
 }
 
 sub _normalizeList {
@@ -1606,11 +1655,14 @@ sub _buildBasicDropContext {
 }
 
 sub _loadMonsterDropDb {
-    return $mondb_cache if $mondb_cache;
-
     my $path = File::Spec->catfile(_pluginBaseDir(), 'config', 'mondb.txt');
+    my $mtime = _getFileMtime($path);
+    if ($mondb_cache && defined $mondb_cache_mtime && $mondb_cache_mtime == $mtime) {
+        return $mondb_cache;
+    }
     unless (-e $path) {
         $mondb_cache = {};
+        $mondb_cache_mtime = $mtime;
         return $mondb_cache;
     }
 
@@ -1663,6 +1715,7 @@ sub _loadMonsterDropDb {
     }
 
     $mondb_cache = \%db;
+    $mondb_cache_mtime = $mtime;
     $mondb_lookup_cache = undef;
     %mondb_tier_lookup_cache = ();
     $mondb_entity_lookup_cache = undef;
@@ -1745,7 +1798,10 @@ sub updateMondbFromMap {
         print $fh @lines;
         close $fh;
         $mondb_cache = undef;
+        $mondb_cache_mtime = undef;
         %mondb_tier_lookup_cache = ();
+        $drop_db_context_cache = undef;
+        $drop_db_context_mtime = undef;
     }
 }
 
@@ -1786,11 +1842,14 @@ sub _parseClassAliases {
 }
 
 sub _loadClassDb {
-    return $classdb_cache if $classdb_cache;
-
     my $path = File::Spec->catfile(_pluginBaseDir(), 'config', 'db.txt');
+    my $mtime = _getFileMtime($path);
+    if ($classdb_cache && defined $classdb_cache_mtime && $classdb_cache_mtime == $mtime) {
+        return $classdb_cache;
+    }
     unless (-e $path) {
         $classdb_cache = {};
+        $classdb_cache_mtime = $mtime;
         return $classdb_cache;
     }
 
@@ -1844,6 +1903,7 @@ sub _loadClassDb {
     }
 
     $classdb_cache = \%db;
+    $classdb_cache_mtime = $mtime;
     return $classdb_cache;
 }
 

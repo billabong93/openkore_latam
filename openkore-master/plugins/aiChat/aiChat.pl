@@ -462,6 +462,7 @@ sub onInitialized {
         \&onCommand
     ]);
     AIChat::Config::load();
+    AIChat::MessageHandler::preloadReferenceContexts();
 
     # Chamar updateBotCharacterData uma vez na inicialização, caso o bot já esteja em jogo
     updateBotCharacterData();
@@ -499,6 +500,7 @@ sub onUnload {
 
 sub onReload {
     AIChat::Config::load();
+    AIChat::MessageHandler::preloadReferenceContexts();
     updateBotCharacterData(); # Atualizar dados ao recarregar
 }
 
