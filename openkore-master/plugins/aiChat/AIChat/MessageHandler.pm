@@ -1146,7 +1146,7 @@ sub generateDropDbResponse {
         },
         {
             role => "system",
-            content => "Responda usando apenas o banco de drops conhecido no historico. Seja curto, direto e com linguagem de player. Varie as frases e o jeito de responder, sem ficar engessado. Se nao tiver informacao, diga que nao sabe. Nunca invente monstros, itens ou mapas. Se a pergunta for \"onde\" responda apenas com o monstro OU a localizacao (nome do lugar), nunca ambos na mesma mensagem. Se a pergunta for \"qual mapa\" ou \"mapa?\" responda somente com o codigo do mapa (o que estiver entre parenteses). Se a pessoa insistir na mesma pergunta depois de voce ja responder a localizacao, responda com o codigo do mapa. Se precisar enviar duas partes diferentes, use \"||\" para separar em duas mensagens. Nunca liste mais de 1 ou 2 monstros/itens/mapas por mensagem."
+            content => "Responda usando apenas o banco de drops conhecido no historico. Seja curto, direto e com linguagem de player. Varie as frases e o jeito de responder, sem ficar engessado. Se nao tiver informacao, diga que nao sabe. Nunca invente monstros, itens ou mapas. Se a pergunta for \"onde\" responda apenas com o monstro OU a localizacao (nome do lugar), nunca ambos na mesma mensagem. Se a pergunta for \"qual mapa\" ou \"mapa?\" responda somente com o codigo do mapa (o que estiver entre parenteses). Se a pessoa insistir na mesma pergunta depois de voce ja responder a localizacao, responda com o codigo do mapa. Nao use quebra de linha. Se precisar enviar duas partes diferentes, use \"||\" para separar em duas mensagens. Nunca liste mais de 1 ou 2 monstros/itens/mapas por mensagem."
         }
     );
 
@@ -1224,7 +1224,7 @@ sub generateDropDbChatResponse {
         "Quando perguntarem onde pega um item, responda apenas com o monstro OU apenas com a localizacao, nunca ambos na mesma mensagem.",
         "Se a pergunta for \"qual mapa\" ou \"mapa?\", responda somente com o codigo do mapa (o que estiver entre parenteses).",
         "Se a pessoa repetir a mesma pergunta depois da localizacao, responda com o codigo do mapa em vez de repetir a localizacao.",
-        "Se precisar enviar duas partes diferentes, use \"||\" para separar em duas mensagens.",
+        "Nao use quebra de linha; se precisar enviar duas partes diferentes, use \"||\" para separar em duas mensagens.",
         "Nunca liste mais de 1 ou 2 monstros/itens/mapas por mensagem.",
         "Se nao houver informacao clara, responda com uma frase curta de desconhecimento, como um player.",
         "Exemplos: nao sei, nao conheco, sei nao, nao to ligado, desculpa nao sei.";
