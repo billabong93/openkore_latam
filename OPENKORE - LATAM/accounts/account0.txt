@@ -1,7 +1,0 @@
-!include ../control/config.txt
-
-#######################################
-# Openkore configs
-#######################################
-XKore_port 5400
-adminPassword

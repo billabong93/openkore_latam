@@ -56,7 +56,7 @@ XKore_ID
 
 ######## Login options and server-specific options ########
 
-master LandVerse
+master Latam - ROla: Freya/Nidhogg/Yggdrasil
 server 0
 username
 password 
