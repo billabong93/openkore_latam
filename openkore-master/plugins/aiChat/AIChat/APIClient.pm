@@ -62,7 +62,7 @@ sub callAPI {
     if (defined $glossary && $glossary ne '') {
         push @messages, {
             role => "system",
-            content => "Glossario do jogo para referencia: $glossary",
+            content => "Glossario do jogo para referencia: $glossary. Use os termos do glossario quando fizer sentido na fala do jogador, sem substituir palavras a esmo. Evite abreviacoes de comercio (ex: \"C>\", \"V>\") fora de anuncios. Nao troque \"zeny\" por \"k/kk/kks\" sem quantia explicita. Prefira nomes de classes do glossario quando aplicavel.",
         };
     }
     
