@@ -1114,13 +1114,11 @@ sub generateDropDbResponse {
         return generateDropDbRefusal($message, $sender);
     }
 
-    unless (_isDropDbQueryMessage($message) || _isMapQuery($message)) {
-        my $analysis = _interpretDropDbQuestion($message, $sender);
-        my $analysis_intent = $analysis && ref $analysis eq 'HASH' ? ($analysis->{intent} // '') : '';
-        my $analysis_entity = $analysis && ref $analysis eq 'HASH' ? ($analysis->{entity} // '') : '';
-        if ($analysis_intent eq '' || $analysis_intent eq 'unknown') {
-            return dropDbUnknownReply() unless defined $analysis_entity && $analysis_entity ne '';
-        }
+    my $analysis = _interpretDropDbQuestion($message, $sender);
+    my $analysis_intent = $analysis && ref $analysis eq 'HASH' ? ($analysis->{intent} // '') : '';
+    my $analysis_entity = $analysis && ref $analysis eq 'HASH' ? ($analysis->{entity} // '') : '';
+    if ($analysis_intent eq '' || $analysis_intent eq 'unknown') {
+        return dropDbUnknownReply() unless defined $analysis_entity && $analysis_entity ne '';
     }
 
     if (_isRepeatedDropDbQuestion($sender, $message)) {
@@ -1256,7 +1254,9 @@ sub generateDropDbChatResponse {
     my $analysis = _interpretDropDbQuestion($message, $sender);
     my $intent = $analysis && ref $analysis eq 'HASH' ? ($analysis->{intent} // '') : '';
     my $map_only = ($analysis && $analysis->{map_only}) ? 1 : 0;
-    $map_only ||= _isMapQuery($message);
+    if ($intent eq '' || $intent eq 'unknown') {
+        $map_only ||= _isMapQuery($message);
+    }
     my $subject_monster = _resolveDropDbSubjectMonster($analysis, $sender);
     my $subject_tier = 'chance';
     my $subject_entry;
@@ -1290,8 +1290,11 @@ sub generateDropDbChatResponse {
         }
     }
     my $normalized_message = _normalizeQueryText($message);
-    my $is_followup_where = defined $normalized_message
-		&& $normalized_message =~ /\b(onde|local|localizacao|lugar)\b/;
+    my $is_followup_where = ($intent eq 'monster_location') ? 1 : 0;
+    if (!$is_followup_where && ($intent eq '' || $intent eq 'unknown')) {
+		$is_followup_where = defined $normalized_message
+			&& $normalized_message =~ /\b(onde|local|localizacao|lugar)\b/;
+    }
     my $last_intent = $last_answer ? ($last_answer->{intent} // '') : '';
     $last_subject = $last_answer ? ($last_answer->{subject} // '') : '';
     my $last_answer_type = $last_answer ? ($last_answer->{answer_type} // '') : '';
@@ -1390,7 +1393,7 @@ sub generateDropDbChatResponse {
         }
     }
 
-	if ($subject_monster && $subject_entry && ($intent eq 'monster_drops' || _isDropDbDropQuestion($message))) {
+	if ($subject_monster && $subject_entry && ($intent eq 'monster_drops' || (($intent eq '' || $intent eq 'unknown') && _isDropDbDropQuestion($message)))) {
 		my $drops = _formatDropDbDrops($subject_entry);
 		if ($drops ne '') {
 			my $response = $drops;
@@ -1469,7 +1472,11 @@ sub generateDropDbChatResponse {
                     });
                     return $response;
                 }
-                if (!_isMapQuery($message) && _responseContainsMapCode($response)) {
+                my $map_hint = $map_only;
+                if (!$map_hint && ($intent eq '' || $intent eq 'unknown')) {
+                    $map_hint = _isMapQuery($message);
+                }
+                if (!$map_hint && _responseContainsMapCode($response)) {
                     my $subject_monster = _resolveDropDbSubjectMonster($analysis, $sender);
                     if ($subject_monster) {
                         my $mondb = _loadMonsterDropDb();
