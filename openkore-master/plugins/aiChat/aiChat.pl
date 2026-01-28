@@ -17,6 +17,7 @@ use Utils qw(getHex timeOut distance);
 use Cwd 'abs_path';
 use Time::HiRes qw(time);
 use Encode qw(encode_utf8);
+use Unicode::Normalize qw(NFC);
 use Actor ();
 
 use lib $Plugins::current_plugin_folder;
@@ -140,14 +141,13 @@ sub _getBufferState {
 sub _sanitizeOutgoingMessage {
     my ($message) = @_;
     return '' unless defined $message;
-    my $sanitized = $message;
+    my $sanitized = NFC($message);
     if (!utf8::is_utf8($sanitized) && isUTF8($sanitized)) {
         $sanitized = UTF8ToString($sanitized);
     }
     $sanitized =~ s/\s*\r?\n\s*/ /g;
     $sanitized =~ s/[\x00-\x1F\x7F]+/ /g;
     $sanitized =~ s/\s+/ /g;
-    $sanitized =~ s/\bna\s+o\b/nao/gi;
     $sanitized =~ s/^\s+//;
     $sanitized =~ s/\s+$//;
     return $sanitized;
