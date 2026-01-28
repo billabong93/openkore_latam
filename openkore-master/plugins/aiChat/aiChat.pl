@@ -16,6 +16,8 @@ use Misc qw(getEmotionByCommand);
 use Utils qw(getHex timeOut distance);
 use Cwd 'abs_path';
 use Time::HiRes qw(time);
+use Encode qw(encode_utf8);
+use Unicode::Normalize qw(NFC);
 use Actor ();
 
 use lib $Plugins::current_plugin_folder;
@@ -83,6 +85,8 @@ my %silence_after_response_by_sender;
 my %last_visibility_state_by_sender;
 my %conversation_message_count_by_sender;
 my %conversation_close_stage_by_sender;
+my %typo_message_count_by_sender;
+my %typo_next_trigger_by_sender;
 my $last_packet_sent_at = 0;
 
 my %invisibility_statuses = map { $_ => 1 } qw(
@@ -116,6 +120,7 @@ my @fallback_emotion_commands = qw(
 
 use constant {
     MAX_CHAT_LENGTH => 200,
+    SOFT_CHAT_LENGTH => 120,
     DROP_DB_REFUSAL_MIN => 2,
     DROP_DB_REFUSAL_MAX => 4,
     SPAM_QUESTION_LIMIT => 3,
@@ -138,7 +143,7 @@ sub _getBufferState {
 sub _sanitizeOutgoingMessage {
     my ($message) = @_;
     return '' unless defined $message;
-    my $sanitized = $message;
+    my $sanitized = NFC($message);
     if (!utf8::is_utf8($sanitized) && isUTF8($sanitized)) {
         $sanitized = UTF8ToString($sanitized);
     }
@@ -147,11 +152,222 @@ sub _sanitizeOutgoingMessage {
     $sanitized =~ s/\s+/ /g;
     $sanitized =~ s/^\s+//;
     $sanitized =~ s/\s+$//;
-    if (length($sanitized) > MAX_CHAT_LENGTH) {
-        $sanitized = substr($sanitized, 0, MAX_CHAT_LENGTH);
-        $sanitized =~ s/\s+$//;
-    }
     return $sanitized;
+}
+
+sub _keyboardNeighborMap {
+    return {
+        a => [qw(q w s z)],
+        b => [qw(v g h n)],
+        c => [qw(x d f v)],
+        d => [qw(e r s f x c)],
+        e => [qw(w s d r)],
+        f => [qw(r t d g v c)],
+        g => [qw(t y f h v b)],
+        h => [qw(y u g j b n)],
+        i => [qw(u o k j)],
+        j => [qw(u i h k n m)],
+        k => [qw(i o j l m)],
+        l => [qw(o p k)],
+        m => [qw(n j k)],
+        n => [qw(b h j m)],
+        o => [qw(i p k l)],
+        p => [qw(o l)],
+        q => [qw(w a)],
+        r => [qw(e t d f)],
+        s => [qw(w e d x z a)],
+        t => [qw(r y f g)],
+        u => [qw(y i h j)],
+        v => [qw(c f g b)],
+        w => [qw(q a s e)],
+        x => [qw(z s d c)],
+        y => [qw(t u g h)],
+        z => [qw(a s x)],
+    };
+}
+
+sub _getTypoInterval {
+    my $value = AIChat::Config::get('typo_rate');
+    return _resolveRangeLimit($value, 0);
+}
+
+sub _shouldInjectTypo {
+    my ($sender) = @_;
+    return unless defined $sender;
+    my $interval = _getTypoInterval();
+    return if !$interval || $interval <= 0;
+    my $key = _normalizeSenderKey($sender);
+    return unless $key;
+    $typo_message_count_by_sender{$key} = ($typo_message_count_by_sender{$key} // 0) + 1;
+    if (!defined $typo_next_trigger_by_sender{$key}) {
+        $typo_next_trigger_by_sender{$key} = $interval;
+    }
+    if ($typo_message_count_by_sender{$key} >= $typo_next_trigger_by_sender{$key}) {
+        $typo_message_count_by_sender{$key} = 0;
+        $typo_next_trigger_by_sender{$key} = _getTypoInterval();
+        return 1;
+    }
+    return;
+}
+
+sub _applyKeyboardTypo {
+    my ($text) = @_;
+    return $text unless defined $text && length($text) > 3;
+    my $map = _keyboardNeighborMap();
+    my @chars = split //, $text;
+    my @indices;
+    for my $i (0 .. $#chars) {
+        my $char = $chars[$i];
+        next unless defined $char && $char =~ /[A-Za-z]/;
+        my $lower = lc $char;
+        next unless $map->{$lower};
+        push @indices, $i;
+    }
+    return $text unless @indices;
+    my $pick_index = $indices[int(rand(@indices))];
+    my $orig = $chars[$pick_index];
+    my $lower = lc $orig;
+    my $neighbors = $map->{$lower} || [];
+    return $text unless @$neighbors;
+    my $replacement = $neighbors->[int(rand(@$neighbors))];
+    $replacement = uc $replacement if $orig =~ /[A-Z]/;
+    $chars[$pick_index] = $replacement;
+    return join('', @chars);
+}
+
+sub _splitOutgoingMessageByBytes {
+    my ($message) = @_;
+    return () unless defined $message;
+    my $encoded = encode_utf8($message);
+    my $comma_count = () = $message =~ /,/g;
+    my $list_mode = $comma_count >= 4 ? 1 : 0;
+    my $soft_limit = $list_mode ? SOFT_CHAT_LENGTH : MAX_CHAT_LENGTH;
+    return ($message) if length($encoded) <= $soft_limit && !$list_mode;
+
+    my @segments;
+    my $work = $message;
+    my @punct_parts = split /(?<=[.!?])\s+/, $work;
+    for my $part (@punct_parts) {
+        my @comma_parts = split /(?<=,|;|:)\s+/, $part;
+        push @segments, @comma_parts;
+    }
+
+    my @refined;
+    my $conjunctions = qr/\b(mas|porem|por[eê]m|so que|s[oó] que|entao|ent[ãa]o|porque|pq)\b/i;
+    for my $segment (@segments) {
+        if ($segment =~ $conjunctions) {
+            my @pieces = split /($conjunctions)/i, $segment;
+            my $buffer = '';
+            for my $piece (@pieces) {
+                next unless defined $piece && $piece ne '';
+                if ($piece =~ $conjunctions) {
+                    if ($buffer ne '') {
+                        $buffer =~ s/\s+$//;
+                        push @refined, $buffer if $buffer ne '';
+                    }
+                    $buffer = $piece;
+                } else {
+                    $buffer .= ($buffer ne '' ? ' ' : '') . $piece;
+                }
+            }
+            if ($buffer ne '') {
+                $buffer =~ s/^\s+//;
+                $buffer =~ s/\s+$//;
+                push @refined, $buffer if $buffer ne '';
+            }
+        } else {
+            push @refined, $segment;
+        }
+    }
+    @segments = map {
+        my $trimmed = $_;
+        $trimmed =~ s/^\s+//;
+        $trimmed =~ s/\s+$//;
+        $trimmed;
+    } grep { defined $_ && $_ ne '' } @refined;
+    @segments = ($message) unless @segments;
+    if ($list_mode) {
+        my @list_segments;
+        for my $segment (@segments) {
+            my $segment_commas = () = $segment =~ /,/g;
+            if ($segment_commas >= 2) {
+                my @items = map {
+                    my $item = $_;
+                    $item =~ s/^\s+//;
+                    $item =~ s/\s+$//;
+                    $item;
+                } grep { defined $_ && $_ ne '' } split /\s*,\s*/, $segment;
+                while (@items) {
+                    my @group = splice @items, 0, 3;
+                    push @list_segments, join(', ', @group);
+                }
+            } else {
+                push @list_segments, $segment;
+            }
+        }
+        @segments = @list_segments if @list_segments;
+    }
+
+    my @parts;
+    my $current = '';
+    for my $segment (@segments) {
+        my $candidate = $current eq '' ? $segment : "$current $segment";
+        my $candidate_bytes = length(encode_utf8($candidate));
+        if ($candidate_bytes <= $soft_limit) {
+            $current = $candidate;
+            next;
+        }
+
+        if ($current ne '') {
+            push @parts, $current;
+            $current = '';
+        }
+
+        my $segment_bytes = length(encode_utf8($segment));
+        if ($segment_bytes <= $soft_limit) {
+            $current = $segment;
+            next;
+        }
+
+        my @words = split /\s+/, $segment;
+        for my $word (@words) {
+            my $word_candidate = $current eq '' ? $word : "$current $word";
+            my $word_candidate_bytes = length(encode_utf8($word_candidate));
+            if ($word_candidate_bytes <= $soft_limit) {
+                $current = $word_candidate;
+                next;
+            }
+
+            if ($current ne '') {
+                push @parts, $current;
+                $current = '';
+            }
+
+            my $word_bytes = length(encode_utf8($word));
+            if ($word_bytes <= MAX_CHAT_LENGTH) {
+                $current = $word;
+                next;
+            }
+
+            my $chunk = '';
+            my $chunk_bytes = 0;
+            for my $char (split //, $word) {
+                my $char_bytes = length(encode_utf8($char));
+                if ($chunk_bytes + $char_bytes > MAX_CHAT_LENGTH) {
+                    push @parts, $chunk if $chunk ne '';
+                    $chunk = '';
+                    $chunk_bytes = 0;
+                }
+                $chunk .= $char;
+                $chunk_bytes += $char_bytes;
+            }
+            if ($chunk ne '') {
+                $current = $chunk;
+            }
+        }
+    }
+    push @parts, $current if $current ne '';
+    return @parts;
 }
 
 sub _splitOutgoingResponse {
@@ -293,7 +509,14 @@ sub _sendQueuedResponse {
         } else {
             my $typing_speed = AIChat::Config::get('typing_speed');
             if ($typing_speed && $typing_speed > 0) {
-                $delay = length($response) / $typing_speed;
+                my $preview = $response;
+                if ($context->{sabotage} || $context->{normalize}) {
+                    $preview = AIChat::MessageHandler::_normalizeResponseText($preview);
+                }
+                $preview = _sanitizeOutgoingMessage($preview);
+                my @preview_chunks = _splitOutgoingMessageByBytes($preview);
+                my $first_chunk = $preview_chunks[0] // $preview;
+                $delay = length($first_chunk) / $typing_speed;
             }
         }
         $state->{typing_until} = time() + $delay;
@@ -339,6 +562,20 @@ sub _sendQueuedResponse {
             $state->{response_started} = 0 unless @{$state->{response_queue}};
             return;
         }
+        if (_shouldInjectTypo($sender)) {
+            $response = _applyKeyboardTypo($response);
+        }
+    }
+
+    if (!$emotion_command) {
+        my @chunks = _splitOutgoingMessageByBytes($response);
+        if (@chunks > 1) {
+            my @rest = @chunks[1 .. $#chunks];
+            unshift @{$state->{response_queue}}, map {
+                { text => $_, context => $context }
+            } @rest;
+            $response = $chunks[0];
+        }
     }
 
     if (!$emotion_command && $context->{type} && $context->{type} eq 'public') {
@@ -362,7 +599,17 @@ sub _sendQueuedResponse {
     }
 
     AIChat::ConversationHistory::addMessage($sender, "assistant", $response);
-    $state->{typing_until} = 0;
+    if (@{$state->{response_queue}}) {
+        my $next_item = $state->{response_queue}[0];
+        my $next_text = ref $next_item eq 'HASH' ? ($next_item->{text} // '') : $next_item;
+        my $next_delay = _calculateTypingDelay($next_text);
+        my $send_at = time() + ($next_delay > 0 ? $next_delay : 0);
+        my $next_allowed = _nextAllowedPacketTime();
+        $send_at = $next_allowed if $send_at < $next_allowed;
+        $state->{typing_until} = $send_at;
+    } else {
+        $state->{typing_until} = 0;
+    }
     $state->{response_started} = 0 unless @{$state->{response_queue}};
     _finalizeSilenceIfNeeded($sender);
 }
@@ -1207,6 +1454,8 @@ sub _processPendingEmotionFollowups {
             delete $pending_emotion_followup_by_sender{$sender_key};
             next;
         }
+        my @chunks = _splitOutgoingMessageByBytes($message);
+        $message = shift @chunks;
         my $context = $pending->{context};
         my $sender_name = $pending->{sender_name};
         if ($context && $context eq 'public') {
@@ -1230,6 +1479,18 @@ sub _processPendingEmotionFollowups {
         }
 
         AIChat::ConversationHistory::addMessage($sender_name, "assistant", $message);
+        if (@chunks) {
+            my $state = _getBufferState($sender_name);
+            $state->{messages} = [];
+            $state->{context} = { type => $context };
+            unshift @{$state->{response_queue}}, map {
+                { text => $_, context => $state->{context} }
+            } @chunks;
+            my $next_delay = _calculateTypingDelay($chunks[0]);
+            my $send_at = time() + ($next_delay > 0 ? $next_delay : 0);
+            my $next_allowed = _nextAllowedPacketTime();
+            $state->{typing_until} = $send_at < $next_allowed ? $next_allowed : $send_at;
+        }
         delete $pending_emotion_followup_by_sender{$sender_key};
     }
 }

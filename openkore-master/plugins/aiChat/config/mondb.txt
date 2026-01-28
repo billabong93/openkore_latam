@@ -14,12 +14,12 @@ Fabre: (Arredores de Prontera, prt_fild08, prt_fild06, pay_fild03) Felpa, Erva V
 Salgueiro: (Floresta de Payon, pay_fild01, pay_fild07, pay_fild03) Raiz de Árvore, Tronco, Resina, Batata Doce, Tronco Estéril, Tronco Sólido, Tronco de Alta Qualidade, Carta Salgueiro
 Condor: (Deserto de Morroc, moc_fild12, moc_fild11, prt_fild09) Garra de Ave, Carne, Plumas de Ave, Gema Amarela, Flecha, Laranja, Arco [4], Carta Condor
 Rocker: (Arredores de Prontera, prt_fild07, mjolnir_09, mjolnir_01) Perna de Gafanhoto, Antenas Verdes, Hinalle, Folha de Hinalle, Azagaia [4], Violão da Mãe Terra, Boneco de Rocker, Carta Rocker
-Rabo de Verme: (Floresta de Payon, pay_fild06, prt_fild08) Escama Afiada, Vida Verdejante, Erva Amarela, Emveretarcon, Pique [4], Laço Verde, Esmeralda, Carta Rabo de Verme
+Rabo de Verme: (Floresta de Payon, pay_fild06, pay_fild08) Escama Afiada, Vida Verdejante, Erva Amarela, Emveretarcon, Pique [4], Laço Verde, Esmeralda, Carta Rabo de Verme
 Esporo: (Floresta de Payon, pay_fild08, pay_fild03) Esporo de Cogumelo, Erva Vermelha, Morango, Esporo Venenoso, Chapéu, Erva Azul, Boneco de Esporo, Carta Esporo
 Esqueleto: (Caverna de Payon, pay_dun00) Osso, Jellopy, Erva Vermelha, Fracon, Anel de Caveira, Carta Esqueleto
 Zumbi: (Caverna de Payon, pay_dun00) Unha Apodrecida, Muco Pegajoso, Mandíbula Horrenda, Opala, Rubi Amaldiçoado, Carta Zumbi
 Jibóia: (Floresta de Payon, pay_fild02, pay_fild08, moc_fild13) Escamas de Cobra, Canino Venenoso, Escama Brilhante, Erva Vermelha, Maçã, Emveretarcon, Carta Jibóia
-Bebê Selvagem: (Arredores de Prontera, prt_fild10, mjolnir_09, prt_fild07) Carne, Couro de Animal, Fracon, Pluma, Carne de Selvagem, Leite Doce, Carta Bebê Selvagem
+Bebê Selvagem: (Arredores de Prontera, prt_fild10, mjolnir_09) Carne, Couro de Animal, Fracon, Pluma, Carne de Selvagem, Leite Doce, Carta Bebê Selvagem
 Sapo de Rodda: (Arredores de Prontera, prt_fild00, prt_fild04, gef_fild01) Pata Pegajosa, Erva Verde, Ova de Sapo, Garrafa Vazia, Esmeralda, Carta Sapo de Rodda
 Filhote de Lobo: (Deserto de Morroc, moc_fild11, moc_fild01, moc_fild18) Couro de Animal, Carne, Sangue de Lobo, Laranja, Camisa de Algodão, Fracon, Túnica [1], Asura [3], Carta Filhote de Lobo
 Escorpião: (Deserto de Morroc, moc_fild18, in_sphinx1) Cauda de Escorpião, Casca Rija, Torrão de Areia Fina, Erva Amarela, Ferro Enferrujado, Sangue Escarlate, Minério de Elunium, Carta Escorpião
