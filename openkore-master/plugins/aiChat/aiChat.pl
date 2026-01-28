@@ -489,7 +489,6 @@ sub _sendQueuedResponse {
                 { text => $_, context => $context }
             } @rest;
             $response = $chunks[0];
-            $state->{typing_until} = 0;
         }
     }
 
@@ -514,7 +513,14 @@ sub _sendQueuedResponse {
     }
 
     AIChat::ConversationHistory::addMessage($sender, "assistant", $response);
-    $state->{typing_until} = 0;
+    if (@{$state->{response_queue}}) {
+        my $next_item = $state->{response_queue}[0];
+        my $next_text = ref $next_item eq 'HASH' ? ($next_item->{text} // '') : $next_item;
+        my $next_delay = _calculateTypingDelay($next_text);
+        $state->{typing_until} = time() + $next_delay if $next_delay > 0;
+    } else {
+        $state->{typing_until} = 0;
+    }
     $state->{response_started} = 0 unless @{$state->{response_queue}};
     _finalizeSilenceIfNeeded($sender);
 }
