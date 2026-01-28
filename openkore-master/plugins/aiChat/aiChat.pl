@@ -119,8 +119,7 @@ my @fallback_emotion_commands = qw(
 );
 
 use constant {
-    MAX_CHAT_LENGTH => 200,
-    SOFT_CHAT_LENGTH => 120,
+    DEFAULT_MAX_CHAT_LENGTH => 80,
     DROP_DB_REFUSAL_MIN => 2,
     DROP_DB_REFUSAL_MAX => 4,
     SPAM_QUESTION_LIMIT => 3,
@@ -138,6 +137,19 @@ sub _getBufferState {
         response_started => 0,
         context => undef,
     };
+}
+
+sub _maxChatLength {
+    my $limit = $config{'message_length_max'};
+    return $limit if defined $limit && $limit =~ /^\d+$/ && $limit > 0;
+    return DEFAULT_MAX_CHAT_LENGTH;
+}
+
+sub _softChatLength {
+    my $limit = _maxChatLength();
+    my $soft = int($limit * 0.6);
+    $soft = 1 if $soft < 1;
+    return $soft;
 }
 
 sub _sanitizeOutgoingMessage {
@@ -241,7 +253,7 @@ sub _splitOutgoingMessageByBytes {
     my $encoded = encode_utf8($message);
     my $comma_count = () = $message =~ /,/g;
     my $list_mode = $comma_count >= 4 ? 1 : 0;
-    my $soft_limit = $list_mode ? SOFT_CHAT_LENGTH : MAX_CHAT_LENGTH;
+    my $soft_limit = $list_mode ? _softChatLength() : _maxChatLength();
     return ($message) if length($encoded) <= $soft_limit && !$list_mode;
 
     my @segments;
@@ -344,7 +356,7 @@ sub _splitOutgoingMessageByBytes {
             }
 
             my $word_bytes = length(encode_utf8($word));
-            if ($word_bytes <= MAX_CHAT_LENGTH) {
+            if ($word_bytes <= _maxChatLength()) {
                 $current = $word;
                 next;
             }
@@ -353,7 +365,7 @@ sub _splitOutgoingMessageByBytes {
             my $chunk_bytes = 0;
             for my $char (split //, $word) {
                 my $char_bytes = length(encode_utf8($char));
-                if ($chunk_bytes + $char_bytes > MAX_CHAT_LENGTH) {
+                if ($chunk_bytes + $char_bytes > _maxChatLength()) {
                     push @parts, $chunk if $chunk ne '';
                     $chunk = '';
                     $chunk_bytes = 0;
