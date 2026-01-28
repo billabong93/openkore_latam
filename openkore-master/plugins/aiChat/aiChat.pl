@@ -85,6 +85,8 @@ my %silence_after_response_by_sender;
 my %last_visibility_state_by_sender;
 my %conversation_message_count_by_sender;
 my %conversation_close_stage_by_sender;
+my %typo_message_count_by_sender;
+my %typo_next_trigger_by_sender;
 my $last_packet_sent_at = 0;
 
 my %invisibility_statuses = map { $_ => 1 } qw(
@@ -151,6 +153,86 @@ sub _sanitizeOutgoingMessage {
     $sanitized =~ s/^\s+//;
     $sanitized =~ s/\s+$//;
     return $sanitized;
+}
+
+sub _keyboardNeighborMap {
+    return {
+        a => [qw(q w s z)],
+        b => [qw(v g h n)],
+        c => [qw(x d f v)],
+        d => [qw(e r s f x c)],
+        e => [qw(w s d r)],
+        f => [qw(r t d g v c)],
+        g => [qw(t y f h v b)],
+        h => [qw(y u g j b n)],
+        i => [qw(u o k j)],
+        j => [qw(u i h k n m)],
+        k => [qw(i o j l m)],
+        l => [qw(o p k)],
+        m => [qw(n j k)],
+        n => [qw(b h j m)],
+        o => [qw(i p k l)],
+        p => [qw(o l)],
+        q => [qw(w a)],
+        r => [qw(e t d f)],
+        s => [qw(w e d x z a)],
+        t => [qw(r y f g)],
+        u => [qw(y i h j)],
+        v => [qw(c f g b)],
+        w => [qw(q a s e)],
+        x => [qw(z s d c)],
+        y => [qw(t u g h)],
+        z => [qw(a s x)],
+    };
+}
+
+sub _getTypoInterval {
+    my $value = AIChat::Config::get('typo_rate');
+    return _resolveRangeLimit($value, 0);
+}
+
+sub _shouldInjectTypo {
+    my ($sender) = @_;
+    return unless defined $sender;
+    my $interval = _getTypoInterval();
+    return if !$interval || $interval <= 0;
+    my $key = _normalizeSenderKey($sender);
+    return unless $key;
+    $typo_message_count_by_sender{$key} = ($typo_message_count_by_sender{$key} // 0) + 1;
+    if (!defined $typo_next_trigger_by_sender{$key}) {
+        $typo_next_trigger_by_sender{$key} = $interval;
+    }
+    if ($typo_message_count_by_sender{$key} >= $typo_next_trigger_by_sender{$key}) {
+        $typo_message_count_by_sender{$key} = 0;
+        $typo_next_trigger_by_sender{$key} = _getTypoInterval();
+        return 1;
+    }
+    return;
+}
+
+sub _applyKeyboardTypo {
+    my ($text) = @_;
+    return $text unless defined $text && length($text) > 3;
+    my $map = _keyboardNeighborMap();
+    my @chars = split //, $text;
+    my @indices;
+    for my $i (0 .. $#chars) {
+        my $char = $chars[$i];
+        next unless defined $char && $char =~ /[A-Za-z]/;
+        my $lower = lc $char;
+        next unless $map->{$lower};
+        push @indices, $i;
+    }
+    return $text unless @indices;
+    my $pick_index = $indices[int(rand(@indices))];
+    my $orig = $chars[$pick_index];
+    my $lower = lc $orig;
+    my $neighbors = $map->{$lower} || [];
+    return $text unless @$neighbors;
+    my $replacement = $neighbors->[int(rand(@$neighbors))];
+    $replacement = uc $replacement if $orig =~ /[A-Z]/;
+    $chars[$pick_index] = $replacement;
+    return join('', @chars);
 }
 
 sub _splitOutgoingMessageByBytes {
@@ -479,6 +561,9 @@ sub _sendQueuedResponse {
             $state->{typing_until} = 0;
             $state->{response_started} = 0 unless @{$state->{response_queue}};
             return;
+        }
+        if (_shouldInjectTypo($sender)) {
+            $response = _applyKeyboardTypo($response);
         }
     }
 

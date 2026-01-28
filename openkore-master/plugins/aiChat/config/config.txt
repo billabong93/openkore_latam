@@ -54,3 +54,6 @@ aiChat_conversation_limit 8..10
 
 # Numero de perguntas seguidas antes de recusar por spam (0 desativa, aceita range ex: 3..5)
 aiChat_spam_question_limit 3..5
+
+# Quantidade de mensagens entre erros de digitacao (0 desativa, aceita range ex: 6..10)
+aiChat_typo_rate 0

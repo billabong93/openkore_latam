@@ -28,6 +28,7 @@ use constant {
     DEFAULT_MIN_PACKET_INTERVAL => 0.6, # Intervalo minimo entre pacotes enviados (em segundos)
     DEFAULT_CONVERSATION_LIMIT => 10, # Numero de mensagens do jogador antes de iniciar o encerramento
     DEFAULT_SPAM_QUESTION_LIMIT => 3, # Numero de perguntas seguidas antes de recusar por spam
+    DEFAULT_TYPO_RATE => 0, # Quantidade de mensagens entre erros de digitacao (0 desativa, aceita range)
 };
 
 # Use a lexically scoped variable for the package's internal config
@@ -52,6 +53,7 @@ my %_file_key_map = (
     aiChat_min_packet_interval => 'min_packet_interval',
     aiChat_conversation_limit => 'conversation_limit',
     aiChat_spam_question_limit => 'spam_question_limit',
+    aiChat_typo_rate => 'typo_rate',
 );
 
 sub _configFilePath {
@@ -80,6 +82,7 @@ sub _loadFromConfigHash {
         'aiChat_min_packet_interval',
         'aiChat_conversation_limit',
         'aiChat_spam_question_limit',
+        'aiChat_typo_rate',
     );
 
     for my $file_key (@load_order) {
@@ -127,6 +130,8 @@ sub _applyValue {
         return unless $value =~ /^(?:\d+|\d+\s*\.\.\s*\d+)$/;
     } elsif ($key eq 'spam_question_limit') {
         return unless $value =~ /^(?:\d+|\d+\s*\.\.\s*\d+)$/;
+    } elsif ($key eq 'typo_rate') {
+        return unless $value =~ /^(?:\d+|\d+\s*\.\.\s*\d+)$/;
     }
 
     $_aiChatConfig{$key} = $value;
@@ -154,6 +159,7 @@ BEGIN {
         min_packet_interval => DEFAULT_MIN_PACKET_INTERVAL,
         conversation_limit => DEFAULT_CONVERSATION_LIMIT,
         spam_question_limit => DEFAULT_SPAM_QUESTION_LIMIT,
+        typo_rate => DEFAULT_TYPO_RATE,
     );
 }
 
@@ -199,6 +205,7 @@ sub save {
     print $fh "aiChat_min_packet_interval $_aiChatConfig{min_packet_interval}\n";
     print $fh "aiChat_conversation_limit $_aiChatConfig{conversation_limit}\n";
     print $fh "aiChat_spam_question_limit $_aiChatConfig{spam_question_limit}\n";
+    print $fh "aiChat_typo_rate $_aiChatConfig{typo_rate}\n";
     close $fh or warning "[aiChat] Não foi possível fechar $config_file: $!\n", "plugin";
 }
 

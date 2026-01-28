@@ -38,6 +38,7 @@ Configure as opções no `plugins/aiChat/config/config.txt` ou via console do Op
 *   `aiChat_min_packet_interval`: Intervalo mínimo entre pacotes enviados (em segundos, padrão: `0.6`).
 *   `aiChat_conversation_limit`: Número de mensagens do jogador antes do bot encerrar o papo (padrão: `10`, `0` desativa, ex: `8..12`).
 *   `aiChat_spam_question_limit`: Número de perguntas seguidas antes de recusar por spam (padrão: `3`, `0` desativa, ex: `3..5`).
+*   `aiChat_typo_rate`: Número de mensagens entre erros de digitação (padrão: `0` desativa, ex: `6..10`).
 
 ### Banco de monstros/drops (`plugins/aiChat/config/mondb.txt`)
 
