@@ -518,7 +518,10 @@ sub _sendQueuedResponse {
         my $next_item = $state->{response_queue}[0];
         my $next_text = ref $next_item eq 'HASH' ? ($next_item->{text} // '') : $next_item;
         my $next_delay = _calculateTypingDelay($next_text);
-        $state->{typing_until} = time() + $next_delay if $next_delay > 0;
+        my $send_at = time() + ($next_delay > 0 ? $next_delay : 0);
+        my $next_allowed = _nextAllowedPacketTime();
+        $send_at = $next_allowed if $send_at < $next_allowed;
+        $state->{typing_until} = $send_at;
     } else {
         $state->{typing_until} = 0;
     }
