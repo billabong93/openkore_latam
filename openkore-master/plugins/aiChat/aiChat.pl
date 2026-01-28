@@ -147,6 +147,7 @@ sub _sanitizeOutgoingMessage {
     $sanitized =~ s/\s*\r?\n\s*/ /g;
     $sanitized =~ s/[\x00-\x1F\x7F]+/ /g;
     $sanitized =~ s/\s+/ /g;
+    $sanitized =~ s/\bna\s+o\b/nao/gi;
     $sanitized =~ s/^\s+//;
     $sanitized =~ s/\s+$//;
     return $sanitized;
