@@ -1454,6 +1454,8 @@ sub _processPendingEmotionFollowups {
             delete $pending_emotion_followup_by_sender{$sender_key};
             next;
         }
+        my @chunks = _splitOutgoingMessageByBytes($message);
+        $message = shift @chunks;
         my $context = $pending->{context};
         my $sender_name = $pending->{sender_name};
         if ($context && $context eq 'public') {
@@ -1477,6 +1479,18 @@ sub _processPendingEmotionFollowups {
         }
 
         AIChat::ConversationHistory::addMessage($sender_name, "assistant", $message);
+        if (@chunks) {
+            my $state = _getBufferState($sender_name);
+            $state->{messages} = [];
+            $state->{context} = { type => $context };
+            unshift @{$state->{response_queue}}, map {
+                { text => $_, context => $state->{context} }
+            } @chunks;
+            my $next_delay = _calculateTypingDelay($chunks[0]);
+            my $send_at = time() + ($next_delay > 0 ? $next_delay : 0);
+            my $next_allowed = _nextAllowedPacketTime();
+            $state->{typing_until} = $send_at < $next_allowed ? $next_allowed : $send_at;
+        }
         delete $pending_emotion_followup_by_sender{$sender_key};
     }
 }
