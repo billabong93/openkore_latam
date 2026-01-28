@@ -16,6 +16,7 @@ use Misc qw(getEmotionByCommand);
 use Utils qw(getHex timeOut distance);
 use Cwd 'abs_path';
 use Time::HiRes qw(time);
+use Encode qw(encode_utf8);
 use Actor ();
 
 use lib $Plugins::current_plugin_folder;
@@ -116,6 +117,7 @@ my @fallback_emotion_commands = qw(
 
 use constant {
     MAX_CHAT_LENGTH => 200,
+    SOFT_CHAT_LENGTH => 120,
     DROP_DB_REFUSAL_MIN => 2,
     DROP_DB_REFUSAL_MAX => 4,
     SPAM_QUESTION_LIMIT => 3,
@@ -147,11 +149,142 @@ sub _sanitizeOutgoingMessage {
     $sanitized =~ s/\s+/ /g;
     $sanitized =~ s/^\s+//;
     $sanitized =~ s/\s+$//;
-    if (length($sanitized) > MAX_CHAT_LENGTH) {
-        $sanitized = substr($sanitized, 0, MAX_CHAT_LENGTH);
-        $sanitized =~ s/\s+$//;
-    }
     return $sanitized;
+}
+
+sub _splitOutgoingMessageByBytes {
+    my ($message) = @_;
+    return () unless defined $message;
+    my $encoded = encode_utf8($message);
+    my $comma_count = () = $message =~ /,/g;
+    my $list_mode = $comma_count >= 4 ? 1 : 0;
+    my $soft_limit = $list_mode ? SOFT_CHAT_LENGTH : MAX_CHAT_LENGTH;
+    return ($message) if length($encoded) <= $soft_limit && !$list_mode;
+
+    my @segments;
+    my $work = $message;
+    my @punct_parts = split /(?<=[.!?])\s+/, $work;
+    for my $part (@punct_parts) {
+        my @comma_parts = split /(?<=,|;|:)\s+/, $part;
+        push @segments, @comma_parts;
+    }
+
+    my @refined;
+    my $conjunctions = qr/\b(mas|porem|por[eê]m|so que|s[oó] que|entao|ent[ãa]o|porque|pq)\b/i;
+    for my $segment (@segments) {
+        if ($segment =~ $conjunctions) {
+            my @pieces = split /($conjunctions)/i, $segment;
+            my $buffer = '';
+            for my $piece (@pieces) {
+                next unless defined $piece && $piece ne '';
+                if ($piece =~ $conjunctions) {
+                    if ($buffer ne '') {
+                        $buffer =~ s/\s+$//;
+                        push @refined, $buffer if $buffer ne '';
+                    }
+                    $buffer = $piece;
+                } else {
+                    $buffer .= ($buffer ne '' ? ' ' : '') . $piece;
+                }
+            }
+            if ($buffer ne '') {
+                $buffer =~ s/^\s+//;
+                $buffer =~ s/\s+$//;
+                push @refined, $buffer if $buffer ne '';
+            }
+        } else {
+            push @refined, $segment;
+        }
+    }
+    @segments = map {
+        my $trimmed = $_;
+        $trimmed =~ s/^\s+//;
+        $trimmed =~ s/\s+$//;
+        $trimmed;
+    } grep { defined $_ && $_ ne '' } @refined;
+    @segments = ($message) unless @segments;
+    if ($list_mode) {
+        my @list_segments;
+        for my $segment (@segments) {
+            my $segment_commas = () = $segment =~ /,/g;
+            if ($segment_commas >= 2) {
+                my @items = map {
+                    my $item = $_;
+                    $item =~ s/^\s+//;
+                    $item =~ s/\s+$//;
+                    $item;
+                } grep { defined $_ && $_ ne '' } split /\s*,\s*/, $segment;
+                while (@items) {
+                    my @group = splice @items, 0, 3;
+                    push @list_segments, join(', ', @group);
+                }
+            } else {
+                push @list_segments, $segment;
+            }
+        }
+        @segments = @list_segments if @list_segments;
+    }
+
+    my @parts;
+    my $current = '';
+    for my $segment (@segments) {
+        my $candidate = $current eq '' ? $segment : "$current $segment";
+        my $candidate_bytes = length(encode_utf8($candidate));
+        if ($candidate_bytes <= $soft_limit) {
+            $current = $candidate;
+            next;
+        }
+
+        if ($current ne '') {
+            push @parts, $current;
+            $current = '';
+        }
+
+        my $segment_bytes = length(encode_utf8($segment));
+        if ($segment_bytes <= $soft_limit) {
+            $current = $segment;
+            next;
+        }
+
+        my @words = split /\s+/, $segment;
+        for my $word (@words) {
+            my $word_candidate = $current eq '' ? $word : "$current $word";
+            my $word_candidate_bytes = length(encode_utf8($word_candidate));
+            if ($word_candidate_bytes <= $soft_limit) {
+                $current = $word_candidate;
+                next;
+            }
+
+            if ($current ne '') {
+                push @parts, $current;
+                $current = '';
+            }
+
+            my $word_bytes = length(encode_utf8($word));
+            if ($word_bytes <= MAX_CHAT_LENGTH) {
+                $current = $word;
+                next;
+            }
+
+            my $chunk = '';
+            my $chunk_bytes = 0;
+            for my $char (split //, $word) {
+                my $char_bytes = length(encode_utf8($char));
+                if ($chunk_bytes + $char_bytes > MAX_CHAT_LENGTH) {
+                    push @parts, $chunk if $chunk ne '';
+                    $chunk = '';
+                    $chunk_bytes = 0;
+                }
+                $chunk .= $char;
+                $chunk_bytes += $char_bytes;
+            }
+            if ($chunk ne '') {
+                $current = $chunk;
+            }
+        }
+    }
+    push @parts, $current if $current ne '';
+    return @parts;
 }
 
 sub _splitOutgoingResponse {
@@ -338,6 +471,18 @@ sub _sendQueuedResponse {
             $state->{typing_until} = 0;
             $state->{response_started} = 0 unless @{$state->{response_queue}};
             return;
+        }
+    }
+
+    if (!$emotion_command) {
+        my @chunks = _splitOutgoingMessageByBytes($response);
+        if (@chunks > 1) {
+            my @rest = @chunks[1 .. $#chunks];
+            unshift @{$state->{response_queue}}, map {
+                { text => $_, context => $context }
+            } @rest;
+            $response = $chunks[0];
+            $state->{typing_until} = 0;
         }
     }
 
