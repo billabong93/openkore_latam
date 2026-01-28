@@ -426,7 +426,14 @@ sub _sendQueuedResponse {
         } else {
             my $typing_speed = AIChat::Config::get('typing_speed');
             if ($typing_speed && $typing_speed > 0) {
-                $delay = length($response) / $typing_speed;
+                my $preview = $response;
+                if ($context->{sabotage} || $context->{normalize}) {
+                    $preview = AIChat::MessageHandler::_normalizeResponseText($preview);
+                }
+                $preview = _sanitizeOutgoingMessage($preview);
+                my @preview_chunks = _splitOutgoingMessageByBytes($preview);
+                my $first_chunk = $preview_chunks[0] // $preview;
+                $delay = length($first_chunk) / $typing_speed;
             }
         }
         $state->{typing_until} = time() + $delay;
