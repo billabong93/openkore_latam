@@ -62,7 +62,7 @@ sub callAPI {
     if (defined $glossary && $glossary ne '') {
         push @messages, {
             role => "system",
-            content => "Glossario do jogo para referencia: $glossary",
+            content => "Glossario do jogo para referencia: $glossary. Use os termos do glossario quando fizer sentido na fala do jogador, sem substituir palavras a esmo. Prefira nomes de classes do glossario quando aplicavel. Quando usar o nome completo da classe, prefira o termo em portugues.",
         };
     }
     

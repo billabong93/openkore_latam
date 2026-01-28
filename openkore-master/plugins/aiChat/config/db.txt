@@ -1,39 +1,66 @@
 # Base de conhecimento simples sobre classes e niveis.
 
 [requirements]
-O nivel minimo para a primeira classe é job 10.
-O nivel minimo para troca/evolucao/quest da segunda classe é job 40, e o maximo é job 50.
-O nivel necessario para reborn/rebirth/renascimento é base 99 e job 50.
-O nivel necessario para terceira classe é base 99 e job 70.
+O nivel minimo para a primeira classe (incluindo classes expandidas) é job 10.
+O nivel minimo para troca/evolucao/quest da segunda classe (classes principais 2-1/2-2) é job 40, e o maximo é job 50.
+O nivel necessario para reborn/rebirth/renascimento é base 99 e job 50 (classe 2).
+O nivel necessario para terceira classe (classes principais) é base 99 e job 70 (transclasse).
+O nivel necessario para evolucao de Taekwon (Taekwon) é job 40 (para Taekwon Master/Mestre Taekwon ou Soul Linker/Espiritualista).
+O nivel necessario para evolucao de Ninja é base 99 e job 70 (para Kagerou ou Oboro).
+O nivel necessario para evolucao de Gunslinger (Justiceiro) é base 99 e job 70 (para Rebel/Insurgente).
 
 [general]
 Há duas raças disponíveis para o player, Humano e Doram.
-A única classe disponível para Dorans é Summoner, todas as demais são para a raça Humanos.
+A única classe disponível para Dorans é Summoner (Invocador), todas as demais são para a raça Humanos.
 A cidade onde acontece o reborn/rebirth/renascimento é Juno.
+Classes expandidas não renascem (não viram transclasse).
 Apenas evoluções de classes principais renascem (Swordsman (Espadachim), Mage (Mago), Archer (Arqueiro), Acolyte (Acolito), Thief (Gatuno) e Merchant (Mercador)).
-As classes expandidas são Taekwon (Taekwon), Ninja (Ninja), Gunslinger (Justiceiro) e Summoner (Invocador).
+As classes expandidas humanas são Taekwon (Taekwon), Ninja (Ninja) e Gunslinger (Justiceiro).
+Evoluções expandidas (LATAM): Taekwon Master (Mestre Taekwon), Soul Linker (Espiritualista), Kagerou (Kagerou), Oboro (Oboro), Rebel (Rebel)/Insurgente (Insurgente).
+Bard (Bardo) e suas evoluções são masculinas; Dancer (Odalisca) e suas evoluções são femininas.
+Kagerou é masculino e Oboro é feminino.
 O aprendiz inicia no navio naufragado.
 
 [evolutions]
-Novice (Aprendiz): Swordsman (Espadachim), Mage (Mago), Archer (Arqueiro), Acolyte (Acolito), Thief (Gatuno), Merchant (Mercador), Super Novice (Super Aprendiz)
+Novice (Aprendiz): Swordsman (Espadachim), Mage (Mago), Archer (Arqueiro), Acolyte (Acolito), Thief (Gatuno), Merchant (Mercador), Super Novice (Super Aprendiz), Taekwon (Taekwon), Ninja (Ninja), Gunslinger (Justiceiro)
+
 Swordsman (Espadachim): Knight (Cavaleiro), Crusader (Templario)
 Mage (Mago): Wizard (Bruxo), Sage (Sabio)
-Archer (Arqueiro): Hunter (Cacador), Bard (Bardo), Dancer (Dancarina)
+Archer (Arqueiro): Hunter (Cacador), Bard (Bardo), Dancer (Odalisca)
 Acolyte (Acolito): Priest (Sacerdote), Monk (Monge)
 Thief (Gatuno): Assassin (Mercenario), Rogue (Arruaceiro)
 Merchant (Mercador): Blacksmith (Ferreiro), Alchemist (Alquimista)
+
 Super Novice (Super Aprendiz): nenhuma
+
 Taekwon (Taekwon): Taekwon Master (Mestre Taekwon), Soul Linker (Espiritualista)
+Ninja (Ninja): Kagerou (Kagerou), Oboro (Oboro)
+Gunslinger (Justiceiro): Rebel (Insurgente)
+
 Knight (Cavaleiro): Lord Knight (Lorde)
 Crusader (Templario): Paladin (Paladino)
 Wizard (Bruxo): High Wizard (Arquimago)
 Sage (Sabio): Professor
 Hunter (Cacador): Sniper (Atirador)
 Bard (Bardo): Clown (Menestrel)
-Dancer (Dancarina): Gypsy (Cigana)
+Dancer (Odalisca): Gypsy (Cigana)
 Priest (Sacerdote): High Priest (Sumo Sacerdote)
 Monk (Monge): Champion (Mestre)
 Assassin (Mercenario): Assassin Cross (Algoz)
 Rogue (Arruaceiro): Stalker (Desordeiro)
 Blacksmith (Ferreiro): Whitesmith (Mestre Ferreiro)
 Alchemist (Alquimista): Creator (Criador)
+
+Lord Knight (Lorde): Rune Knight (Cavaleiro Runico)
+Paladin (Paladino): Royal Guard (Guardiao Real)
+High Wizard (Arquimago): Warlock (Arcano)
+Professor: Sorcerer (Feiticeiro)
+Sniper (Atirador): Ranger (Sentinela)
+Clown (Menestrel): Minstrel (Trovador)
+Gypsy (Cigana): Wanderer (Musa)
+High Priest (Sumo Sacerdote): Archbishop (Arcebispo)
+Champion (Mestre): Sura (Shura)
+Assassin Cross (Algoz): Guillotine Cross (Sicario)
+Stalker (Desordeiro): Shadow Chaser (Renegado)
+Whitesmith (Mestre Ferreiro): Mechanic (Mecanico)
+Creator (Criador): Genetic (Bioquimico)

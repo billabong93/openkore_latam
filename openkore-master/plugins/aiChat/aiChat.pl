@@ -955,19 +955,7 @@ sub _countWords {
 
 sub _shouldForceDropDbIntent {
     my ($sender, $intent, $message) = @_;
-    return 0 unless defined $sender;
-    $intent = {} unless $intent && ref $intent eq 'HASH';
-    return 0 if ($intent->{action} // '') eq 'drop_db';
-    if (defined $message && $message ne '' && AIChat::MessageHandler::_isDropDbQueryMessage($message)) {
-        return 1;
-    }
-    return 0 unless (_hasLastDropDbSubject($sender) || _hasDropDbIntentHistory($sender));
-    my $normalized = defined $message ? AIChat::MessageHandler::_normalizeQueryText($message) : '';
-    my $has_followup_keyword = $normalized =~ /\b(onde|mapa|qual|local|localizacao|lugar)\b/;
-    return 1 if $has_followup_keyword;
-    return 1 if ($intent->{is_question} // 0) && _countWords($message) <= 4;
-    return 1 if defined $message && $message =~ /[?]/ && _countWords($message) <= 4;
-    return _countWords($message) <= 2;
+    return 0;
 }
 
 sub _normalizeSenderKey {
