@@ -1321,6 +1321,7 @@ sub _queueEmotionRequestIfNeeded {
     my $action = $intent && ref $intent eq 'HASH' ? ($intent->{action} // '') : '';
     my $emote_count = $intent && ref $intent eq 'HASH' ? ($intent->{emote_count}) : undef;
     my $emote_selection = $intent && ref $intent eq 'HASH' ? ($intent->{emote_selection}) : undef;
+    my $emote_requires_history = $intent && ref $intent eq 'HASH' ? ($intent->{emote_requires_history}) : undef;
     $pending_emotion_request_by_sender{$sender_key} = {
         requested_at => time(),
         respond_at => time() + $delay,
@@ -1329,6 +1330,7 @@ sub _queueEmotionRequestIfNeeded {
         mode => $action,
         emote_count => $emote_count,
         emote_selection => $emote_selection,
+        emote_requires_history => $emote_requires_history,
     };
     return 1;
 }
@@ -1421,9 +1423,11 @@ sub _processPendingEmotionRequests {
         }
         if (!$command && (!$pending->{commands} || !@{$pending->{commands}})) {
             if (($pending->{mode} // '') ne 'emote_random') {
-                _queueDirectResponse($pending->{sender_name}, "Nao lembro qual foi o emoticon. Qual foi mesmo?", { type => $pending->{context}, normalize => 1 });
-                delete $pending_emotion_request_by_sender{$sender_key};
-                next;
+                if ($pending->{emote_requires_history}) {
+                    _queueDirectResponse($pending->{sender_name}, "Nao lembro qual foi o emoticon. Qual foi mesmo?", { type => $pending->{context}, normalize => 1 });
+                    delete $pending_emotion_request_by_sender{$sender_key};
+                    next;
+                }
             }
         }
         $command = _pickFallbackEmotionCommand() unless $command;
