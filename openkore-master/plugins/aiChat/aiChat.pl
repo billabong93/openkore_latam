@@ -825,8 +825,6 @@ sub onPrivateMessage {
     return unless defined $sender && $sender ne '';
     return unless defined $message && $message ne '';
 
-    message $translator->translatef("(De: %s) : %s\n", $sender, $message), "pm";
-
     my $actor = _getSenderActor($sender);
     my $visibility_state = _resolveVisibilityState($actor);
     _ensureVisibilityInfo($sender, $visibility_state);
@@ -1502,6 +1500,9 @@ sub _buildEmotionCommandQueue {
 
     my $selection = $pending->{emote_selection} // '';
     my $count = $pending->{emote_count};
+    if ($selection eq '' && !defined $count && $pending->{emote_requires_history}) {
+        $selection = 'all';
+    }
 
     if ($selection eq 'all') {
         $count = scalar @recent;
