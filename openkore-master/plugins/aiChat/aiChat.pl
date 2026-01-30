@@ -70,6 +70,7 @@ my %last_emotion_command_by_sender;
 my %last_emotion_time_by_sender;
 my %last_emotion_display_by_sender;
 my %last_emotion_hint_by_sender;
+my %last_emotion_history_by_sender;
 my %pending_emotion_request_by_sender;
 my %pending_emotion_followup_by_sender;
 my %suppress_reply_until_by_sender;
@@ -1089,6 +1090,16 @@ sub onEmotion {
     $last_emotion_command_by_sender{$sender_key} = $command;
     $last_emotion_time_by_sender{$sender_key} = $last_emotion_time;
     $last_emotion_display_by_sender{$sender_key} = $args->{emotion};
+
+    my $history = $last_emotion_history_by_sender{$sender_key} || [];
+    push @$history, {
+        command => $command,
+        time => $last_emotion_time,
+    };
+    if (@$history > 5) {
+        @$history = @$history[-5 .. -1];
+    }
+    $last_emotion_history_by_sender{$sender_key} = $history;
 }
 
 sub _getEmotionCommandByDisplay {
@@ -1300,12 +1311,16 @@ sub _queueEmotionRequestIfNeeded {
     _recordEmoteRequest($sender);
 
     my $action = $intent && ref $intent eq 'HASH' ? ($intent->{action} // '') : '';
+    my $emote_count = $intent && ref $intent eq 'HASH' ? ($intent->{emote_count}) : undef;
+    my $emote_selection = $intent && ref $intent eq 'HASH' ? ($intent->{emote_selection}) : undef;
     $pending_emotion_request_by_sender{$sender_key} = {
         requested_at => time(),
         respond_at => time() + $delay,
         context => $context,
         sender_name => $sender,
         mode => $action,
+        emote_count => $emote_count,
+        emote_selection => $emote_selection,
     };
     return 1;
 }
@@ -1382,16 +1397,27 @@ sub _processPendingEmotionRequests {
         }
 
         my $command;
-        if (($pending->{mode} // '') eq 'emote_random') {
-            $command = _pickFallbackEmotionCommand();
+        if ($pending->{commands} && ref $pending->{commands} eq 'ARRAY') {
+            $command = shift @{$pending->{commands}};
         } else {
-            $command = _getRecentEmotionForSender($sender_key, $now);
-            if (!$command) {
-                $command = _pickFallbackEmotionCommand();
+            my $mode = $pending->{mode} // '';
+            if ($mode eq 'emote_random') {
+                my $count = _normalizeEmoteCount($pending->{emote_count});
+                $pending->{commands} = _buildRandomEmotionQueue($count);
+            } else {
+                $pending->{commands} = _buildEmotionCommandQueue($sender_key, $now, $pending);
+            }
+            if ($pending->{commands} && ref $pending->{commands} eq 'ARRAY') {
+                $command = shift @{$pending->{commands}};
             }
         }
+        $command = _pickFallbackEmotionCommand() unless $command;
 
         _sendEmotionByCommand($command) if $command;
+        if ($pending->{commands} && @{$pending->{commands}}) {
+            $pending->{respond_at} = _nextAllowedPacketTime();
+            next;
+        }
         _resetQuestionStreak($pending->{sender_name});
         _queueEmotionFollowup($pending->{sender_name}, $pending->{context});
         delete $pending_emotion_request_by_sender{$sender_key};
@@ -1406,6 +1432,71 @@ sub _getRecentEmotionForSender {
     return unless $command && $seen_time;
     return if ($now - $seen_time) > 120;
     return $command;
+}
+
+sub _getRecentEmotionsForSender {
+    my ($sender_key, $now, $window) = @_;
+    return unless defined $sender_key;
+    my $history = $last_emotion_history_by_sender{$sender_key} || [];
+    return unless @$history;
+    $window = 8 unless defined $window;
+    my @recent = grep { ($now - ($_->{time} // 0)) <= $window } @$history;
+    return unless @recent;
+    return map { $_->{command} } @recent;
+}
+
+sub _normalizeEmoteCount {
+    my ($count) = @_;
+    return 1 unless defined $count;
+    return 1 unless $count =~ /^\d+$/;
+    return $count > 0 ? $count : 1;
+}
+
+sub _buildRandomEmotionQueue {
+    my ($count) = @_;
+    $count = _normalizeEmoteCount($count);
+    my @queue;
+    for (1 .. $count) {
+        my $command = _pickFallbackEmotionCommand();
+        push @queue, $command if $command;
+    }
+    return \@queue;
+}
+
+sub _buildEmotionCommandQueue {
+    my ($sender_key, $now, $pending) = @_;
+    return unless defined $sender_key;
+    my @recent = _getRecentEmotionsForSender($sender_key, $now);
+    return unless @recent;
+
+    my $selection = $pending->{emote_selection} // '';
+    my $count = $pending->{emote_count};
+
+    if ($selection eq 'all') {
+        $count = scalar @recent;
+    }
+    $count = _normalizeEmoteCount($count);
+    $count = scalar @recent if $count > @recent;
+
+    my @selected;
+    if ($selection eq 'first') {
+        @selected = @recent[0 .. $count - 1];
+    } elsif ($selection eq 'any') {
+        my @indexes = (0 .. $#recent);
+        for (my $i = $#indexes; $i > 0; $i--) {
+            my $j = int(rand($i + 1));
+            @indexes[$i, $j] = @indexes[$j, $i];
+        }
+        my @picked = @indexes[0 .. $count - 1];
+        my %picked = map { $_ => 1 } @picked;
+        @selected = grep { $picked{$_} } 0 .. $#recent;
+        @selected = map { $recent[$_] } @selected;
+    } else {
+        my $start = @recent - $count;
+        $start = 0 if $start < 0;
+        @selected = @recent[$start .. $#recent];
+    }
+    return \@selected;
 }
 
 sub _pickFallbackEmotionCommand {
