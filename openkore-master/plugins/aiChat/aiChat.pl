@@ -825,7 +825,7 @@ sub onPrivateMessage {
     return unless defined $sender && $sender ne '';
     return unless defined $message && $message ne '';
 
-    message sprintf("%s (De: %s): %s\n", PLUGIN_PREFIX, $sender, $message), "list";
+    message $translator->translatef("(De: %s) : %s\n", $sender, $message), "pm";
 
     my $actor = _getSenderActor($sender);
     my $visibility_state = _resolveVisibilityState($actor);
@@ -837,6 +837,9 @@ sub onPrivateMessage {
     $intent = _interpretCommand($message, $sender, $intent_context);
     if (_shouldForceDropDbIntent($sender, $intent, $message)) {
         $intent = { action => 'drop_db', is_question => 1 };
+    }
+    if (!$intent || ($intent->{action} // '') !~ /^emote(?:_random)?$/) {
+        _clearPendingEmotionState($sender);
     }
     if (_handleSpamCheck($sender, $message, 'private', $intent)) {
         AIChat::Log::log_message(
@@ -923,6 +926,9 @@ sub onPublicMessage {
     $intent = _interpretCommand($message, $sender, $intent_context);
     if (_shouldForceDropDbIntent($sender, $intent, $message)) {
         $intent = { action => 'drop_db', is_question => 1 };
+    }
+    if (!$intent || ($intent->{action} // '') !~ /^emote(?:_random)?$/) {
+        _clearPendingEmotionState($sender);
     }
     if (_handleSpamCheck($sender, $message, 'public', $intent)) {
         AIChat::Log::log_message(
@@ -1424,13 +1430,25 @@ sub _processPendingEmotionRequests {
 
         _sendEmotionByCommand($command) if $command;
         if ($pending->{commands} && @{$pending->{commands}}) {
-            $pending->{respond_at} = _nextAllowedPacketTime();
+            my $next_delay = time() + 3;
+            my $next_allowed = _nextAllowedPacketTime();
+            $pending->{respond_at} = $next_delay > $next_allowed ? $next_delay : $next_allowed;
             next;
         }
         _resetQuestionStreak($pending->{sender_name});
         _queueEmotionFollowup($pending->{sender_name}, $pending->{context});
         delete $pending_emotion_request_by_sender{$sender_key};
     }
+}
+
+sub _clearPendingEmotionState {
+    my ($sender) = @_;
+    return unless defined $sender;
+    my $sender_key = _normalizeSenderKey($sender);
+    return unless $sender_key;
+    delete $pending_emotion_request_by_sender{$sender_key};
+    delete $pending_emotion_followup_by_sender{$sender_key};
+    delete $suppress_reply_until_by_sender{$sender_key};
 }
 
 sub _getRecentEmotionForSender {
