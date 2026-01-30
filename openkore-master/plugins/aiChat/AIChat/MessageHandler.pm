@@ -75,6 +75,7 @@ sub getCharacterInfo {
 sub _splitResponse {
     my ($response, $sender_messages) = @_;
     $response = _dedupeMirror($response, $sender_messages);
+    $response = _trimResponseForConciseness($response);
     my @parts;
     my $split_chance = AIChat::Config::get('split_chance');
     $split_chance = 0.2 unless defined $split_chance;
@@ -161,6 +162,31 @@ sub _splitResponse {
 
     return \@parts if @parts;
     return [$response];
+}
+
+sub _trimResponseForConciseness {
+    my ($response) = @_;
+    return $response unless defined $response;
+    return $response if $response =~ /^\s*(?:\/?e)\s+\S+\s*$/i;
+
+    my $trimmed = $response;
+    $trimmed =~ s/\s+/ /g;
+    $trimmed =~ s/^\s+//;
+    $trimmed =~ s/\s+$//;
+
+    my @sentences = split /(?<=[.!?])\s+/, $trimmed;
+    if (@sentences > 2) {
+        $trimmed = join ' ', @sentences[0, 1];
+    }
+
+    my $max_chars = 140;
+    if (length($trimmed) > $max_chars) {
+        $trimmed = substr($trimmed, 0, $max_chars);
+        $trimmed =~ s/\s+\S*$//;
+    }
+
+    return $trimmed if length $trimmed;
+    return $response;
 }
 
 sub _wordCount {

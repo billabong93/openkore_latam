@@ -825,6 +825,8 @@ sub onPrivateMessage {
     return unless defined $sender && $sender ne '';
     return unless defined $message && $message ne '';
 
+    message sprintf("%s (De: %s): %s\n", PLUGIN_PREFIX, $sender, $message), "list";
+
     my $actor = _getSenderActor($sender);
     my $visibility_state = _resolveVisibilityState($actor);
     _ensureVisibilityInfo($sender, $visibility_state);
