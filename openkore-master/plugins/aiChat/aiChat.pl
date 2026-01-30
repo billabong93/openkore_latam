@@ -1411,6 +1411,13 @@ sub _processPendingEmotionRequests {
                 $command = shift @{$pending->{commands}};
             }
         }
+        if (!$command && (!$pending->{commands} || !@{$pending->{commands}})) {
+            if (($pending->{mode} // '') ne 'emote_random') {
+                _queueDirectResponse($pending->{sender_name}, "Nao lembro qual foi o emoticon. Qual foi mesmo?", { type => $pending->{context}, normalize => 1 });
+                delete $pending_emotion_request_by_sender{$sender_key};
+                next;
+            }
+        }
         $command = _pickFallbackEmotionCommand() unless $command;
 
         _sendEmotionByCommand($command) if $command;
@@ -1430,7 +1437,7 @@ sub _getRecentEmotionForSender {
     my $command = $last_emotion_command_by_sender{$sender_key};
     my $seen_time = $last_emotion_time_by_sender{$sender_key} // 0;
     return unless $command && $seen_time;
-    return if ($now - $seen_time) > 120;
+    return if ($now - $seen_time) > 30;
     return $command;
 }
 
@@ -1439,7 +1446,7 @@ sub _getRecentEmotionsForSender {
     return unless defined $sender_key;
     my $history = $last_emotion_history_by_sender{$sender_key} || [];
     return unless @$history;
-    $window = 8 unless defined $window;
+    $window = 30 unless defined $window;
     my @recent = grep { ($now - ($_->{time} // 0)) <= $window } @$history;
     return unless @recent;
     return map { $_->{command} } @recent;
