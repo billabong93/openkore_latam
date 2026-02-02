@@ -833,7 +833,14 @@ sub onPrivateMessage {
     _ensureVisibilityInfo($sender, $visibility_state);
     _ensurePlayerInfo($sender, $actor) if $visibility_state eq 'visible';
 
-    my $intent_context = { map_name => $field ? $field->baseName : undef, lock_map => $config{lockMap} };
+    my $sender_key = _normalizeSenderKey($sender);
+    my @recent_emotes = $sender_key ? _getRecentEmotionsForSender($sender_key, time()) : ();
+    my $intent_context = {
+        map_name => $field ? $field->baseName : undef,
+        lock_map => $config{lockMap},
+        recent_emotes => \@recent_emotes,
+        recent_emote_count => scalar @recent_emotes,
+    };
     my $intent;
     $intent = _interpretCommand($message, $sender, $intent_context);
     if (_shouldForceDropDbIntent($sender, $intent, $message)) {
@@ -922,7 +929,14 @@ sub onPublicMessage {
     _ensureVisibilityInfo($sender, $visibility_state);
     _ensurePlayerInfo($sender, $actor) if $visibility_state eq 'visible';
 
-    my $intent_context = { map_name => $field ? $field->baseName : undef, lock_map => $config{lockMap} };
+    my $sender_key = _normalizeSenderKey($sender);
+    my @recent_emotes = $sender_key ? _getRecentEmotionsForSender($sender_key, time()) : ();
+    my $intent_context = {
+        map_name => $field ? $field->baseName : undef,
+        lock_map => $config{lockMap},
+        recent_emotes => \@recent_emotes,
+        recent_emote_count => scalar @recent_emotes,
+    };
     my $intent;
     $intent = _interpretCommand($message, $sender, $intent_context);
     if (_shouldForceDropDbIntent($sender, $intent, $message)) {
