@@ -5,7 +5,7 @@ use warnings;
 use utf8;
 
 use Commands;
-use Globals qw(%timeout $messageSender $net %config $char $field $playersList %jobs_lut %emotions_lut %monsters %items %monsters_lut %monsters_name_lut %items_lut);
+use Globals qw(%timeout $messageSender $net %config $char $field $playersList %jobs_lut %emotions_lut %monsters %items %monsters_lut %monsters_name_lut %items_lut @lastpm %lastpm);
 use Settings qw(%sys);
 use I18N qw(bytesToString UTF8ToString isUTF8);
 use Log qw(warning message debug);
@@ -601,6 +601,9 @@ sub _sendQueuedResponse {
             message => $response,
         );
     } elsif (!$emotion_command) {
+        undef %lastpm;
+        @lastpm{qw(msg user)} = ($response, $sender);
+        push @lastpm, {%lastpm};
         $messageSender->sendPrivateMsg($sender, $response);
         _recordOutgoingPacketSent();
         AIChat::Log::log_message(
