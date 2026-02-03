@@ -1610,7 +1610,7 @@ sub generateClassDbResponse {
     if ($class_intent eq 'evolution') {
         my ($canonical, $evolutions) = _lookupClassEvolutions($class_name);
         return undef unless $canonical && $evolutions && @$evolutions;
-        return "$canonical pode evoluir para: " . join(', ', @$evolutions);
+        return _formatClassEvolutionResponse($canonical, $evolutions);
     }
 
     if ($class_intent eq 'requirements') {
@@ -1629,13 +1629,27 @@ sub generateClassDbResponse {
 
     if ($class_name ne '') {
         my ($canonical, $evolutions) = _lookupClassEvolutions($class_name);
-        return "$canonical pode evoluir para: " . join(', ', @$evolutions)
+        return _formatClassEvolutionResponse($canonical, $evolutions)
             if $canonical && $evolutions && @$evolutions;
     }
 
     my @general = @{$classdb->{general} || []};
     return $general[0] if @general;
     return undef;
+}
+
+sub _formatClassEvolutionResponse {
+    my ($canonical, $evolutions) = @_;
+    return undef unless defined $canonical && $evolutions && ref $evolutions eq 'ARRAY';
+    my @templates = (
+        "%s vira %s",
+        "%s evolui pra %s",
+        "%s segue pra %s",
+        "da pra virar %s: %s",
+        "as evolucoes de %s sao %s",
+    );
+    my $template = $templates[int(rand(@templates))] || "%s vira %s";
+    return sprintf($template, $canonical, join(', ', @$evolutions));
 }
 
 sub _normalizeList {
