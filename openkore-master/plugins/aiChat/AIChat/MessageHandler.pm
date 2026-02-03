@@ -1624,7 +1624,7 @@ sub generateClassDbResponse {
         my $base = $classdb->{evolutions}{'Novice'} || $classdb->{evolutions}{'Aprendiz'} || [];
         my @classes = @$base;
         @classes = @classes[0 .. 2] if @classes > 3;
-        return "tem varias classes tipo " . join(', ', @classes) if @classes;
+        return _formatClassListResponse(\@classes) if @classes;
     }
 
     if ($class_name ne '') {
@@ -1652,6 +1652,21 @@ sub _formatClassEvolutionResponse {
     );
     my $template = $templates[int(rand(@templates))] || "%s vira %s";
     return sprintf($template, $canonical, join(', ', @$evolutions));
+}
+
+sub _formatClassListResponse {
+    my ($classes_ref) = @_;
+    return undef unless $classes_ref && ref $classes_ref eq 'ARRAY' && @$classes_ref;
+    my $list = join(', ', @$classes_ref);
+    my @templates = (
+        "tem varias classes, tipo %s",
+        "algumas sao %s",
+        "da pra ir de %s",
+        "as basicas sao %s",
+        "de inicio tem %s",
+    );
+    my $template = $templates[int(rand(@templates))] || "tem varias classes, tipo %s";
+    return sprintf($template, $list);
 }
 
 sub _normalizeList {
