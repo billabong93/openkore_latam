@@ -1642,11 +1642,13 @@ sub _formatClassEvolutionResponse {
     my ($canonical, $evolutions) = @_;
     return undef unless defined $canonical && $evolutions && ref $evolutions eq 'ARRAY';
     my @templates = (
-        "%s vira %s",
-        "%s evolui pra %s",
-        "%s segue pra %s",
-        "da pra virar %s: %s",
-        "as evolucoes de %s sao %s",
+        "se ta de %s, o caminho normal e %s",
+        "%s costuma ir pra %s",
+        "de %s normalmente vai pra %s",
+        "pra %s, o comum e virar %s",
+        "o basico de %s e seguir pra %s",
+        "%s -> %s",
+        "e %s que vira %s",
     );
     my $template = $templates[int(rand(@templates))] || "%s vira %s";
     return sprintf($template, $canonical, join(', ', @$evolutions));
