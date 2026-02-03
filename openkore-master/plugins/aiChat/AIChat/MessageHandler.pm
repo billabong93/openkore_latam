@@ -1607,66 +1607,39 @@ sub generateClassDbResponse {
     my $class_name = $intent && ref $intent eq 'HASH' ? ($intent->{class_name} // '') : '';
     $class_name = _extractClassFromMessage($message) if $class_name eq '';
 
-    if ($class_intent eq 'evolution') {
-        my ($canonical, $evolutions) = _lookupClassEvolutions($class_name);
-        return undef unless $canonical && $evolutions && @$evolutions;
-        return _formatClassEvolutionResponse($canonical, $evolutions);
-    }
+    my $class_context = _buildClassDbContext();
+    return undef unless defined $class_context && $class_context ne '';
 
-    if ($class_intent eq 'requirements') {
-        my @requirements = @{$classdb->{requirements} || []};
-        return undef unless @requirements;
-        my $line = $requirements[0];
-        return $line if defined $line && $line ne '';
-    }
-
-    if ($class_intent eq 'list') {
-        my $base = $classdb->{evolutions}{'Novice'} || $classdb->{evolutions}{'Aprendiz'} || [];
-        my @classes = @$base;
-        @classes = @classes[0 .. 2] if @classes > 3;
-        return _formatClassListResponse(\@classes) if @classes;
-    }
-
-    if ($class_name ne '') {
-        my ($canonical, $evolutions) = _lookupClassEvolutions($class_name);
-        return _formatClassEvolutionResponse($canonical, $evolutions)
-            if $canonical && $evolutions && @$evolutions;
-    }
-
-    my @general = @{$classdb->{general} || []};
-    return $general[0] if @general;
-    return undef;
-}
-
-sub _formatClassEvolutionResponse {
-    my ($canonical, $evolutions) = @_;
-    return undef unless defined $canonical && $evolutions && ref $evolutions eq 'ARRAY';
-    my @templates = (
-        "se ta de %s, o caminho normal e %s",
-        "%s costuma ir pra %s",
-        "de %s normalmente vai pra %s",
-        "pra %s, o comum e virar %s",
-        "o basico de %s e seguir pra %s",
-        "%s -> %s",
-        "e %s que vira %s",
+    my $prompt = AIChat::Config::get('prompt');
+    my @messages = (
+        {
+            role => "system",
+            content => $prompt,
+        },
+        {
+            role => "system",
+            content => $class_context,
+        },
+        {
+            role => "system",
+            content => "Intencao de classe detectada: $class_intent. Classe mencionada: " . ($class_name ne '' ? $class_name : 'desconhecida') . ". Responda de forma natural e curta, mantendo concordancia, e usando apenas o conhecimento de classes acima. Se nao houver informacao suficiente, diga que nao sabe ou que pode variar no servidor.",
+        },
+        {
+            role => "user",
+            content => $message,
+        },
     );
-    my $template = $templates[int(rand(@templates))] || "%s vira %s";
-    return sprintf($template, $canonical, join(', ', @$evolutions));
-}
 
-sub _formatClassListResponse {
-    my ($classes_ref) = @_;
-    return undef unless $classes_ref && ref $classes_ref eq 'ARRAY' && @$classes_ref;
-    my $list = join(', ', @$classes_ref);
-    my @templates = (
-        "tem varias classes, tipo %s",
-        "algumas sao %s",
-        "da pra ir de %s",
-        "as basicas sao %s",
-        "de inicio tem %s",
-    );
-    my $template = $templates[int(rand(@templates))] || "tem varias classes, tipo %s";
-    return sprintf($template, $list);
+    my $response;
+    eval {
+        $response = $api_client->callAPIWithMessages(\@messages, {
+            max_tokens => 120,
+            temperature => 0.6,
+        });
+    };
+    return if $@ || !defined $response || $response eq '';
+
+    return $response;
 }
 
 sub _normalizeList {
