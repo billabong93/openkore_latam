@@ -5,7 +5,7 @@ use warnings;
 use utf8;
 
 use Commands;
-use Globals qw(%timeout $messageSender $net %config $char $field $playersList %jobs_lut %emotions_lut %monsters %items %monsters_lut %monsters_name_lut %items_lut);
+use Globals qw(%timeout $messageSender $net %config $char $field $playersList %jobs_lut %emotions_lut %monsters %items %monsters_lut %monsters_name_lut %items_lut @lastpm %lastpm);
 use Settings qw(%sys);
 use I18N qw(bytesToString UTF8ToString isUTF8);
 use Log qw(warning message debug);
@@ -601,6 +601,9 @@ sub _sendQueuedResponse {
             message => $response,
         );
     } elsif (!$emotion_command) {
+        undef %lastpm;
+        @lastpm{qw(msg user)} = ($response, $sender);
+        push @lastpm, {%lastpm};
         $messageSender->sendPrivateMsg($sender, $response);
         _recordOutgoingPacketSent();
         AIChat::Log::log_message(
@@ -830,7 +833,14 @@ sub onPrivateMessage {
     _ensureVisibilityInfo($sender, $visibility_state);
     _ensurePlayerInfo($sender, $actor) if $visibility_state eq 'visible';
 
-    my $intent_context = { map_name => $field ? $field->baseName : undef, lock_map => $config{lockMap} };
+    my $sender_key = _normalizeSenderKey($sender);
+    my @recent_emotes = $sender_key ? _getRecentEmotionsForSender($sender_key, time()) : ();
+    my $intent_context = {
+        map_name => $field ? $field->baseName : undef,
+        lock_map => $config{lockMap},
+        recent_emotes => \@recent_emotes,
+        recent_emote_count => scalar @recent_emotes,
+    };
     my $intent;
     $intent = _interpretCommand($message, $sender, $intent_context);
     if (_shouldForceDropDbIntent($sender, $intent, $message)) {
@@ -866,6 +876,14 @@ sub onPrivateMessage {
     if (_shouldRefuseEmoteRequest($sender, $intent, $intent_context)) {
         _injectEmoteSpamRefusalHint($sender);
     } elsif (_queueEmotionRequestIfNeeded($sender, $message, 'private', $intent, $intent_context)) {
+        AIChat::Log::log_message(
+            direction => 'in',
+            visibility => 'private',
+            sender => $sender,
+            message => $message,
+        );
+        return;
+    } elsif (_queueClassDbResponseIfNeeded($sender, $message, 'private', $intent)) {
         AIChat::Log::log_message(
             direction => 'in',
             visibility => 'private',
@@ -919,7 +937,14 @@ sub onPublicMessage {
     _ensureVisibilityInfo($sender, $visibility_state);
     _ensurePlayerInfo($sender, $actor) if $visibility_state eq 'visible';
 
-    my $intent_context = { map_name => $field ? $field->baseName : undef, lock_map => $config{lockMap} };
+    my $sender_key = _normalizeSenderKey($sender);
+    my @recent_emotes = $sender_key ? _getRecentEmotionsForSender($sender_key, time()) : ();
+    my $intent_context = {
+        map_name => $field ? $field->baseName : undef,
+        lock_map => $config{lockMap},
+        recent_emotes => \@recent_emotes,
+        recent_emote_count => scalar @recent_emotes,
+    };
     my $intent;
     $intent = _interpretCommand($message, $sender, $intent_context);
     if (_shouldForceDropDbIntent($sender, $intent, $message)) {
@@ -955,6 +980,14 @@ sub onPublicMessage {
     if (_shouldRefuseEmoteRequest($sender, $intent, $intent_context)) {
         _injectEmoteSpamRefusalHint($sender);
     } elsif (_queueEmotionRequestIfNeeded($sender, $message, 'public', $intent, $intent_context)) {
+        AIChat::Log::log_message(
+            direction => 'in',
+            visibility => 'public',
+            sender => $sender,
+            message => $message,
+        );
+        return;
+    } elsif (_queueClassDbResponseIfNeeded($sender, $message, 'public', $intent)) {
         AIChat::Log::log_message(
             direction => 'in',
             visibility => 'public',
@@ -1167,6 +1200,20 @@ sub _queueDropDbResponseIfNeeded {
     } else {
         _queueDirectResponse($sender, $response, { type => $context });
     }
+    return 1;
+}
+
+sub _queueClassDbResponseIfNeeded {
+    my ($sender, $message, $context, $intent) = @_;
+    return unless defined $sender && defined $message;
+    return unless $intent && ref $intent eq 'HASH';
+    return unless ($intent->{action} // '') eq 'class_db';
+
+    my $response = AIChat::MessageHandler::generateClassDbResponse($message, $sender, $intent);
+    return unless defined $response && $response ne '';
+
+    AIChat::ConversationHistory::addMessage($sender, "user", $message, "intent");
+    _queueDirectResponse($sender, $response, { type => $context });
     return 1;
 }
 
