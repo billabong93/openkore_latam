@@ -883,6 +883,14 @@ sub onPrivateMessage {
             message => $message,
         );
         return;
+    } elsif (_queueClassDbResponseIfNeeded($sender, $message, 'private', $intent)) {
+        AIChat::Log::log_message(
+            direction => 'in',
+            visibility => 'private',
+            sender => $sender,
+            message => $message,
+        );
+        return;
     } elsif (_queueDropDbResponseIfNeeded($sender, $message, 'private', $intent, $force_drop_refusal)) {
         AIChat::Log::log_message(
             direction => 'in',
@@ -972,6 +980,14 @@ sub onPublicMessage {
     if (_shouldRefuseEmoteRequest($sender, $intent, $intent_context)) {
         _injectEmoteSpamRefusalHint($sender);
     } elsif (_queueEmotionRequestIfNeeded($sender, $message, 'public', $intent, $intent_context)) {
+        AIChat::Log::log_message(
+            direction => 'in',
+            visibility => 'public',
+            sender => $sender,
+            message => $message,
+        );
+        return;
+    } elsif (_queueClassDbResponseIfNeeded($sender, $message, 'public', $intent)) {
         AIChat::Log::log_message(
             direction => 'in',
             visibility => 'public',
@@ -1184,6 +1200,20 @@ sub _queueDropDbResponseIfNeeded {
     } else {
         _queueDirectResponse($sender, $response, { type => $context });
     }
+    return 1;
+}
+
+sub _queueClassDbResponseIfNeeded {
+    my ($sender, $message, $context, $intent) = @_;
+    return unless defined $sender && defined $message;
+    return unless $intent && ref $intent eq 'HASH';
+    return unless ($intent->{action} // '') eq 'class_db';
+
+    my $response = AIChat::MessageHandler::generateClassDbResponse($message, $sender, $intent);
+    return unless defined $response && $response ne '';
+
+    AIChat::ConversationHistory::addMessage($sender, "user", $message, "intent");
+    _queueDirectResponse($sender, $response, { type => $context });
     return 1;
 }
 
